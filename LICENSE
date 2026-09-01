@@ -1,0 +1,72 @@
+DiceCore — License
+Copyright (c) 2026 Philipp Weber.
+
+This work is licensed under the Creative Commons
+Attribution-NonCommercial-NoDerivatives 4.0 International License
+(CC BY-NC-ND 4.0), together with one Additional Restriction imposed
+separately by the licensor (see below).
+
+  Human-readable summary : https://creativecommons.org/licenses/by-nc-nd/4.0/
+  Full legal text        : https://creativecommons.org/licenses/by-nc-nd/4.0/legalcode
+
+================================================================================
+Kurzfassung (unverbindlich — es gilt der volle Lizenztext oben)
+================================================================================
+Du darfst DiceCore kostenlos herunterladen, benutzen und unveränderte Kopien mit
+Quellenangabe weitergeben. Du darfst es NICHT verändern oder veränderte Fassungen
+verbreiten (NoDerivatives), NICHT kommerziell nutzen (NonCommercial) und — durch
+den Zusatz unten — NICHT für militärische oder kriegerische Zwecke einsetzen.
+Das normale Benutzen und Konfigurieren über die vorgesehenen Einstellungen gilt
+nicht als „Veränderung“. Ein eigenes Programm, das die HTTP-API von DiceCore
+benutzt, ist keine veränderte Fassung von DiceCore.
+
+Under CC BY-NC-ND 4.0 you are free to share (copy and redistribute) the material
+in any medium or format, under these terms:
+  • Attribution   — give appropriate credit and indicate the license.
+  • NonCommercial — you may not use the material for commercial purposes.
+  • NoDerivatives — if you remix, transform, or build upon the material, you may
+                    not distribute the modified material.
+
+================================================================================
+Additional Restriction (No Military Use)
+================================================================================
+Notwithstanding anything in the license above, the material may NOT be used, in
+whole or in part, for any military, defense, warfare, weapons, or armed-conflict
+purpose. This includes the design, development, testing, production, operation,
+guidance, or deployment of weapons or military systems, and any use by or on
+behalf of armed forces, intelligence services, or paramilitary organizations.
+
+This is an additional restriction imposed separately by the licensor. Because of
+it, the work as a whole is offered as "CC BY-NC-ND 4.0 with an additional
+restriction" and must not be described as being under an unmodified Creative
+Commons license.
+
+================================================================================
+Notes
+================================================================================
+• Permitted use: running the software and configuring it through its intended
+  settings, configuration files, environment variables, and user interfaces is
+  normal use, not a "modification" or "derivative" under this license.
+• Talking to it is not modifying it: writing your own program, bot or game that
+  calls the DiceCore HTTP API creates a separate work, not a derivative of
+  DiceCore, and this license places no conditions on that program.
+• Your data is yours: images you capture, datasets you collect and models you
+  train with DiceCore belong to you and are not covered by this license.
+• Commercial licensing, or permission to create and distribute modified versions,
+  requires the prior separate written permission of the copyright holder.
+• Third-party components: DiceCore builds on third-party software (for example
+  OpenCV, numpy, FastAPI, uvicorn, onnxruntime and PyTorch) licensed under their
+  own separate terms. This license applies only to the original DiceCore material
+  created by the copyright holder and does not modify or supersede those
+  third-party licenses.
+• No warranty: THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND.
+  DiceCore reports what it believes it sees, and it will sometimes be wrong. Do
+  not use it where a wrong number matters — for money, for wagers, or as a
+  referee no one can overrule. To the maximum extent permitted by law, the
+  copyright holder is not liable for any claim, damages, or other liability
+  arising from the software or its use.
+• Cameras and privacy: DiceCore runs entirely on your own network and sends
+  nothing anywhere. A camera pointed at a table still films the room around it,
+  and recording people may require their consent where you live. It is YOUR
+  responsibility to check and comply with the applicable law before pointing a
+  camera at anything.

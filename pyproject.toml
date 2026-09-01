@@ -1,0 +1,58 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "dicecore"
+version = "0.1.0"
+description = "Reads real dice with a camera: pips, polyhedral numerals, totals — as an API."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { file = "LICENSE" }
+authors = [{ name = "Philipp Weber" }]
+keywords = ["dice", "raspberry-pi", "camera", "computer-vision", "dice-tower"]
+
+# Deliberately empty. The base package (config, capture-to-file, pushing frames to
+# another node) must install on a Pi Zero v1, where ARMv6 wheels for numpy and OpenCV
+# range from painful to nonexistent. Everything heavier is an extra.
+dependencies = []
+
+[project.optional-dependencies]
+# The classic engine and any local image handling.
+vision = ["numpy>=1.24", "opencv-python-headless>=4.8"]
+# API + web UI.
+server = ["fastapi>=0.110", "uvicorn[standard]>=0.27", "python-multipart>=0.0.9"]
+# Running a trained model on this machine (Pi 4/5, or a PC — not ARMv6).
+model = ["onnxruntime>=1.17"]
+# Training a model. PyTorch, so: a PC, not a Pi.
+train = ["torch>=2.2", "torchvision>=0.17", "onnx>=1.15"]
+dev = ["pytest>=8.0", "ruff>=0.4"]
+
+[project.scripts]
+dicecore = "dicecore.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/TechnikWeber/DiceCore"
+Source = "https://github.com/TechnikWeber/DiceCore"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/dicecore"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+
+[tool.ruff]
+line-length = 100
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+
+[tool.ruff.lint.per-file-ignores]
+# B008: `= File(...)` in the signature is how FastAPI declares an upload, not a mutable
+# default. B027: `close()` is deliberately an optional hook — a folder source has nothing
+# to release, and forcing every implementation to write an empty method helps no one.
+"src/dicecore/server/app.py" = ["B008"]
+"src/dicecore/capture/base.py" = ["B027"]
+"src/dicecore/engine/base.py" = ["B027"]

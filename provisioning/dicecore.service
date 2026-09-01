@@ -1,0 +1,32 @@
+[Unit]
+Description=DiceCore — reads real dice with a camera
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=dicecore
+Group=video
+# The camera lives behind /dev/video* and /dev/dma_heap, hence the video group.
+WorkingDirectory=/opt/dicecore
+Environment=DICECORE_STATE=/var/lib/dicecore
+ExecStart=/opt/dicecore/.venv/bin/dicecore serve
+Restart=always
+RestartSec=3
+
+# A headless box must stay reachable to be fixed, so the service is deliberately allowed to
+# come up even when the camera does not: DiceCore reports capture failures through its own
+# UI rather than exiting.
+StandardOutput=journal
+StandardError=journal
+
+# Writing /boot/firmware/config.txt (the CSI module panel) needs root. It is not granted
+# here on purpose — apply a module change with `sudo dicecore camera-module <id>` instead,
+# so the one file that decides whether the Pi boots is never written by a web request.
+NoNewPrivileges=yes
+ProtectSystem=full
+ProtectHome=yes
+PrivateTmp=yes
+
+[Install]
+WantedBy=multi-user.target

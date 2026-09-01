@@ -1,0 +1,159 @@
+"""
+The vocabulary every part of DiceCore speaks.
+
+Pure data, no dependencies — the API serialises these, the engines produce them, the
+dataset stores them and the tests assert on them. Nothing here may import numpy, OpenCV
+or anything else that will not install on an ARMv6 Pi Zero.
+"""
+
+from __future__ import annotations
+
+import time
+from dataclasses import asdict, dataclass, field
+from typing import Any
+
+# --- Dice kinds -------------------------------------------------------------------
+
+#: Faces per kind. `d10` is the 0–9 die, `d100` the tens die (00, 10, … 90).
+DIE_FACES: dict[str, int] = {
+    "d4": 4,
+    "d6": 6,
+    "d8": 8,
+    "d10": 10,
+    "d100": 10,
+    "d12": 12,
+    "d20": 20,
+}
+
+#: How a kind is read. Pipped dice are counted, numeral dice are recognised. A d6 can be
+#: either — pips are the common case, but numeral d6 exist and are read like a d8.
+READING = {
+    "d4": "numeral",
+    "d6": "pips",
+    "d8": "numeral",
+    "d10": "numeral",
+    "d100": "numeral",
+    "d12": "numeral",
+    "d20": "numeral",
+}
+
+DIE_KINDS = tuple(DIE_FACES)
+
+
+def values_for(kind: str) -> list[int]:
+    """The values a kind can show. Needed by the label UI and by the classifier head."""
+    if kind == "d100":
+        return [0, 10, 20, 30, 40, 50, 60, 70, 80, 90]
+    if kind == "d10":
+        return list(range(0, 10))
+    return list(range(1, DIE_FACES[kind] + 1))
+
+
+def is_valid(kind: str, value: int) -> bool:
+    return kind in DIE_FACES and value in values_for(kind)
+
+
+# --- Results ----------------------------------------------------------------------
+
+
+@dataclass
+class Box:
+    """Axis-aligned pixel box in the captured frame. Ints, so it survives JSON intact."""
+
+    x: int
+    y: int
+    w: int
+    h: int
+
+    @property
+    def center(self) -> tuple[int, int]:
+        return self.x + self.w // 2, self.y + self.h // 2
+
+    @property
+    def area(self) -> int:
+        return self.w * self.h
+
+
+@dataclass
+class Die:
+    """One die as read from one frame."""
+
+    kind: str
+    value: int
+    box: Box
+    #: 0..1. The classic engine derives it from how cleanly the pips separated; the model
+    #: engine reports the softmax. Consumers use it to decide whether to ask for a reroll.
+    confidence: float = 1.0
+    #: Set when the engine is unsure but has a runner-up worth showing in the label UI.
+    alternatives: list[int] = field(default_factory=list)
+
+    @property
+    def label(self) -> str:
+        """`d20:14` — the short form used in logs and in the notation string."""
+        return f"{self.kind}:{self.value}"
+
+
+@dataclass
+class RollResult:
+    """What one settled roll amounts to. This is the payload of the whole project."""
+
+    dice: list[Die] = field(default_factory=list)
+    #: Which engine produced it (`classic`, `model`, `remote:<host>`) — kept because a
+    #: number without its provenance is unfixable when it turns out to be wrong.
+    engine: str = "unknown"
+    at: float = field(default_factory=time.time)
+    #: Milliseconds spent in the engine, capture excluded.
+    took_ms: float = 0.0
+    #: Non-fatal complaints: "two dice overlap", "frame is dark", "no tray configured".
+    warnings: list[str] = field(default_factory=list)
+    #: Where the frame was stored, if it was.
+    frame_id: str | None = None
+
+    @property
+    def total(self) -> int:
+        return sum(d.value for d in self.dice)
+
+    @property
+    def count(self) -> int:
+        return len(self.dice)
+
+    @property
+    def notation(self) -> str:
+        """`2d20+1d6 → 14, 3, 5` — the human/text form for chat bots and logs."""
+        if not self.dice:
+            return "no dice"
+        order = [k for k in sorted(DIE_KINDS, key=lambda k: DIE_FACES[k])
+                 if any(d.kind == k for d in self.dice)]
+        groups = "+".join(f"{sum(1 for d in self.dice if d.kind == k)}{k}" for k in order)
+        # Values follow the same grouping as the summary, or "2d6+1d20 → 3, 4, 14" would
+        # list them in an order that does not match the groups it just announced. A die the
+        # engine located but could not read is a "?", never a 0 — printing 0 for "I don't
+        # know" is the kind of number a consumer would happily add up.
+        rolled = ", ".join("?" if d.value == 0 else str(d.value)
+                           for k in order for d in self.dice if d.kind == k)
+        return f"{groups} → {rolled}"
+
+    def to_json(self) -> dict[str, Any]:
+        out = asdict(self)
+        out["total"] = self.total
+        out["count"] = self.count
+        out["notation"] = self.notation
+        return out
+
+
+@dataclass
+class Frame:
+    """
+    A captured image plus what we know about the capture.
+
+    `image` is a numpy array when a vision stack is installed, and `None` in the agent
+    shape where the Pi only forwards `jpeg` without ever decoding it. Code that needs
+    pixels must say so and fail with a clear message, not silently assume numpy is there.
+    """
+
+    image: Any = None
+    jpeg: bytes | None = None
+    at: float = field(default_factory=time.time)
+    source: str = "unknown"
+    #: Width, height in pixels — filled in even when only `jpeg` is present.
+    size: tuple[int, int] | None = None

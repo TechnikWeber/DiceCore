@@ -1,0 +1,233 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>DiceCore</title>
+  <link rel="stylesheet" href="/style.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%232f6df6'/><circle cx='10' cy='10' r='3' fill='white'/><circle cx='22' cy='22' r='3' fill='white'/><circle cx='16' cy='16' r='3' fill='white'/></svg>">
+</head>
+<body>
+<header>
+  <h1>DiceCore</h1>
+  <span class="sub" id="subtitle">reads real dice with a camera</span>
+</header>
+
+<nav>
+  <a href="#roll">Roll</a>
+  <a href="#camera">Camera</a>
+  <a href="#detection">Detection</a>
+  <a href="#training">Training</a>
+  <a href="#api">API</a>
+  <a href="#system">System</a>
+</nav>
+
+<main>
+  <div id="alerts"></div>
+
+  <!-- ---------------------------------------------------------------- Roll -->
+  <section id="roll">
+    <div class="card">
+      <div class="spread">
+        <div>
+          <div class="total" id="total">—</div>
+          <div class="notation" id="notation">nothing read yet</div>
+        </div>
+        <div class="row">
+          <button class="primary" id="btn-roll">Read the dice</button>
+          <label class="row" style="margin:0;gap:6px">
+            <input type="checkbox" id="live"> live
+          </label>
+        </div>
+      </div>
+      <div class="chips" id="dice-chips"></div>
+      <div id="roll-messages" style="margin-top:12px"></div>
+    </div>
+
+    <div class="card">
+      <h2>What the camera saw</h2>
+      <p class="hint">The boxes are what the engine found. A red box is a die it located but
+        could not read — those are exactly the ones worth labelling under Training.</p>
+      <div class="frame" id="roll-frame"><img id="roll-image" alt="last frame"></div>
+    </div>
+  </section>
+
+  <!-- -------------------------------------------------------------- Camera -->
+  <section id="camera">
+    <div class="card">
+      <h2>Source</h2>
+      <p class="hint">Start on <em>Folder</em> — it plays back images from a directory, so
+        everything here works before any hardware arrives.</p>
+      <div class="grid">
+        <div><label>Capture source</label><select id="cap-source"></select></div>
+        <div><label>Folder (simulator)</label><input id="cap-folder" placeholder="/var/lib/dicecore/frames"></div>
+        <div><label>/dev/video index</label><input id="cap-device" type="number" min="0"></div>
+        <div><label>Width</label><input id="cap-width" type="number"></div>
+        <div><label>Height</label><input id="cap-height" type="number"></div>
+        <div><label>Rotation</label><select id="cap-rotation"><option>0</option><option>90</option><option>180</option><option>270</option></select></div>
+      </div>
+      <div class="row" style="margin-top:12px">
+        <button class="primary" data-save>Save</button>
+        <button id="btn-preview">Refresh preview</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>CSI camera module</h2>
+      <p class="hint">A Pi only binds a sensor the firmware knows. The official modules are
+        auto-detected; Arducam's are not — they need <code>camera_auto_detect=0</code> plus an
+        explicit <code>dtoverlay=</code> and a reboot. Picking it here writes that for you.</p>
+      <div class="grid">
+        <div><label>Module</label><select id="csi-module"></select></div>
+        <div id="csi-custom-wrap" hidden><label>Overlay name</label><input id="csi-custom" placeholder="imx519"></div>
+        <div><label>Tuning file</label><input id="cap-tuning" placeholder="(module default)"></div>
+        <div><label>Focus mode</label><select id="cap-focus"><option>manual</option><option>auto</option><option>continuous</option></select></div>
+        <div><label>Lens position (dioptre)</label><input id="cap-dioptre" type="number" step="0.1"></div>
+      </div>
+      <p class="hint" id="csi-note"></p>
+      <div class="row"><button id="btn-module">Apply module and require reboot</button></div>
+    </div>
+
+    <div class="card">
+      <h2>Preview</h2>
+      <div class="frame"><img id="preview-image" alt="camera preview"></div>
+    </div>
+
+    <div class="card">
+      <h2>What the system sees</h2>
+      <div id="hardware"></div>
+      <button id="btn-hardware">Detect cameras</button>
+    </div>
+  </section>
+
+  <!-- ----------------------------------------------------------- Detection -->
+  <section id="detection">
+    <div class="card">
+      <h2>Engine</h2>
+      <p class="hint"><em>Classic</em> counts pips and needs no training. <em>Model</em> reads
+        numerals too, once you have taught it your dice. <em>Remote</em> lets another machine
+        do the reading — that is how a Pi Zero keeps up.</p>
+      <div class="grid">
+        <div><label>Mode</label><select id="eng-mode"></select></div>
+        <div><label>Model directory</label><input id="eng-model" placeholder="(newest)"></div>
+        <div><label>Remote URL</label><input id="eng-remote" placeholder="http://desk.local:8099"></div>
+        <div><label>Minimum confidence</label><input id="eng-conf" type="number" step="0.05" min="0" max="1"></div>
+      </div>
+      <label style="margin-top:12px">Dice that may appear</label>
+      <div class="row" id="kind-checks"></div>
+      <div class="row" style="margin-top:12px"><button class="primary" data-save>Save</button></div>
+    </div>
+
+    <div class="card">
+      <h2>Tray</h2>
+      <p class="hint">Everything outside the tray is ignored — the cheapest accuracy win
+        there is. Values are fractions of the frame, so they survive a resolution change.</p>
+      <div class="grid">
+        <div><label>x</label><input id="tray-x" type="number" step="0.01" min="0" max="1"></div>
+        <div><label>y</label><input id="tray-y" type="number" step="0.01" min="0" max="1"></div>
+        <div><label>width</label><input id="tray-w" type="number" step="0.01" min="0" max="1"></div>
+        <div><label>height</label><input id="tray-h" type="number" step="0.01" min="0" max="1"></div>
+        <div><label>mm per pixel (optional)</label><input id="tray-mm" type="number" step="0.001"></div>
+      </div>
+      <div class="row" style="margin-top:12px"><button class="primary" data-save>Save</button></div>
+    </div>
+
+    <div class="card">
+      <h2>Classic engine</h2>
+      <div class="grid">
+        <div><label>Dice are lighter than the tray</label><input id="cl-light" type="checkbox"></div>
+        <div><label>Smallest die (fraction of tray area)</label><input id="cl-min" type="number" step="0.0001"></div>
+        <div><label>Largest die (fraction of tray area)</label><input id="cl-max" type="number" step="0.001"></div>
+        <div><label>Blur (px, odd)</label><input id="cl-blur" type="number"></div>
+      </div>
+      <div class="row" style="margin-top:12px"><button class="primary" data-save>Save</button></div>
+    </div>
+
+    <div class="card">
+      <h2>Settling</h2>
+      <p class="hint">A frame grabbed mid-tumble is worthless. The engine waits until the
+        picture stops changing before it reads.</p>
+      <div class="grid">
+        <div><label>Wait for the dice to settle</label><input id="st-enabled" type="checkbox"></div>
+        <div><label>Motion threshold</label><input id="st-motion" type="number" step="0.1"></div>
+        <div><label>Still frames required</label><input id="st-frames" type="number"></div>
+        <div><label>Give up after (s)</label><input id="st-timeout" type="number" step="0.5"></div>
+      </div>
+      <div class="row" style="margin-top:12px"><button class="primary" data-save>Save</button></div>
+    </div>
+  </section>
+
+  <!-- ------------------------------------------------------------ Training -->
+  <section id="training">
+    <div class="card">
+      <h2>Teach it your dice</h2>
+      <p class="hint">Roll, glance, correct. Every confirmed roll is a training sample —
+        there is no separate labelling tool and no command line. Aim for a hundred rolls to
+        start with, and watch the thin faces below.</p>
+      <div class="row">
+        <select id="set-select" style="max-width:280px"></select>
+        <button id="btn-new-set">New set</button>
+        <button class="primary" id="btn-capture">Roll and store</button>
+        <label class="row" style="margin:0;gap:6px"><input type="checkbox" id="auto-capture"> keep rolling</label>
+      </div>
+      <div id="set-stats" style="margin-top:12px"></div>
+    </div>
+
+    <div class="card">
+      <h2>Confirm what landed</h2>
+      <p class="hint">Unconfirmed rolls come first. Change what is wrong, then confirm — a
+        die the engine could not read shows as <code>?</code>.</p>
+      <div class="samples" id="samples"></div>
+    </div>
+
+    <div class="card">
+      <h2>Train</h2>
+      <div id="train-availability"></div>
+      <div class="row">
+        <div style="max-width:140px"><label>Epochs</label><input id="train-epochs" type="number" value="30"></div>
+        <button class="primary" id="btn-train">Start training</button>
+        <button id="btn-train-stop">Stop</button>
+      </div>
+      <div id="train-progress" style="margin-top:12px"></div>
+    </div>
+
+    <div class="card">
+      <h2>Models</h2>
+      <div id="models"></div>
+    </div>
+  </section>
+
+  <!-- ----------------------------------------------------------------- API -->
+  <section id="api">
+    <div class="card">
+      <h2>The contract</h2>
+      <p class="hint">This is what other projects embed. It is versioned and only ever grows
+        — a game or a bot written against it today keeps working.</p>
+      <pre id="api-examples"></pre>
+    </div>
+    <div class="card">
+      <h2>Live result</h2>
+      <p class="hint">The websocket pushes a result as soon as the dice settle. This is the
+        same stream a Discord bot would consume.</p>
+      <div class="row"><button id="btn-ws">Connect</button><span class="muted" id="ws-state">not connected</span></div>
+      <pre id="ws-log">—</pre>
+    </div>
+  </section>
+
+  <!-- -------------------------------------------------------------- System -->
+  <section id="system">
+    <div class="card">
+      <h2>This machine</h2>
+      <div id="capabilities"></div>
+    </div>
+    <div class="card">
+      <h2>Settings file</h2>
+      <p class="hint" id="config-path"></p>
+      <pre id="settings-dump"></pre>
+    </div>
+  </section>
+</main>
+
+<script src="/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,33 @@
+from dicecore.dice import Box, Die, RollResult, is_valid, values_for
+
+
+def box() -> Box:
+    return Box(0, 0, 10, 10)
+
+
+def test_d10_counts_from_zero_and_d100_in_tens():
+    assert values_for("d10")[0] == 0
+    assert values_for("d100") == [0, 10, 20, 30, 40, 50, 60, 70, 80, 90]
+    assert values_for("d20")[-1] == 20
+
+
+def test_validity_follows_the_kind():
+    assert is_valid("d20", 20) and not is_valid("d6", 20)
+    assert not is_valid("d13", 1)
+
+
+def test_notation_groups_by_kind_and_lists_values_in_the_same_order():
+    result = RollResult(dice=[Die("d20", 14, box()), Die("d6", 4, box()), Die("d20", 3, box())])
+    assert result.notation == "1d6+2d20 → 4, 14, 3"
+    assert result.total == 21
+
+
+def test_an_unread_die_is_a_question_mark_never_a_zero():
+    # A consumer would happily add a 0 into a total; a "?" makes it look before it leaps.
+    result = RollResult(dice=[Die("d20", 0, box()), Die("d6", 4, box())])
+    assert result.notation.split("→")[1].strip() == "4, ?"
+
+
+def test_empty_result_says_so():
+    assert RollResult().notation == "no dice"
+    assert RollResult().total == 0

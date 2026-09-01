@@ -1,0 +1,162 @@
+# DiceCore — Concept
+
+The reference for *what this is meant to be*. Read this before adding features; if a
+change contradicts something here, change this document in the same commit.
+
+## Goal
+
+A camera looks down on the landing area of a dice tower (or any tray, or a bare table).
+DiceCore turns what lands there into **structured data**: how many dice, of which kind,
+showing which value, and what they add up to. That data is available as a number on a
+screen, as an HTTP/JSON API, as a websocket event stream, and — later — straight into a
+Discord bot or a game.
+
+DiceCore is the **engine other projects embed**, not an application. Everything a
+consumer needs is one HTTP call or one Python import away, and the vision internals stay
+replaceable.
+
+Three properties decide every design question here:
+
+1. **Sim-first.** The whole system runs on a laptop with a folder of JPEGs and no camera
+   at all. Hardware paths are only verifiable on the Pi, so everything else must be
+   verifiable without one.
+2. **The Pi may be weak.** A Pi Zero (v1) is ARMv6 — no PyTorch, no onnxruntime, no
+   modern OpenCV wheels. So capture and recognition must be **separable**: the Pi grabs
+   frames, something else may do the thinking. See *Deployment shapes*.
+3. **The user decides how smart it gets.** Classic image processing and a trained model
+   are two interchangeable engines behind one interface, chosen in the UI — not a
+   migration from one to the other.
+
+## What makes this hard
+
+Counting pips on a d6 lying on a clean tray is a solved exercise. The real problems are:
+
+- **Polyhedral dice show more than one number.** On a d20 the camera sees the top face
+  *and* the surrounding faces at an angle. Reading "the biggest, most centred, most
+  head-on numeral" is the actual task — not OCR of everything visible.
+- **Numerals are ambiguous.** 6 vs 9 needs the underline convention (or the die's
+  orientation); 1 vs 7 varies by manufacturer.
+- **Dice differ wildly.** Colour, translucency, metallic, swirled, inked vs raw. A model
+  trained on one set generalises badly to another — which is exactly why the training
+  workflow has to be so easy that retraining for a new set of dice is a five-minute job,
+  not a project.
+- **The tower moves and the light changes.** Fixed geometry cannot be assumed forever;
+  the tray region and the scale (mm per pixel) are configuration, not constants.
+- **Knowing when the roll is over.** A frame grabbed mid-tumble is worthless. Settling
+  detection (frame differencing until motion stops, then N stable frames) is part of the
+  pipeline, not an afterthought.
+
+## Architecture
+
+```
+        ┌──────────────┐   frames    ┌──────────────┐   RollResult   ┌────────────┐
+        │   Capture    │ ──────────► │    Engine    │ ─────────────► │  Outputs   │
+        │              │             │              │                │            │
+        │ picamera2    │             │ classic      │                │ HTTP/JSON  │
+        │ rpicam-still │             │ model (onnx) │                │ WebSocket  │
+        │ v4l2/OpenCV  │             │ remote       │                │ Web UI     │
+        │ folder (sim) │             │              │                │ Discord…   │
+        └──────────────┘             └──────────────┘                └────────────┘
+                │                            ▲
+                │        ┌──────────────┐    │
+                └──────► │   Dataset    │────┘  labelled frames → training → model
+                         └──────────────┘
+```
+
+Every arrow is a plain Python interface with a simulated implementation, and every box is
+swappable through configuration alone.
+
+### Capture
+
+`FrameSource.grab() -> Frame`. Implementations: `picamera2` (Pi, CSI), `rpicam` (shells out
+to `rpicam-still`, the fallback for Pis where picamera2 is a pain), `v4l2` (USB cameras via
+OpenCV), `folder` (a directory of images — the simulator), `push` (frames arriving through
+the API from another DiceCore node).
+
+**CSI camera modules are configuration, not luck.** A Pi only binds a sensor the firmware
+knows: the four official modules are found by `camera_auto_detect=1`, everything else —
+Arducam IMX519 16MP, 64MP Hawkeye, OV64A40 Owlsight, Pivariety — needs
+`camera_auto_detect=0` plus an explicit `dtoverlay=` in `/boot/firmware/config.txt` and a
+reboot. Picking that module belongs in the web UI, never in an SSH session. The logic is
+ported from YonderRC (`packages/vehicle/src/system/bootConfig.ts`), including the hard-won
+detail that Raspberry Pi's own `imx519.json` tuning file has no autofocus algorithm, so the
+IMX519 needs the shipped `imx519-af.json` or its lens simply never moves.
+
+### Engine
+
+`Engine.read(frame) -> RollResult`. Three implementations:
+
+- **`classic`** — no training, no dependencies beyond OpenCV. Segments dice against the
+  tray, counts pips per die by blob detection. Honest scope: pipped dice (d6, and pipped
+  d10 faces), good light, contrasting tray. This is what makes the project useful on day
+  one and it stays useful as the fallback when no model is loaded.
+- **`model`** — a trained network. Two stages, deliberately: **(a)** find the dice
+  (segmentation or a small detector), **(b)** classify each cropped die into
+  `(die_type, value)`. Two stages instead of one end-to-end detector because crops are
+  cheap to label, the classifier is small enough for a Pi 4/5, and adding a new set of
+  dice means retraining only stage (b).
+- **`remote`** — forwards the frame to another DiceCore instance's `/api/v1/detect` and
+  returns its answer. This is what makes an ARMv6 Zero useful: the Pi captures, a PC or a
+  Pi 5 reads. The API is identical either way, so a consumer never knows the difference.
+
+### Deployment shapes
+
+| Shape | Capture | Engine | For |
+|---|---|---|---|
+| **All-in-one** | Pi 4 / Pi 5 | `classic` or `model` locally | The normal case |
+| **Split** | Pi Zero / Pi 3 | `remote` → PC or Pi 5 | Weak Pi, or a big model |
+| **Agent only** | Pi Zero | none — pushes frames | Absolute minimum on the Pi |
+| **Desk** | `folder` (sim) | any | Development, training, tests |
+
+### Dataset and training
+
+The training data comes from the thing itself: **you roll, DiceCore guesses, you confirm
+or correct.** Every confirmed roll is a labelled sample. That loop lives entirely in the
+web UI — no command line, no manual labelling tool, no folder juggling:
+
+1. Pick or create a **set** ("my black d20s", "the translucent café set").
+2. Roll. The frame is captured, dice are located, each one gets a guess.
+3. Tap a wrong value, type the right one. Confirm.
+4. At any point: **Train**. Progress, loss and accuracy stream into the page; the result is
+   an ONNX file that the `model` engine picks up.
+
+Storage is deliberately boring: one directory per session, the original frames as JPEG
+next to one JSON per frame holding the dice boxes, types and values, plus the camera and
+lighting metadata. Copyable, inspectable, and readable by any other tool.
+
+Training itself needs PyTorch, so it runs where PyTorch runs — the PC. A Pi that cannot
+train can still *collect* (dataset stays on the Pi, or is pushed to the trainer) and can
+still *run* the exported model if it is a Pi 4/5. The UI states plainly which of those
+this machine can do rather than failing halfway through.
+
+## Outputs and modes
+
+The same `RollResult` is served through every output; a mode only chooses what is
+emphasised, never a different pipeline.
+
+- **Display** — the number, big, in the browser. Total, or per die.
+- **API** — `GET /api/v1/roll` (read now), `GET /api/v1/state` (last result), websocket
+  `/api/v1/events` (a result pushed as soon as the dice settle).
+- **Notation** — a D&D-style summary for consumers that want text: `2d20+1d6 → 14, 3, 5`.
+- **Consumers** — a Discord bot, a game, a scoreboard. They live in their own repos and
+  depend on this API, not on this code. That direction is the whole point.
+
+## Non-goals
+
+- Not a dice *roller* — no RNG, no rules engine, no character sheets. DiceCore reads
+  physical dice, full stop.
+- Not a general OCR project.
+- Not a cloud service. It runs on your network; nothing leaves it.
+- Not a fairness/casino-grade auditing tool. Detecting loaded dice is a statistics problem
+  that a consumer can solve on top of this data.
+
+## Roadmap
+
+1. **Skeleton** — config, capture (sim + Pi), classic d6 engine, API, web UI, camera module
+   selection. *You can roll and see a number.*
+2. **Dataset + training loop** — set management, confirm/correct labelling, training job
+   with live progress, ONNX export, `model` engine. *You can teach it your dice.*
+3. **Polyhedral quality** — top-face selection, 6/9 disambiguation, mixed-dice rolls,
+   settling detection tuned on real footage.
+4. **Consumers** — reference Discord bot and a minimal game integration, each in its own
+   repo, to prove the API is actually embeddable.

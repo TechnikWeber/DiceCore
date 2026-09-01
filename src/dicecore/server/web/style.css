@@ -1,0 +1,122 @@
+/* One stylesheet, no framework, no build step. Light and dark from the same tokens. */
+:root {
+  color-scheme: light dark;
+  --bg: #f4f5f7;
+  --panel: #ffffff;
+  --panel-2: #f8f9fb;
+  --line: #dfe3ea;
+  --ink: #14181f;
+  --ink-soft: #5c6673;
+  --accent: #2f6df6;
+  --accent-ink: #ffffff;
+  --good: #1f8a51;
+  --warn: #a86a00;
+  --bad: #c23c2f;
+  --radius: 10px;
+  --shadow: 0 1px 2px rgba(16, 24, 40, .06), 0 4px 12px rgba(16, 24, 40, .05);
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #14171c;
+    --panel: #1c2027;
+    --panel-2: #232830;
+    --line: #2f353f;
+    --ink: #e8ecf2;
+    --ink-soft: #9aa5b4;
+    --accent: #5b8dff;
+    --accent-ink: #0d1117;
+    --good: #4ec98a;
+    --warn: #e0a94a;
+    --bad: #f0806f;
+    --shadow: none;
+  }
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font: 15px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+header {
+  display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap;
+  padding: 18px 20px 0;
+}
+header h1 { font-size: 20px; margin: 0; letter-spacing: -.01em; }
+header .sub { color: var(--ink-soft); font-size: 13px; }
+nav { display: flex; gap: 4px; flex-wrap: wrap; padding: 12px 20px 0; }
+nav a {
+  padding: 7px 13px; border-radius: 8px; text-decoration: none;
+  color: var(--ink-soft); font-weight: 500; font-size: 14px;
+}
+nav a:hover { background: var(--panel-2); color: var(--ink); }
+nav a.on { background: var(--accent); color: var(--accent-ink); }
+main { padding: 16px 20px 60px; max-width: 1100px; }
+section { display: none; }
+section.on { display: block; }
+.card {
+  background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius);
+  padding: 16px; margin-bottom: 14px; box-shadow: var(--shadow);
+}
+.card h2 { margin: 0 0 4px; font-size: 15px; }
+.card p.hint { margin: 0 0 12px; color: var(--ink-soft); font-size: 13px; }
+.row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+.grid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
+label { display: block; font-size: 12px; color: var(--ink-soft); margin-bottom: 4px; }
+input, select, textarea {
+  width: 100%; padding: 8px 10px; border-radius: 8px; font: inherit;
+  border: 1px solid var(--line); background: var(--panel-2); color: var(--ink);
+}
+input[type=checkbox] { width: auto; }
+button {
+  padding: 8px 14px; border-radius: 8px; border: 1px solid var(--line);
+  background: var(--panel-2); color: var(--ink); font: inherit; font-weight: 500;
+  cursor: pointer;
+}
+button:hover { border-color: var(--accent); }
+button.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+button.danger { color: var(--bad); }
+button:disabled { opacity: .5; cursor: not-allowed; }
+.total { font-size: 64px; font-weight: 650; line-height: 1; letter-spacing: -.03em; }
+.notation { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--ink-soft); }
+.chips { display: flex; gap: 8px; flex-wrap: wrap; margin: 12px 0 0; }
+.chip {
+  border: 1px solid var(--line); border-radius: 999px; padding: 5px 12px;
+  background: var(--panel-2); font-size: 13px;
+}
+.chip.weak { border-color: var(--warn); color: var(--warn); }
+.chip.unread { border-color: var(--bad); color: var(--bad); }
+.msg { padding: 9px 12px; border-radius: 8px; font-size: 13px; margin-bottom: 8px; }
+.msg.warn { background: color-mix(in srgb, var(--warn) 12%, transparent); color: var(--warn); }
+.msg.bad { background: color-mix(in srgb, var(--bad) 12%, transparent); color: var(--bad); }
+.msg.good { background: color-mix(in srgb, var(--good) 12%, transparent); color: var(--good); }
+.frame { position: relative; display: inline-block; max-width: 100%; }
+.frame img { max-width: 100%; border-radius: 8px; display: block; border: 1px solid var(--line); }
+.frame .box { position: absolute; border: 2px solid var(--accent); border-radius: 4px; }
+.frame .box.unread { border-color: var(--bad); }
+/* The label sits above the box rather than filling it — a filled box hides the die, which
+   is the one thing the reader is trying to look at. */
+.frame .box > b {
+  position: absolute; left: -2px; top: -19px; font-size: 11px; font-weight: 600;
+  padding: 1px 5px; border-radius: 4px; background: var(--accent); color: var(--accent-ink);
+}
+.frame .box.unread > b { background: var(--bad); }
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+th, td { text-align: left; padding: 7px 8px; border-bottom: 1px solid var(--line); }
+th { color: var(--ink-soft); font-weight: 500; }
+code, pre {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12.5px;
+}
+pre {
+  background: var(--panel-2); border: 1px solid var(--line); border-radius: 8px;
+  padding: 12px; overflow-x: auto;
+}
+.sample { border: 1px solid var(--line); border-radius: var(--radius); padding: 10px; background: var(--panel-2); }
+.sample img { width: 100%; border-radius: 6px; display: block; }
+.sample .dice { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+.sample select { width: auto; padding: 4px 6px; font-size: 12px; }
+.samples { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); }
+.bar { height: 6px; background: var(--panel-2); border-radius: 999px; overflow: hidden; border: 1px solid var(--line); }
+.bar > i { display: block; height: 100%; background: var(--accent); }
+.muted { color: var(--ink-soft); font-size: 13px; }
+.spread { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
