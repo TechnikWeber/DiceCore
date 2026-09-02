@@ -499,14 +499,31 @@ async function loadSets() {
     return;
   }
   if (!state.setId && state.sets.length) state.setId = state.sets[0].id;
-  fillSelect($("set-select"), state.sets.map((s) => ({ id: s.id, label: `${s.name} (${s.stats.confirmed_dice} dice)` })), state.setId);
+  // An empty <select> is a blank box that tells you nothing — broken and empty look the
+  // same. Say which it is, and switch off the buttons that need a set to work.
+  const empty = !state.sets.length;
+  $("set-select").innerHTML = empty
+    ? `<option value="">No sets yet — press “New set”</option>`
+    : state.sets.map((s) => `<option value="${s.id}" ${s.id === state.setId ? "selected" : ""}
+        >${escapeHtml(s.name)} (${s.stats.confirmed_dice} dice)</option>`).join("");
+  $("set-select").disabled = empty;
+  $("btn-capture").disabled = empty;
+  $("auto-capture").disabled = empty;
+  if (empty) $("auto-capture").checked = false;
   renderSetStats();
   loadSamples();
 }
 
 function renderSetStats() {
   const set = state.sets.find((s) => s.id === state.setId);
-  if (!set) { $("set-stats").innerHTML = `<p class="muted">Create a set to start collecting.</p>`; return; }
+  if (!set) {
+    $("set-stats").innerHTML = `<div class="msg warn">
+      <b>No set yet.</b> A set is one lot of dice photographed under one light — name it
+      after both (“black d20s, desk lamp”), because a model trained across two different
+      setups learns the average of them and is worse at each. Press <b>New set</b> to start
+      one.</div>`;
+    return;
+  }
   const r = set.readiness;
   const classes = Object.entries(r.classes)
     .map(([k, v]) => `<span class="chip ${v < 10 ? "weak" : ""}">${k} <span class="muted">${v}</span></span>`)
@@ -526,6 +543,11 @@ async function loadSamples() {
     samples = await api(`/api/setup/sets/${state.setId}/samples?limit=40`);
   } catch (err) { alertBox(err.message); return; }
 
+  if (!samples.length) {
+    $("samples").innerHTML = `<p class="muted">Nothing stored yet — press
+      <b>Roll and store</b> and the throws will appear here to be confirmed.</p>`;
+    return;
+  }
   $("samples").innerHTML = samples.map((sample) => {
     const dice = sample.dice.map((die, index) => {
       const kinds = state.options.kinds

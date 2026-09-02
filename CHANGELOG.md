@@ -2,6 +2,15 @@
 
 Notable changes, newest first. Dates are the day the work landed.
 
+## 0.8.1 (2026-09-02)
+
+### Fixed
+- The dataset picker under Training was an empty box when no set existed, which looks the
+  same as a broken one. It now says so and switches off the buttons that need a set, and
+  the panel explains what a set *is* rather than assuming.
+- The training page says plainly that every die in the vocabulary can be learned — d4
+  through d20, not only six-siders — and roughly how much rolling each one takes.
+
 ## 0.8.0 (2026-09-02)
 
 A review pass that turned up more than it was meant to, plus the two things the game screen

@@ -5,6 +5,6 @@ A camera over the landing area of a dice tower, a Raspberry Pi, and an API that 
 was rolled. See docs/CONCEPT.md for what this is meant to become.
 """
 
-__version__ = "0.8.0"
+__version__ = "0.8.1"
 
 __all__ = ["__version__"]

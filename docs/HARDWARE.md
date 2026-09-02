@@ -112,7 +112,11 @@ blamed for that.
 Once, in the **Detection** tab:
 
 1. **Drag a rectangle** over the picture under *Detection → Tray*, covering the landing
-   area and nothing else. The four fractions follow; there is nothing to type.
+   area and nothing else. The four fractions follow; there is nothing to type. Everything
+   outside the rectangle is dimmed, so what the engine will ignore is visible rather than
+   implied.
+
+   ![The tray editor: the camera picture with a quarter-frame grid over it and a dragged rectangle covering the landing area, everything outside it dimmed](screenshots/tray.jpg)
 2. Measure one die with a ruler (a standard d6 is 16 mm) and read its pixel width off a
    captured frame. `mm_per_px = 16 / pixels`. This lets the engine use physical size as a
    hint when telling die kinds apart.
