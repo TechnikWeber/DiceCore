@@ -9,37 +9,17 @@
 </head>
 <body>
 <header>
-  <span class="who" id="who">—</span>
+  <span class="who" id="who">DiceCore</span>
   <span class="game" id="game-name"></span>
   <span class="spacer"></span>
-  <span class="game" id="link-state">connecting…</span>
+  <span class="game" id="link-state">…</span>
+  <button class="quiet" id="btn-quit" hidden>Leave game</button>
   <a class="setup" href="/setup">Setup</a>
 </header>
 
-<main id="main">
-  <section class="board">
-    <div class="turnbar" id="turnbar"></div>
-    <div class="headline" id="headline">Throw the dice</div>
-    <div class="detail" id="detail"></div>
-    <div class="dice" id="dice"></div>
-    <div id="notes"></div>
-    <div class="actions">
-      <button class="primary" id="btn-aside" hidden>Set aside</button>
-      <button id="btn-bank" hidden>Bank</button>
-      <button class="chip" id="btn-chip">Spend a chip</button>
-      <button id="btn-next">End turn</button>
-      <button id="btn-reset">New game</button>
-    </div>
-  </section>
-
-  <aside id="side" hidden>
-    <div class="card" id="card"></div>
-    <div class="card" style="margin-top:16px">
-      <h2>Last turns</h2>
-      <div class="log" id="log"></div>
-    </div>
-  </aside>
-</main>
+<!-- Every screen is rendered by play.js: lobby, wizard, game, result. One place decides
+     which, so the page can never be halfway between two of them. -->
+<main id="app"></main>
 
 <script src="/play.js"></script>
 </body>

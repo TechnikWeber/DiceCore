@@ -33,9 +33,12 @@ event stream a bot or a game can subscribe to.
 - **Training from the browser**, with live loss and accuracy, exporting an ONNX model the
   engine picks up. Training needs PyTorch and so runs on a PC; the UI says so plainly rather
   than failing halfway through.
-- **A game screen and a setup page.** `/` is the board you put on the television — the
-  number in large letters, the dice drawn, the turn counter, the scorecard. `/setup` is
-  everything else. One service, one repo, two front doors.
+- **A game screen and a setup page.** `/` is the board you put on the television: pick a
+  game, tap through a setup wizard, play. `/setup` is everything else. One service, one
+  repo, two front doors.
+- **Nothing is read until a game is started.** Pick from the lobby, choose how many are
+  playing — the defaults are already right — and go. No keyboard needed: player count,
+  names, colours and the game's own settings are all a tap.
 - **Turns, holds and chips.** Kniffel is three throws with dice kept in between, so
   DiceCore counts them down, notices which dice you left on the tray, and lets a chip buy a
   fourth. Two optional GPIO buttons do the same without a browser.
@@ -58,6 +61,8 @@ event stream a bot or a game can subscribe to.
 
 *The same renderer drives every panel and the browser preview, so the layout can be worked
 out before anything is soldered.*
+
+![The lobby: every mode as a tile, grouped into games, plain readers and workshop tools](docs/screenshots/lobby.jpg)
 
 ![The game screen during a Kniffel turn: the combination in large letters, the five dice drawn as pips, the throw counter with chips, and the scorecard down the side](docs/screenshots/play.jpg)
 

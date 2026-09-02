@@ -21,6 +21,19 @@ from . import farkle as farkle_rules
 from . import kniffel
 from .turns import Turn, TurnRules, apply_roll, end_turn, spend_chip, start_turn, toggle_hold
 
+#: Assigned in order, and chosen to stay apart on a television across a room: nobody has
+#: to remember which player they are if their column is the blue one.
+COLOURS = ("#5b8dff", "#3ecf8e", "#e0a94a", "#f0806f", "#c084fc", "#4dd0e1", "#f472b6",
+           "#a3e635")
+
+
+def colours_for(count: int, chosen: list[str] | None = None) -> list[str]:
+    """One colour per player, keeping any the table picked itself."""
+    picked = list(chosen or [])
+    return [picked[i] if i < len(picked) and picked[i] else COLOURS[i % len(COLOURS)]
+            for i in range(count)]
+
+
 #: Which board a mode plays on. Everything not listed is turns and a running log.
 BOARDS = {
     "yahtzee": kniffel.STANDARD,
@@ -65,6 +78,12 @@ class GameSession:
         #: The mode's own numbers — Farkle's target and entry threshold live here.
         self.params: dict[str, Any] = dict(params or {})
         self.players = players or ["Player 1"]
+        self.colours = colours_for(len(self.players))
+        #: False until a game is actually started from the lobby. The screen shows the game
+        #: picker while this is false, and — the part that matters — nothing reads the tray.
+        #: A camera quietly capturing for nobody was the thing that made the screen
+        #: impossible to understand.
+        self.running = False
         self.cards: list[kniffel.Card] = []
         #: Farkle's board, when that is the game. Push-your-luck rather than a card, which
         #: is the whole reason for building a second one.
@@ -116,6 +135,7 @@ class GameSession:
                 self.params = dict(params)
             if players is not None:
                 self.players = players or ["Player 1"]
+                self.colours = colours_for(len(self.players), self.colours)
             if changed and not keep_scores:
                 self.reset()
             else:
@@ -124,6 +144,23 @@ class GameSession:
                 self.chips = [min(left, rules.chips) for left in self.chips]
                 self.chips += [rules.chips] * (len(self.players) - len(self.chips))
                 self.turn.chips_left = self.chips[self.turn.player % len(self.chips)]
+
+    def start(self, mode: str, rules: TurnRules, players: list[str],
+              colours: list[str] | None = None, params: dict[str, Any] | None = None) -> None:
+        """Begin a game: this is what the lobby's Start button does, and the only way in."""
+        with self._lock:
+            self.mode, self.rules = mode, rules
+            self.players = players or ["Player 1"]
+            self.colours = colours_for(len(self.players), colours)
+            self.params = dict(params or {})
+            self.reset()
+            self.running = True
+
+    def stop(self) -> None:
+        """Back to the lobby. Nothing is read while no game is running."""
+        with self._lock:
+            self.running = False
+            self.message = ""
 
     def reset(self) -> None:
         with self._lock:
@@ -268,7 +305,9 @@ class GameSession:
             card = self.cards[self.turn.player] if self.cards else None
             return {
                 "mode": self.mode,
+                "running": self.running,
                 "players": self.players,
+                "colours": list(self.colours),
                 "rules": {"rolls": self.rules.rolls, "holds": self.rules.holds,
                           "chips": self.rules.chips, "multi": self.rules.multi},
                 "turn": self.turn.to_json(),

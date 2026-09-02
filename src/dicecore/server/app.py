@@ -34,6 +34,7 @@ from ..integrity import POLICIES
 from ..modes import DEFAULT as DEFAULT_MODE
 from ..modes import MODES as GAME_MODES
 from ..modes import mode_by_id
+from ..modes.catalogue import rules_for
 from ..panel import ButtonPanel, OutputHub
 from ..panel import state as phases
 from ..panel.displays import COMMON_SIZES, PANELS
@@ -70,7 +71,7 @@ def create_app(settings: Settings | None = None) -> Any:
     buttons = ButtonPanel(loaded.panel.signals, on_chip, on_next)
     state["buttons"] = buttons
 
-    app = FastAPI(title="DiceCore", version="0.6.0",
+    app = FastAPI(title="DiceCore", version="0.7.0",
                   description="Reads real dice with a camera.")
     app.state.reader = reader
     app.state.training = training
@@ -112,7 +113,7 @@ def create_app(settings: Settings | None = None) -> Any:
             "modes": [
                 {"id": m.id, "label": m.label, "blurb": m.blurb, "kinds": list(m.kinds),
                  "dice": m.dice, "rule": m.rule, "stateful": m.stateful,
-                 "defaults": m.defaults,
+                 "family": m.family, "defaults": m.defaults,
                  "params": state["settings"].mode.params.get(m.id, {})}
                 for m in GAME_MODES
             ],
@@ -178,6 +179,46 @@ def create_app(settings: Settings | None = None) -> Any:
         """End the turn without booking anything. The same call the GPIO button makes."""
         last = reader.last
         reader.game.finish_turn((last.reading or {}).get("headline", "") if last else "")
+        return reader.game.to_json()
+
+    @app.post("/api/v1/game/start")
+    async def game_start(request: Request) -> Any:
+        """
+        Begin a game: which one, who is playing, and the numbers it needs.
+
+        The only way into a game, and deliberately so. Before this call nothing reads the
+        tray — a camera quietly capturing for nobody is what made the game screen impossible
+        to understand.
+        """
+        body = await request.json() if await request.body() else {}
+        wanted = str(body.get("mode", state["settings"].mode.active))
+        mode = mode_by_id(wanted)
+        if mode is None:
+            raise HTTPException(400, f"Unknown game mode {wanted!r}.")
+
+        names = [str(n)[:24].strip() or f"Player {i + 1}"
+                 for i, n in enumerate(body.get("players") or [])][:8]
+        if not names:
+            names = list(state["settings"].play.players) or ["Player 1", "Player 2"]
+        colours = [str(c)[:9] for c in (body.get("colours") or [])][:len(names)]
+        params = dict(state["settings"].mode.params.get(wanted) or {})
+        if isinstance(body.get("params"), dict):
+            params.update(body["params"])
+
+        current = state["settings"]
+        current.mode.active = wanted
+        current.mode.params[wanted] = params
+        current.play.players = names
+        current.play.colours = colours
+        current.save()
+        reader.settings = current
+        reader.game.start(wanted, rules_for(mode, params), names, colours, params)
+        return reader.game.to_json()
+
+    @app.post("/api/v1/game/stop")
+    def game_stop() -> Any:
+        """Back to the game picker. Reading stops with it."""
+        reader.game.stop()
         return reader.game.to_json()
 
     @app.post("/api/v1/game/reset")
@@ -286,6 +327,15 @@ def create_app(settings: Settings | None = None) -> Any:
         previous: str | None = None
         try:
             while True:
+                if not reader.game.running:
+                    # Nothing is being played, so nothing is looked at. This is what makes
+                    # the lobby honest — and it is also why the Pi is not capturing all
+                    # night for an empty table.
+                    await socket.send_text(json.dumps({"idle": True,
+                                                       "game": reader.game.to_json()}))
+                    await asyncio.sleep(1.0)
+                    previous = None
+                    continue
                 try:
                     # Two messages per roll on purpose: the number as soon as the dice
                     # settle (`verdict: "pending"`), then the same roll again once the tray
@@ -353,7 +403,7 @@ def create_app(settings: Settings | None = None) -> Any:
                       for k in DIE_KINDS],
             "modes": [{"id": m.id, "label": m.label, "blurb": m.blurb, "dice": m.dice,
                        "kinds": list(m.kinds), "rule": m.rule, "stateful": m.stateful,
-                       "defaults": m.defaults} for m in GAME_MODES],
+                       "family": m.family, "defaults": m.defaults} for m in GAME_MODES],
             "default_mode": DEFAULT_MODE,
             "policies": [{"id": i, "label": name} for i, name in POLICIES],
             "panels": [{"id": i, "label": label, "mono": mono, "bus": bus,

@@ -245,8 +245,8 @@ def test_both_front_doors_are_served(client):
 
 
 def test_a_game_can_be_played_through_the_api(client):
-    client.post("/api/setup/mode", json={"mode": "yahtzee", "params": {"chips": 1}})
-    client.post("/api/v1/game/reset", json={"players": ["A", "B"]})
+    client.post("/api/v1/game/start",
+                json={"mode": "yahtzee", "players": ["A", "B"], "params": {"chips": 1}})
 
     state = client.get("/api/v1/game").json()["game"]
     assert state["rules"]["rolls"] == 3 and state["rules"]["chips"] == 1
@@ -264,16 +264,15 @@ def test_a_game_can_be_played_through_the_api(client):
 
 
 def test_a_chip_is_refused_while_throws_remain(client):
-    client.post("/api/setup/mode", json={"mode": "yahtzee", "params": {"chips": 1}})
-    client.post("/api/v1/game/reset", json={"players": ["A"]})
+    client.post("/api/v1/game/start",
+                json={"mode": "yahtzee", "players": ["A"], "params": {"chips": 1}})
     client.get("/api/v1/roll?verify=0")
     answer = client.post("/api/v1/game/chip").json()
     assert not answer["ok"] and "no need" in answer["detail"].lower()
 
 
 def test_booking_a_category_hands_the_tower_on(client):
-    client.post("/api/setup/mode", json={"mode": "yahtzee"})
-    client.post("/api/v1/game/reset", json={"players": ["A", "B"]})
+    client.post("/api/v1/game/start", json={"mode": "yahtzee", "players": ["A", "B"]})
     client.get("/api/v1/roll?verify=0")
     booked = client.post("/api/v1/game/book", json={"category": "chance"}).json()
     assert booked["ok"] and booked["points"] > 0
@@ -281,8 +280,7 @@ def test_booking_a_category_hands_the_tower_on(client):
 
 
 def test_giving_a_category_up_has_to_be_meant(client):
-    client.post("/api/setup/mode", json={"mode": "yahtzee"})
-    client.post("/api/v1/game/reset", json={"players": ["A"]})
+    client.post("/api/v1/game/start", json={"mode": "yahtzee", "players": ["A"]})
     client.get("/api/v1/roll?verify=0")
     refused = client.post("/api/v1/game/book", json={"category": "kniffel"})
     assert refused.status_code == 400
@@ -291,8 +289,7 @@ def test_giving_a_category_up_has_to_be_meant(client):
 
 
 def test_a_hold_can_be_corrected_from_the_browser(client):
-    client.post("/api/setup/mode", json={"mode": "yahtzee"})
-    client.post("/api/v1/game/reset", json={"players": ["A"]})
+    client.post("/api/v1/game/start", json={"mode": "yahtzee", "players": ["A"]})
     client.get("/api/v1/roll?verify=0")
     state = client.post("/api/v1/game/hold", json={"index": 0}).json()
     assert state["turn"]["dice"][0]["held"] is True
@@ -311,6 +308,55 @@ def test_a_zero_on_a_ten_sided_die_can_be_worth_nothing_instead_of_ten(client):
     assert client.get("/api/setup/settings").json()["mode"]["d10_zero_counts_as_ten"] is False
 
 
+def test_nothing_is_running_until_a_game_is_started(client):
+    # The screen showed numbers changing for a game nobody had started, which is what made
+    # it impossible to understand. A game now has to be begun.
+    assert client.get("/api/v1/game").json()["game"]["running"] is False
+
+
+def test_starting_a_game_sets_everything_the_lobby_chose(client):
+    started = client.post("/api/v1/game/start", json={
+        "mode": "yahtzee", "players": ["Ada", "Bob", "Cy"],
+        "colours": ["#5b8dff", "#3ecf8e", "#e0a94a"], "params": {"chips": 2},
+    }).json()
+    assert started["running"] and started["players"] == ["Ada", "Bob", "Cy"]
+    assert started["colours"][1] == "#3ecf8e"
+    assert started["chips"] == [2, 2, 2]
+    assert client.get("/api/v1/modes").json()["active"] == "yahtzee"
+
+
+def test_leaving_a_game_stops_the_reading(client):
+    client.post("/api/v1/game/start", json={"mode": "yahtzee"})
+    assert client.post("/api/v1/game/stop").json()["running"] is False
+
+
+def test_a_game_started_without_names_gets_sensible_ones(client):
+    # No keyboard at the table: every default has to be right on the first tap.
+    started = client.post("/api/v1/game/start", json={"mode": "farkle"}).json()
+    assert len(started["players"]) >= 1
+    assert all(name for name in started["players"])
+    assert len(started["colours"]) == len(started["players"])
+
+
+def test_players_get_a_colour_each_even_when_none_were_chosen(client):
+    started = client.post("/api/v1/game/start",
+                          json={"mode": "yahtzee", "players": ["A", "B", "C", "D"]}).json()
+    assert len(set(started["colours"])) == 4
+
+
+def test_starting_an_unknown_game_is_refused(client):
+    assert client.post("/api/v1/game/start", json={"mode": "nonsense"}).status_code == 400
+
+
+def test_the_mode_list_says_what_kind_of_thing_each_mode_is(client):
+    # The lobby groups by this: games to play, readers that only report, workshop tools.
+    modes = {m["id"]: m["family"] for m in client.get("/api/v1/modes").json()["modes"]}
+    assert modes["yahtzee"] == "board"
+    assert modes["backgammon"] == "turns"
+    assert modes["normal"] == "read"
+    assert modes["fairness"] == "tool"
+
+
 def test_the_extended_kniffel_sheet_is_offered_and_described(client):
     modes = [m["id"] for m in client.get("/api/v1/modes").json()["modes"]]
     assert "yahtzee_extreme" in modes
@@ -323,8 +369,7 @@ def test_the_extended_kniffel_sheet_is_offered_and_described(client):
 
 
 def test_farkle_is_played_by_setting_dice_aside_and_banking(client):
-    client.post("/api/setup/mode", json={"mode": "farkle"})
-    client.post("/api/v1/game/reset", json={"players": ["A", "B"]})
+    client.post("/api/v1/game/start", json={"mode": "farkle", "players": ["A", "B"]})
     state = client.get("/api/v1/game").json()["game"]
     assert state["farkle"]["target"] == 10000 and state["turn"]["unlimited"]
 
@@ -342,8 +387,7 @@ def test_farkle_is_played_by_setting_dice_aside_and_banking(client):
 
 
 def test_setting_aside_a_die_that_scores_nothing_is_refused(client):
-    client.post("/api/setup/mode", json={"mode": "farkle"})
-    client.post("/api/v1/game/reset", json={"players": ["A"]})
+    client.post("/api/v1/game/start", json={"mode": "farkle", "players": ["A"]})
     client.get("/api/v1/roll?verify=0")
     answer = client.post("/api/v1/game/aside").json()      # nothing held at all
     assert not answer["ok"]
@@ -355,8 +399,8 @@ def test_a_game_without_a_board_refuses_to_bank(client):
 
 
 def test_chips_belong_to_the_player_for_the_whole_game(client):
-    client.post("/api/setup/mode", json={"mode": "yahtzee", "params": {"chips": 2}})
-    client.post("/api/v1/game/reset", json={"players": ["A", "B"]})
+    client.post("/api/v1/game/start",
+                json={"mode": "yahtzee", "players": ["A", "B"], "params": {"chips": 2}})
     for _ in range(3):
         client.get("/api/v1/roll?verify=0")
     client.post("/api/v1/game/chip")

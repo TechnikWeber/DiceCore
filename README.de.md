@@ -37,9 +37,12 @@ als JSON-API und als Live-Stream, den ein Bot oder ein Spiel abonnieren kann.
 - **Training aus dem Browser**, mit laufender Loss- und Genauigkeitsanzeige, am Ende ein
   ONNX-Modell, das die Engine übernimmt. Training braucht PyTorch und läuft deshalb auf dem
   PC; die Oberfläche sagt das offen, statt auf halbem Weg abzubrechen.
-- **Ein Spielbildschirm und eine Einrichtungsseite.** `/` ist das Brett für den Fernseher —
-  die Zahl groß, die Würfel gezeichnet, der Wurfzähler, der Spielblock. `/setup` ist alles
-  andere. Ein Dienst, ein Repo, zwei Eingänge.
+- **Ein Spielbildschirm und eine Einrichtungsseite.** `/` ist das Brett für den Fernseher:
+  Spiel aussuchen, Assistent durchtippen, spielen. `/setup` ist alles andere. Ein Dienst,
+  ein Repo, zwei Eingänge.
+- **Es wird nichts gelesen, bevor ein Spiel läuft.** In der Lobby aussuchen, Spielerzahl
+  antippen — die Vorgaben stimmen schon — und los. Ohne Tastatur: Spielerzahl, Namen,
+  Farben und die Spieleinstellungen sind alle ein Tipp.
 - **Züge, Halten und Chips.** Kniffel sind drei Würfe mit Behalten dazwischen: DiceCore
   zählt sie herunter, erkennt welche Würfel liegen geblieben sind, und ein Chip kauft einen
   vierten. Zwei optionale GPIO-Taster tun dasselbe ohne Browser.
@@ -57,6 +60,8 @@ als JSON-API und als Live-Stream, den ein Bot oder ein Spiel abonnieren kann.
   `dtoverlay` in die `config.txt` und sagt, dass neu gestartet werden muss.
 - **Alles davon ohne Hardware.** `dicecore synth` zeichnet Würfel, die Quelle `folder` spielt
   sie ab, und alles oben Genannte läuft damit auf dem Laptop.
+
+![Die Lobby: jeder Modus als Kachel, gruppiert in Spiele, reine Anzeigen und Werkzeuge](docs/screenshots/lobby.jpg)
 
 ![Der Spielbildschirm während eines Kniffel-Zugs: die Kombination groß, die fünf Würfel als Augen gezeichnet, der Wurfzähler mit Chips und rechts der Spielblock](docs/screenshots/play.jpg)
 

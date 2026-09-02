@@ -8,9 +8,52 @@ Two front doors, one service.
 | **`/setup`** | Everything else — camera, detection, fair play, panel, training. |
 
 The game screen is at the root and the setup page is not, on purpose: the page you look at
-all evening should not be one tab away behind six you never touch. Opening the game screen
-is also what makes DiceCore start watching the tray — it holds the websocket that drives
-continuous reading, so there is no "start" button to forget.
+all evening should not be one tab away behind six you never touch.
+
+## Four screens, one at a time
+
+```
+lobby ──► setup ──► game ──► result
+  ▲                            │
+  └────────────────────────────┘
+```
+
+**Nothing reads the tray until a game is running.** The first version of this screen opened
+straight into whatever mode happened to be configured and started capturing, which meant a
+player was watching numbers change with no idea what was going on. A game is now something
+you *start*, and the camera idles until you do.
+
+### The lobby
+
+Every mode as a tile, in three groups: **Games** (turns, players, a score), **Just show the
+numbers** (DiceCore reads and reports, nothing to play), and **Tools** (the fairness test
+and the build-your-own). Tap one.
+
+### The setup wizard
+
+Everything by tapping, because a table does not have a keyboard:
+
+- **How many are playing** — 1 to 6, and **2 is already selected**.
+- **Who** — *Player 1*, *Player 2* … already filled in, each with its own colour. Tap a
+  colour to swap it for one nobody else is using; tap a name to rename it if you feel like
+  it. Neither is necessary.
+- **The game's own settings**, and only the ones a table actually decides: chips for
+  Kniffel, the target and the entry threshold for Farkle, the success threshold for a pool.
+  Every one is a row of buttons with a sensible answer already chosen.
+
+Start works on the first tap. The wizard remembers the names and colours from the last game
+of that kind, so the second evening is one tap shorter than the first.
+
+### The game, and the result
+
+Colours run through everything — the turn marker, the scorecard columns, the log — so nobody
+has to remember which player they are. When the last box is booked or somebody passes the
+target, the result screen shows the standings and offers **Play again** with the same
+players, or a different game.
+
+![The lobby: every mode as a tile, grouped into games, plain readers and workshop tools](screenshots/lobby.jpg)
+
+![The setup wizard for Kniffel: how many are playing as a row of buttons with two preselected, then the players with their colours, then chips per player](screenshots/wizard.jpg)
 
 ![The game screen during a Kniffel turn: the combination in large letters, the five dice drawn as pips, the throw counter with two chips left, and the scorecard down the right-hand side](screenshots/play.jpg)
 
@@ -127,13 +170,14 @@ board; first to 10 000 wins. The target and the entry threshold are settings.
 
 ## Several players
 
-Set the names under **Setup → Players and turns**, one per line. The tower passes round by
-itself: booking a category ends the turn and the next name comes up. Changing the players
-starts a new game, because handing player three's card to a different player three would be
-worse than losing the scores.
+Chosen in the wizard, and that is the only place they need to be chosen. The tower passes
+round by itself: booking a category ends the turn and the next name comes up. Changing the
+players starts a new game, because handing player three's card to a different player three
+would be worse than losing the scores.
 
-One name is a solo game, which is the right shape for practising, for a fairness test, or
-for a machine that just shows numbers.
+One player is a solo game, which is the right shape for practising, for a fairness test, or
+for a machine that just shows numbers. The names can also be set under **Setup → Players and
+turns** if you would rather type them once and forget them.
 
 ## Your own screen instead
 
@@ -142,12 +186,15 @@ API — because a play screen is exactly the sort of thing someone will want to 
 own version of, on a tablet, on a TV, in a language this project does not use.
 
 ```bash
+curl -X POST .../api/v1/game/start \
+     -d '{"mode": "yahtzee", "players": ["Ada", "Bob"], "params": {"chips": 2}}'
 curl http://dicecore.local:8099/api/v1/game            # turn, cards, options, log
 curl -X POST .../api/v1/game/chip                      # one more throw
 curl -X POST .../api/v1/game/hold  -d '{"index": 2}'   # correct a hold
 curl -X POST .../api/v1/game/book  -d '{"category": "full_house"}'
 curl -X POST .../api/v1/game/next                      # end the turn
 curl -X POST .../api/v1/game/reset -d '{"players": ["A", "B"]}'
+curl -X POST .../api/v1/game/stop                      # back to the lobby; reading stops
 ```
 
 The websocket at `/api/v1/events` carries the same game state alongside every roll, so a

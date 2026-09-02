@@ -2,6 +2,35 @@
 
 Notable changes, newest first. Dates are the day the work landed.
 
+## 0.7.0 (2026-09-02)
+
+The game screen becomes a game screen. It had no lobby: it opened into whatever mode was
+configured and started reading the tray, so a player was watching numbers change with no
+idea what was going on.
+
+### Added
+- **A lobby.** Every mode as a tile, grouped into games, plain readers and workshop tools.
+- **A setup wizard per game**, entirely by tapping: how many are playing (1–6, two already
+  chosen), who (Player 1, Player 2 … each with its own colour, both editable and neither
+  necessary), and the settings that game actually has — chips, target, threshold — as rows
+  of buttons.
+- **A colour per player**, running through the turn marker, the scorecard columns and the
+  log. Tapping a swatch takes the next colour nobody else is using.
+- **A result screen** with the standings and *Play again* with the same players.
+- `POST /api/v1/game/start` and `/stop`; `running`, `colours` and each mode's `family` in
+  the API.
+
+### Changed
+- **Nothing reads the tray until a game has been started.** The camera idles in the lobby,
+  which is both what makes the screen comprehensible and what stops a Pi capturing all
+  night for an empty table.
+- The default player list is two rather than one.
+
+### Fixed
+- Cycling a player's colour walked blindly through the palette and could hand two players
+  the same one, which defeats the only reason the colours are there.
+- With four players the scorecard was cut off; it grows and scrolls inside itself now.
+
 ## 0.6.0 (2026-09-02)
 
 A second board, an extended sheet, and chips that belong to a player rather than to a turn.

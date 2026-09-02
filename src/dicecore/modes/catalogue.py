@@ -34,6 +34,12 @@ class GameMode:
     dice: str = "any"
     #: Parameters the rule takes; every one of them is editable in the UI.
     defaults: dict[str, Any] = field(default_factory=dict)
+    #: What kind of thing this is, which decides how the game screen offers it:
+    #: "board" — a scorecard and players; "turns" — passed round but nothing to score;
+    #: "read"  — it just reports numbers; "tool" — a workshop instrument.
+    #: The lobby groups by this, and the setup wizard only asks for players when the
+    #: answer can possibly matter.
+    family: str = "read"
     #: True when the mode needs to remember something between throws.
     stateful: bool = False
     #: What a turn looks like. Most games are one throw and done; Kniffel is three with
@@ -93,6 +99,7 @@ MODES: tuple[GameMode, ...] = (
         "browser.",
         ("d6",), "yahtzee", "5",
         {"rolls": 3, "chips": 0},
+        family="board",
         turns=TurnRules(rolls=3, holds=True, chips=0, auto_end=False),
     ),
     GameMode(
@@ -101,6 +108,7 @@ MODES: tuple[GameMode, ...] = (
         "full house, and a straight all the way from one to six.",
         ("d6",), "yahtzee", "6",
         {"rolls": 3, "chips": 0},
+        family="board",
         turns=TurnRules(rolls=3, holds=True, chips=0, auto_end=False),
     ),
     GameMode(
@@ -109,17 +117,18 @@ MODES: tuple[GameMode, ...] = (
         "again. A throw that scores nothing loses the whole turn.",
         ("d6",), "farkle", "1–6",
         {"target": 10000, "entry": 500, "chips": 0},
+        family="board",
         turns=TurnRules(rolls=1, holds=True, chips=0, auto_end=False, unlimited=True),
     ),
     GameMode(
         "backgammon", "Backgammon",
         "Two dice, and a double is four moves rather than two.",
-        ("d6",), "backgammon", "2",
+        ("d6",), "backgammon", "2", family="turns",
     ),
     GameMode(
         "maexchen", "Mäxchen",
         "Two dice as a two-digit number, higher first. 21 is the Mäxchen.",
-        ("d6",), "maexchen", "2",
+        ("d6",), "maexchen", "2", family="turns",
     ),
     GameMode(
         "counting", "One die, big",
@@ -131,7 +140,7 @@ MODES: tuple[GameMode, ...] = (
         "fairness", "Fairness test",
         "Throw the same die a few hundred times and see whether the distribution argues it "
         "is loaded. The one thing only a machine that counts can do.",
-        ALL_KINDS, "fairness", "1", stateful=True,
+        ALL_KINDS, "fairness", "1", family="tool", stateful=True,
     ),
     GameMode(
         "custom", "Build your own",
@@ -140,6 +149,7 @@ MODES: tuple[GameMode, ...] = (
         ALL_KINDS, "sum", "any",
         {"rule": "sum", "threshold": 4, "take": "high", "target": 50,
          "double_on_max": False, "percentile": False, "zero_is_ten": False},
+        family="tool",
     ),
 )
 

@@ -36,7 +36,11 @@ header a.setup { text-decoration: none; font-size: 14px; padding: 6px 12px;
                  border: 1px solid var(--line); border-radius: 8px; }
 
 main { flex: 1; display: grid; grid-template-columns: 1fr; gap: 20px; padding: 22px 24px 30px; }
-@media (min-width: 1000px) { main.with-card { grid-template-columns: minmax(0,1fr) 460px; } }
+/* The card grows with the number of players and scrolls inside itself rather than pushing
+   the board off the screen — four columns of Kniffel is wider than a fixed sidebar. */
+@media (min-width: 1000px) {
+  main.with-card { grid-template-columns: minmax(0, 1fr) clamp(340px, 34vw, 640px); }
+}
 
 .board { display: flex; flex-direction: column; gap: 18px; min-width: 0; }
 .headline {
@@ -96,11 +100,13 @@ button:disabled { opacity: .4; cursor: not-allowed; }
 
 /* The scorecard. Dense on purpose: thirteen rows have to fit beside the dice. */
 .card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px;
-        padding: 14px 16px; }
+        padding: 14px 16px; overflow-x: auto; }
 .card h2 { margin: 0 0 10px; font-size: 15px; color: var(--ink-soft); font-weight: 600; }
-table { width: 100%; border-collapse: collapse; font-size: 15px; }
-th, td { padding: 6px 8px; border-bottom: 1px solid var(--line); text-align: right; }
-th:first-child, td:first-child { text-align: left; color: var(--ink-soft); font-weight: 500; }
+table { width: 100%; border-collapse: collapse; font-size: 15px; min-width: 260px; }
+th, td { padding: 6px 8px; border-bottom: 1px solid var(--line); text-align: right;
+         white-space: nowrap; }
+th:first-child, td:first-child { text-align: left; color: var(--ink-soft); font-weight: 500;
+                                 position: sticky; left: 0; background: var(--panel); }
 tr.section td { padding-top: 12px; color: var(--ink-soft); font-size: 13px; border: none; }
 tr.total td { font-weight: 700; font-size: 17px; border-top: 2px solid var(--line); }
 td.you { background: rgba(91, 141, 255, .08); }
@@ -115,3 +121,72 @@ td.open button:hover:not(:disabled) { background: var(--panel-2); }
 .log { font-size: 14px; color: var(--ink-soft); }
 .log div { padding: 4px 0; border-bottom: 1px solid var(--line); }
 .idle { color: var(--ink-soft); font-size: clamp(22px, 4vw, 40px); font-weight: 600; }
+
+/* --- the lobby: what are we playing? ------------------------------------- */
+.lobby h1, .wizard h1 { font-size: clamp(26px, 4vw, 44px); margin: 0 0 6px; letter-spacing: -.02em; }
+.lobby .lead, .wizard .lead { color: var(--ink-soft); font-size: 17px; margin: 0 0 24px; }
+.group { margin-bottom: 30px; }
+.group h2 { font-size: 14px; text-transform: uppercase; letter-spacing: .08em;
+            color: var(--ink-soft); margin: 0 0 12px; font-weight: 600; }
+.tiles { display: grid; gap: 14px; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); }
+.tile {
+  text-align: left; padding: 18px 20px; border-radius: 14px; background: var(--panel);
+  border: 1px solid var(--line); cursor: pointer; display: flex; flex-direction: column;
+  gap: 6px; font: inherit; color: var(--ink);
+}
+.tile:hover { border-color: var(--accent); background: var(--panel-2); }
+.tile b { font-size: 20px; font-weight: 650; }
+.tile span { color: var(--ink-soft); font-size: 14px; line-height: 1.4; }
+.tile .dice-count { color: var(--accent); font-size: 13px; font-weight: 600; }
+
+/* --- the wizard: everything by tapping ----------------------------------- */
+.wizard { max-width: 820px; }
+.step { margin-bottom: 26px; }
+.step h2 { font-size: 16px; margin: 0 0 12px; color: var(--ink-soft); font-weight: 600; }
+.choices { display: flex; gap: 10px; flex-wrap: wrap; }
+.choice {
+  min-width: 62px; padding: 14px 20px; border-radius: 12px; border: 2px solid var(--line);
+  background: var(--panel); color: var(--ink); font: inherit; font-size: 19px;
+  font-weight: 650; cursor: pointer;
+}
+.choice:hover { border-color: var(--accent); }
+.choice.on { border-color: var(--accent); background: rgba(91, 141, 255, .16); color: #fff; }
+.choice small { display: block; font-size: 12px; font-weight: 500; color: var(--ink-soft); }
+
+.roster { display: flex; flex-direction: column; gap: 10px; }
+.player {
+  display: flex; align-items: center; gap: 14px; padding: 10px 14px; border-radius: 12px;
+  background: var(--panel); border: 1px solid var(--line);
+}
+.player .swatch {
+  width: 34px; height: 34px; border-radius: 10px; border: none; cursor: pointer; flex: none;
+}
+.player input {
+  flex: 1; background: transparent; border: none; color: var(--ink); font: inherit;
+  font-size: 19px; font-weight: 600; padding: 6px 2px; border-bottom: 1px dashed var(--line);
+}
+.player input:focus { outline: none; border-bottom-color: var(--accent); }
+.player .hint { color: var(--ink-soft); font-size: 13px; }
+.start-row { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; margin-top: 8px; }
+button.big { font-size: 20px; padding: 16px 32px; }
+button.quiet { background: transparent; border-color: var(--line); font-size: 14px;
+               padding: 6px 12px; }
+
+/* --- waiting, and the result --------------------------------------------- */
+.waiting { color: var(--ink-soft); display: flex; align-items: center; gap: 10px; font-size: 18px; }
+.waiting i {
+  width: 12px; height: 12px; border-radius: 50%; background: var(--good); display: block;
+  animation: breathe 1.6s ease-in-out infinite;
+}
+@keyframes breathe { 0%, 100% { opacity: .25; } 50% { opacity: 1; } }
+.standings { display: flex; flex-direction: column; gap: 10px; margin: 20px 0 26px; }
+.standing {
+  display: flex; align-items: center; gap: 14px; padding: 14px 18px; border-radius: 12px;
+  background: var(--panel); border: 1px solid var(--line); font-size: 20px;
+}
+.standing.win { border-color: var(--good); }
+.standing .rank { color: var(--ink-soft); width: 28px; }
+.standing .name { flex: 1; font-weight: 650; }
+.standing .score { font-weight: 700; font-size: 24px; }
+.dot { width: 14px; height: 14px; border-radius: 50%; display: inline-block; flex: none; }
+th .dot, td .dot { margin-right: 6px; vertical-align: -2px; }

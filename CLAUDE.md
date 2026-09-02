@@ -96,6 +96,13 @@ python3 -m venv .venv && .venv/bin/pip install -e '.[vision,server,dev]'
 - **The game lives on the server.** The panel has to be able to say "throw 2 of 3" as well,
   a closed tab must lose nothing, and a second screen must see the same game. Browser-side
   game state would fail all three.
+- **The game screen has exactly one of four states** — lobby, wizard, game, result — and one
+  function decides which, so it can never be halfway between two. It was built without a
+  lobby first: it opened into whatever mode was configured and started reading, and a player
+  watching numbers change had no idea what was going on. **Nothing reads the tray until
+  `game.running`.**
+- **The table has no keyboard.** Every default in the wizard is already right, and every
+  choice is a tap. Typing a name is allowed, never required.
 - **`/` is the game screen, `/setup` is the workshop.** The page that stays on all evening
   is not buried behind admin tabs. Opening `/` is also what starts continuous reading.
 - **A mode is data.** New game → an entry in `catalogue.py` and a function in `scoring.py`.

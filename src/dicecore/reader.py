@@ -279,6 +279,7 @@ class Reader:
         params = self.settings.mode.params.get(mode.id) or {}
         rules = rules_for(mode, params)
         self.game.configure(mode.id, rules, list(self.settings.play.players), params=params)
+        self.game.colours = list(self.settings.play.colours) or self.game.colours
 
     def session_for(self, mode_id: str) -> ModeSession:
         session = self.mode_sessions.get(mode_id)

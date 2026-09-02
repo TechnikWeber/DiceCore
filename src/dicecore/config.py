@@ -259,8 +259,11 @@ class PanelSettings:
 class PlaySettings:
     """The game screen at the table."""
 
-    #: Who is playing. One name is a solo game; the play screen passes the tower round.
-    players: list[str] = field(default_factory=lambda: ["Player 1"])
+    #: Who is playing. Two by default, because that is the common case and because the
+    #: game screen should be usable without typing anything at all.
+    players: list[str] = field(default_factory=lambda: ["Player 1", "Player 2"])
+    #: One colour per player, assigned automatically and changeable by tapping.
+    colours: list[str] = field(default_factory=list)
     #: Show the scorecard and turn counter, rather than just the number.
     enabled: bool = True
 
