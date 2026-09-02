@@ -69,6 +69,10 @@ class GameSession:
     lock over the whole object is the right amount of machinery.
     """
 
+    #: Called after anything that changes the game, so it survives a restart. Set by
+    #: whoever owns the session; a session with no store simply does not persist.
+    on_change: Any = None
+
     def __init__(self, mode: str = "normal", rules: TurnRules | None = None,
                  players: list[str] | None = None,
                  params: dict[str, Any] | None = None) -> None:
@@ -155,12 +159,14 @@ class GameSession:
             self.params = dict(params or {})
             self.reset()
             self.running = True
+            self.touch()
 
     def stop(self) -> None:
         """Back to the lobby. Nothing is read while no game is running."""
         with self._lock:
             self.running = False
             self.message = ""
+            self.touch()
 
     def reset(self) -> None:
         with self._lock:
@@ -190,6 +196,7 @@ class GameSession:
             apply_roll(self.turn, result.dice, self.rules)
             self.reading = result.reading
             self.message = ""
+            self.touch()
             if self.farkle is not None and not farkle_rules.breakdown(
                     self.turn.values()).scoring:
                 # A throw with nothing in it takes the whole turn with it. That is the game,
@@ -202,6 +209,7 @@ class GameSession:
     def hold(self, index: int) -> None:
         with self._lock:
             toggle_hold(self.turn, index)
+            self.touch()
 
     def chip(self) -> str | None:
         with self._lock:
@@ -213,6 +221,7 @@ class GameSession:
                 if self.chips:
                     self.chips[index] = max(0, self.chips[index] - 1)
             self.message = problem or "Chip spent — one more throw."
+            self.touch()
             return problem
 
     # --- Farkle ------------------------------------------------------------
@@ -226,6 +235,7 @@ class GameSession:
             self.message = problem or (
                 f"{farkle_rules.breakdown(chosen).points} set aside — "
                 f"{self.farkle.turn_points} this turn, {self.farkle.dice_left} dice to throw.")
+            self.touch()
             if ok:
                 # The dice that were set aside have physically left the tray, so the turn
                 # starts the next throw with nothing held.
@@ -268,16 +278,52 @@ class GameSession:
             self._advance()
             return {"category": category, "points": points, "card": card.to_json()}
 
-    def finish_turn(self, headline: str = "") -> None:
-        """End a turn that has nothing to book — every game that is not Kniffel."""
+    @property
+    def needs_a_decision(self) -> str | None:
+        """
+        What this game is waiting for that "the turn is over" cannot express.
+
+        The point of asking: a turn can only be ended by a plain "done" where there is
+        nothing else to say. On a scorecard there always is — *which box* — and a button
+        that ended the turn anyway threw the throw away. One press on the panel could cost a
+        player their turn, which is the worst thing a physical button can do.
+        """
+        if self.cards:
+            return "Book a category first — ending the turn would throw this one away."
+        if self.farkle is not None:
+            return "Bank the points or set dice aside — ending the turn would lose them."
+        return None
+
+    def finish_turn(self, headline: str = "") -> tuple[bool, str | None]:
+        """
+        End a turn that has nothing left to say, and hand the tower on.
+
+        Backgammon and Mäxchen are what this is for: you throw, you move your own pieces,
+        and there is nothing for DiceCore to write down. Refused where a decision is owed.
+        """
         with self._lock:
+            problem = self.needs_a_decision
+            if problem:
+                self.message = problem
+                return False, problem
             if self.turn.dice:
                 self.log.append(TurnRecord(self.turn.player, self.turn.number,
                                            self.turn.values(), headline=headline))
             self._advance()
+            return True, None
+
+    def touch(self) -> None:
+        """Something changed. Persist it, and never let persisting break the game."""
+        if self.on_change is None:
+            return
+        try:
+            self.on_change(self)
+        except Exception:
+            pass
 
     def _advance(self) -> None:
         end_turn(self.turn)
+        self.touch()
         following = (self.turn.player + 1) % max(1, len(self.players))
         number = self.turn.number + 1
         left = self.chips[following] if following < len(self.chips) else self.rules.chips
@@ -285,6 +331,7 @@ class GameSession:
         self.reading = None
         self.message = ""
         del self.log[:-40]
+        self.touch()
 
     # --- what the screens show ---------------------------------------------
     @property

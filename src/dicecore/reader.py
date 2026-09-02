@@ -33,6 +33,7 @@ from .modes import ModeSession, interpret
 from .modes.catalogue import mode_by_id, rules_for
 from .panel import state as phases
 from .play import GameSession
+from .play import store as game_store
 
 
 class Reader:
@@ -57,8 +58,14 @@ class Reader:
         #: The live game: whose turn it is, how many throws are left, what has been scored.
         #: Owned here because a roll has to reach it before anything is shown — the screen
         #: over the tower says "throw 2 of 3" from the same state the browser does.
-        self.game = GameSession()
-        self.configure_game()
+        # A game in progress survives a restart: an evening of Kniffel is an hour of
+        # somebody's life and a Pi that loses power should not cost it.
+        self.game_path = settings.state_dir_path / "game.json"
+        restored = game_store.load(self.game_path)
+        self.game = restored or GameSession()
+        self.game.on_change = lambda session: game_store.save(session, self.game_path)
+        if restored is None:
+            self.configure_game()
         #: What each game mode remembers between throws — an exploding roll still open, a
         #: fairness tally being built up. One per mode, because two consumers may read the
         #: same tray differently: a screen in "normal" and a bot in "pool" are both right,
@@ -271,8 +278,17 @@ class Reader:
         # The moment the lamps exist for: the watch is over, throw again.
         self._show(result, phases.VOID if result.verdict == VOID else phases.READY)
 
-    def configure_game(self) -> None:
-        """Point the live game at the configured mode, its turn rules and the players."""
+    def configure_game(self, force: bool = False) -> None:
+        """
+        Point the live game at the configured mode, its turn rules and the players.
+
+        Refused while a game is running unless forced. Saving an unrelated setting — a
+        buzzer pin, a tray corner — used to reconfigure the session underneath the players,
+        and a mode change turned a Kniffel with points on the card into an empty Farkle
+        without a word. The lobby starts games; nothing else may take one away.
+        """
+        if self.game.running and not force:
+            return
         mode = mode_by_id(self.settings.mode.active)
         if mode is None:
             return

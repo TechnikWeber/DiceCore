@@ -95,15 +95,31 @@ A chip **cannot be spent while ordinary throws remain**. Spending one by fumblin
 is exactly the kind of mistake a game should not allow. In a game with no throw limit at
 all, like Farkle, a chip buys nothing and says so.
 
+## Surviving a restart
+
+A game in progress is written to `game.json` in the state directory after every move and
+read back when the service starts. An evening of Kniffel is an hour of somebody's life and
+a Pi that loses power should not cost it. A file that cannot be read means a lost game —
+never a service that will not start.
+
 ## The two buttons
 
 The browser is not always where your hands are. Two optional GPIO buttons do the same two
 things:
 
-| Button | Default pin (BCM) | Physical | Does |
-|---|---|---|---|
-| Chip | *(off)* | — | Spend a chip — one more throw |
-| End turn | *(off)* | — | Finish the turn and hand the tower on |
+| Button | Default pin (BCM) | Does |
+|---|---|---|
+| Chip | *(off)* | Spend a chip — one more throw |
+| End turn | *(off)* | In the lobby: start the configured game. In a game: end the turn |
+
+**Ending a turn only means something where "done" is the whole story** — Backgammon,
+Mäxchen, and anything else where you move your own pieces and DiceCore has nothing to write
+down. On a scorecard there is always something else to say (*which box*), so the button
+refuses there and says what it is waiting for. It used to end the turn anyway, which cost
+the player their throw: the worst thing a physical button can do.
+
+In the lobby it starts the configured game, which is the keyboard-free path from standing
+up to throwing: press one button, play.
 
 Wire each between the pin and ground and leave **Buttons use the internal pull-up** on;
 that is the whole circuit. Set the pins under **Setup → Screen & lamps**, and `-1` for a

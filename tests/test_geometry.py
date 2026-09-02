@@ -58,3 +58,27 @@ def test_size_is_only_a_hint_and_stays_silent_without_calibration():
 
 def test_offset_moves_a_box_back_into_full_frame_coordinates():
     assert offset(Box(5, 5, 10, 10), 100, 200) == Box(105, 205, 10, 10)
+
+
+def test_the_dice_a_table_says_are_in_play_name_an_unread_die():
+    # "Which dice may appear" was a checkbox list that changed nothing at all. A control
+    # that does nothing is worse than no control.
+    from dicecore.engine.geometry import guess_unread_kind
+
+    box = Box(0, 0, 80, 80)
+    assert guess_unread_kind(box, 0, ["d6", "d12"]) == "d12"
+    assert guess_unread_kind(box, 0, ["d6", "d20"]) == "d20"
+
+
+def test_size_decides_when_the_table_named_several_numeral_dice():
+    from dicecore.engine.geometry import guess_unread_kind
+
+    # A calibrated tray can tell them apart; without one, the first named kind is the guess.
+    assert guess_unread_kind(Box(0, 0, 80, 80), 0.25, ["d6", "d12", "d20"]) == "d20"
+    assert guess_unread_kind(Box(0, 0, 80, 80), 0, ["d6", "d12", "d20"]) == "d12"
+
+
+def test_a_table_that_named_only_pipped_dice_still_gets_an_answer():
+    from dicecore.engine.geometry import guess_unread_kind
+
+    assert guess_unread_kind(Box(0, 0, 80, 80), 0, ["d6"]) == "d20"

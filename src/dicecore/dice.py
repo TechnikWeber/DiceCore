@@ -93,6 +93,10 @@ class Die:
     confidence: float = 1.0
     #: Set when the engine is unsure but has a runner-up worth showing in the label UI.
     alternatives: list[int] = field(default_factory=list)
+    #: What colour the die is, when colour detection is on: "red", "white", … or None.
+    #: Rides along on the result; nothing in DiceCore decides anything from it, because
+    #: which games care is the consumer's business.
+    colour: str | None = None
 
     @property
     def label(self) -> str:

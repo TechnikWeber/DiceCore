@@ -164,3 +164,25 @@ pre {
 nav a.away { border: 1px solid var(--accent); color: var(--accent); }
 nav a.away:hover { background: var(--accent); color: var(--accent-ink); }
 textarea { min-height: 70px; resize: vertical; font-family: inherit; }
+
+/* The tray editor: a picture you drag a rectangle on, because four fractions typed into
+   four boxes is a guess and this is a measurement. */
+.trayview { position: relative; display: inline-block; max-width: 100%; line-height: 0;
+            border-radius: 8px; overflow: hidden; border: 1px solid var(--line);
+            background: var(--panel-2); cursor: crosshair; touch-action: none; }
+.trayview img { display: block; max-width: 100%; }
+.traygrid { position: absolute; inset: 0; pointer-events: none;
+  background-image:
+    linear-gradient(to right, rgba(255,255,255,.16) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255,255,255,.16) 1px, transparent 1px);
+  background-size: 25% 25%; }
+.traygrid::after {
+  content: ""; position: absolute; inset: 0;
+  background-image:
+    linear-gradient(to right, rgba(255,255,255,.32) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255,255,255,.32) 1px, transparent 1px);
+  background-size: 50% 50%;
+}
+.traysel { position: absolute; border: 2px solid var(--accent); pointer-events: none;
+           background: color-mix(in srgb, var(--accent) 14%, transparent);
+           box-shadow: 0 0 0 9999px rgba(0, 0, 0, .45); }

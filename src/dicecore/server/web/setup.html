@@ -64,8 +64,11 @@
   <section id="camera">
     <div class="card">
       <h2>Source</h2>
-      <p class="hint">Start on <em>Folder</em> — it plays back images from a directory, so
-        everything here works before any hardware arrives.</p>
+      <p class="hint"><b>Where the pictures come from.</b> Start on <em>Folder</em>: it plays
+        back images from a directory, so the whole of DiceCore works before any hardware
+        arrives. <em>picamera2</em> and <em>rpicam</em> are the Pi's own camera port,
+        <em>v4l2</em> is a USB webcam, and <em>push</em> means another machine sends the
+        pictures here.</p>
       <div class="grid">
         <div><label>Capture source</label><select id="cap-source"></select></div>
         <div><label>Folder (simulator)</label><input id="cap-folder" placeholder="/var/lib/dicecore/frames"></div>
@@ -136,14 +139,13 @@
     </div>
 
     <div class="card">
-      <h2>Players and turns</h2>
-      <p class="hint">Games with more than one throw a turn — Kniffel, Farkle — keep the
-        dice you leave on the tray and count the throws down. Chips buy an extra throw when
-        the ordinary ones are gone; set the number under the mode above. The game itself is
-        on the <a href="/">game screen</a>.</p>
+      <h2>Default players</h2>
+      <p class="hint"><b>Games are set up on the <a href="/">game screen</a>, not here.</b>
+        This is the line-up used when a game is started <em>without</em> being asked — from
+        the API, or by the panel's end-turn button in the lobby. The wizard on the game
+        screen overrides it every time, so most tables never need to touch this.</p>
       <div class="grid">
         <div><label>Players (one per line)</label><textarea id="play-players" rows="3"></textarea></div>
-        <div><label>Show the scorecard and turn counter</label><input id="play-enabled" type="checkbox"></div>
       </div>
       <div class="row" style="margin-top:12px">
         <button class="primary" id="btn-players">Save players and start a new game</button>
@@ -153,9 +155,12 @@
 
     <div class="card">
       <h2>Engine</h2>
-      <p class="hint"><em>Classic</em> counts pips and needs no training. <em>Model</em> reads
-        numerals too, once you have taught it your dice. <em>Remote</em> lets another machine
-        do the reading — that is how a Pi Zero keeps up.</p>
+      <p class="hint"><b>What actually reads the dice.</b> <em>Classic</em> counts pips and
+        needs no training, but cannot read numerals. <em>Model</em> is a small network you
+        train on your own dice under Training, and reads numerals too. <em>Remote</em> sends
+        the picture to another DiceCore on the network and uses its answer — which is how a
+        Pi Zero, where neither of the other two can run, still works. <em>Automatic</em>
+        takes the model if one is loaded and the classic reader otherwise.</p>
       <div class="grid">
         <div><label>Mode</label><select id="eng-mode"></select></div>
         <div><label>Model directory</label><input id="eng-model" placeholder="(newest)"></div>
@@ -169,8 +174,21 @@
 
     <div class="card">
       <h2>Tray</h2>
-      <p class="hint">Everything outside the tray is ignored — the cheapest accuracy win
-        there is. Values are fractions of the frame, so they survive a resolution change.</p>
+      <p class="hint"><b>The landing area, and nothing else.</b> Dice outside it are not
+        looked at, which removes table edges, hands and the tower itself before any
+        recognition happens — the cheapest accuracy win there is. <b>Drag a rectangle on the
+        picture below</b>; the numbers follow. They are fractions of the frame (0 to 1), so
+        they still mean the same thing after a resolution change.</p>
+      <div class="trayview" id="tray-view">
+        <img id="tray-image" alt="camera view">
+        <div class="traygrid" id="tray-grid"></div>
+        <div class="traysel" id="tray-sel" hidden></div>
+      </div>
+      <div class="row" style="margin:10px 0">
+        <button id="btn-tray-refresh">Take a fresh picture</button>
+        <button id="btn-tray-all">Use the whole frame</button>
+        <span class="muted" id="tray-readout"></span>
+      </div>
       <div class="grid">
         <div><label>x</label><input id="tray-x" type="number" step="0.01" min="0" max="1"></div>
         <div><label>y</label><input id="tray-y" type="number" step="0.01" min="0" max="1"></div>
@@ -183,6 +201,11 @@
 
     <div class="card">
       <h2>Classic engine</h2>
+      <p class="hint"><b>The reader that needs no training.</b> It finds the dice by
+        contrast against the tray and counts the pips as dark blobs on a light face — so it
+        reads six-siders, and honestly admits it cannot read the numerals on a d20. These
+        knobs are the two things that differ per table: which way round the contrast runs,
+        and how big a die is in the picture.</p>
       <div class="grid">
         <div><label>Dice are lighter than the tray</label><input id="cl-light" type="checkbox"></div>
         <div><label>Smallest die (fraction of tray area)</label><input id="cl-min" type="number" step="0.0001"></div>
@@ -214,8 +237,12 @@
 
     <div class="card">
       <h2>Settling</h2>
-      <p class="hint">A frame grabbed mid-tumble is worthless. The engine waits until the
-        picture stops changing before it reads.</p>
+      <p class="hint"><b>Knowing when the dice have stopped.</b> A picture taken mid-tumble
+        is worthless, and a fixed wait is wrong in both directions — too slow for a d6 that
+        lands flat, too fast for a d20 that rolls off the ramp. So DiceCore watches how much
+        the picture changes and reads once it has been quiet for a few frames in a row.
+        Raise the threshold if a busy room keeps it waiting; raise the frame count if it
+        reads too early.</p>
       <div class="grid">
         <div><label>Wait for the dice to settle</label><input id="st-enabled" type="checkbox"></div>
         <div><label>Motion threshold</label><input id="st-motion" type="number" step="0.1"></div>

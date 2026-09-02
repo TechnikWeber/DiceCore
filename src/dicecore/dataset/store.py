@@ -120,8 +120,12 @@ class DatasetSet:
 
 
 class DatasetStore:
-    def __init__(self, root: Path) -> None:
+    def __init__(self, root: Path, d10_style: str = "0-9") -> None:
         self.root = Path(root)
+        #: How this set's ten-sided dice are printed. It decides which labels are legal:
+        #: a die printed 1–10 has a face showing 10, and rejecting that label made the
+        #: whole 1–10 setting useless for training.
+        self.d10_style = d10_style
 
     # --- sets ---------------------------------------------------------------
     def create_set(self, name: str, note: str = "") -> DatasetSet:
@@ -211,8 +215,9 @@ class DatasetStore:
                 continue
             kind = str(raw.get("kind", existing.kind))
             value = int(raw.get("value", existing.value))
-            if not is_valid(kind, value):
-                raise ValueError(f"{kind}:{value} is not a die this vocabulary knows.")
+            if not is_valid(kind, value, self.d10_style):
+                raise ValueError(f"{kind}:{value} is not a die this vocabulary knows "
+                                 f"(ten-sided dice here are printed {self.d10_style}).")
             existing.kind, existing.value = kind, value
             existing.confirmed = bool(raw.get("confirmed", True))
         if note is not None:

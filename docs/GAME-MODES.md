@@ -102,8 +102,14 @@ two-digit glyph on a single face.
 
 That is a property of *your dice*, not of the game, so it is set once under **Detection →
 Game mode** and it decides the labels a model is trained on — changing it later means
-relabelling. Whether a zero then counts as nothing or as ten is a per-mode setting, because
-that genuinely is the game's business.
+relabelling.
+
+**What the zero is worth is a different question, and it belongs to the game.** Ten in
+nearly every one, which is the general answer under the same panel; but some house rules
+count it as nothing, so that a 0-1-2-3-4-5 run is a straight. Every mode can override the
+general answer with its own, and *as set generally* is the third choice — so a table can
+have one game where a zero is ten and another where it is nothing, without either of them
+being wrong.
 
 ## From your own code
 

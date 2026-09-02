@@ -101,6 +101,15 @@ python3 -m venv .venv && .venv/bin/pip install -e '.[vision,server,dev]'
   lobby first: it opened into whatever mode was configured and started reading, and a player
   watching numbers change had no idea what was going on. **Nothing reads the tray until
   `game.running`.**
+- **A control that does nothing is worse than no control.** Three shipped that way — a
+  checkbox list the engine ignored, a "show the scorecard" flag nothing read, a
+  `restrict_kinds` that was pure decoration. Before adding a setting, name the line that
+  will read it.
+- **The setup form is built in guarded sections** (`apply({...})` in `app.js`). One stale
+  path once threw halfway through and left every field after it silently empty, which looks
+  like a dozen unrelated bugs rather than one.
+- **The lobby starts games and nothing else ends one.** `configure_game()` is a no-op while
+  a game is running; a mode change takes effect at the next start.
 - **The table has no keyboard.** Every default in the wizard is already right, and every
   choice is a tap. Typing a name is allowed, never required.
 - **`/` is the game screen, `/setup` is the workshop.** The page that stays on all evening

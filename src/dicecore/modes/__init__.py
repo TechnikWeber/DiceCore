@@ -71,11 +71,17 @@ class ModeSession:
                 "tally": self.tally.verdict() if self.tally.rolls else None}
 
 
+#: Accepted as an override on *every* mode, whether or not it declares one. What a zero on
+#: a 0–9 ten-sider is worth is a house rule that can differ per game at the same table —
+#: ten almost everywhere, but nothing in the variants where 0-1-2-3-4-5 is a straight.
+UNIVERSAL = ("zero_is_ten",)
+
+
 def parameters(mode: GameMode, overrides: dict[str, Any] | None) -> dict[str, Any]:
-    """A mode's defaults with the user's changes on top, ignoring keys it does not have."""
+    """A mode's defaults with the table's changes on top, ignoring keys it cannot use."""
     values = dict(mode.defaults)
     for key, value in (overrides or {}).items():
-        if key in values:
+        if key in values or key in UNIVERSAL:
             values[key] = value
     return values
 
@@ -178,6 +184,7 @@ def _apply(rule: str, dice: list[Die], values: dict[str, Any], session: ModeSess
     if rule == "fairness":
         for die in dice:
             session.tally.kind = die.kind
+            session.tally.d10_style = d10_style
             session.tally.observe(die.value)
         verdict = session.tally.verdict()
         return Score(

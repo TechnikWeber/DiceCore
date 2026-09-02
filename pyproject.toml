@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "dicecore"
-version = "0.7.0"
+version = "0.8.0"
 description = "Reads real dice with a camera: pips, polyhedral numerals, totals — as an API."
 readme = "README.md"
 requires-python = ">=3.10"

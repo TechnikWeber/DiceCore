@@ -99,6 +99,14 @@ class ClassicSettings:
     #: A pip must cover at least this fraction of the die's own area.
     min_pip_area_frac: float = 0.005
     max_pip_area_frac: float = 0.12
+    #: Pips darker than the face — white dice with black pips, the usual case. Turn it off
+    #: for black or dark coloured dice with light pips, which the counter otherwise cannot
+    #: see at all: it looks for dark blobs and there are none.
+    pips_are_dark: bool = True
+    #: Name each die's colour as well as its face. Off by default — it costs a little work
+    #: per die and most games do not care. Turn it on for the games that are *about* the
+    #: colours, or to tell one player's dice from another's on a shared tray.
+    detect_colour: bool = False
 
 
 @dataclass
@@ -173,9 +181,6 @@ class ModeSettings:
     d10_zero_counts_as_ten: bool = True
     #: Per-mode parameter overrides, keyed by mode id: {"pool": {"threshold": 5}}.
     params: dict[str, Any] = field(default_factory=dict)
-    #: Let a mode narrow engine.expected_kinds by itself. Off only for a mixed table where
-    #: dice from another game are lying around on purpose.
-    restrict_kinds: bool = True
 
 
 @dataclass
@@ -264,8 +269,6 @@ class PlaySettings:
     players: list[str] = field(default_factory=lambda: ["Player 1", "Player 2"])
     #: One colour per player, assigned automatically and changeable by tapping.
     colours: list[str] = field(default_factory=list)
-    #: Show the scorecard and turn counter, rather than just the number.
-    enabled: bool = True
 
 
 @dataclass
@@ -292,6 +295,10 @@ class Settings:
     extra: dict[str, Any] = field(default_factory=dict)
 
     # --- paths (derived, never stored) ---
+    @property
+    def state_dir_path(self) -> Path:
+        return state_dir()
+
     @property
     def dataset_dir(self) -> Path:
         return state_dir() / "datasets"

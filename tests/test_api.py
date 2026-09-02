@@ -357,6 +357,21 @@ def test_the_mode_list_says_what_kind_of_thing_each_mode_is(client):
     assert modes["fairness"] == "tool"
 
 
+def test_the_panel_button_cannot_throw_a_kniffel_turn_away(client):
+    client.post("/api/v1/game/start", json={"mode": "yahtzee", "players": ["A"]})
+    client.get("/api/v1/roll?verify=0")
+    refused = client.post("/api/v1/game/next")
+    assert refused.status_code == 409 and "Book a category" in refused.json()["detail"]
+    assert client.get("/api/v1/game").json()["game"]["turn"]["number"] == 1
+
+
+def test_ending_a_turn_works_where_done_is_the_whole_story(client):
+    client.post("/api/v1/game/start", json={"mode": "backgammon", "players": ["A", "B"]})
+    client.get("/api/v1/roll?verify=0")
+    after = client.post("/api/v1/game/next").json()
+    assert after["turn"]["number"] == 2 and after["current_player"] == "B"
+
+
 def test_the_extended_kniffel_sheet_is_offered_and_described(client):
     modes = [m["id"] for m in client.get("/api/v1/modes").json()["modes"]]
     assert "yahtzee_extreme" in modes
@@ -409,3 +424,31 @@ def test_chips_belong_to_the_player_for_the_whole_game(client):
 
 def test_the_page_itself_is_served(client):
     assert "DiceCore" in client.get("/setup").text
+
+
+def test_saving_a_setting_cannot_take_a_running_game_away(client):
+    # It could: a mode change in the setup page turned a Kniffel with points on the card
+    # into an empty Farkle, mid-game, without a word.
+    client.post("/api/v1/game/start", json={"mode": "yahtzee", "players": ["A", "B"]})
+    client.get("/api/v1/roll?verify=0")
+    client.post("/api/v1/game/book", json={"category": "chance"})
+    before = client.get("/api/v1/game").json()["game"]
+
+    settings = client.get("/api/setup/settings").json()
+    settings["mode"]["active"] = "farkle"
+    settings["panel"]["signals"]["beep_ms"] = 99
+    client.put("/api/setup/settings", json=settings)
+
+    after = client.get("/api/v1/game").json()["game"]
+    assert after["mode"] == "yahtzee" and after["running"]
+    assert after["cards"][0]["total"] == before["cards"][0]["total"]
+    assert after["turn"]["number"] == before["turn"]["number"]
+
+
+def test_the_new_mode_takes_effect_once_the_game_is_left(client):
+    client.post("/api/v1/game/start", json={"mode": "yahtzee", "players": ["A"]})
+    client.post("/api/setup/mode", json={"mode": "farkle"})
+    assert client.get("/api/v1/game").json()["game"]["mode"] == "yahtzee"
+    client.post("/api/v1/game/stop")
+    client.post("/api/setup/mode", json={"mode": "farkle"})
+    assert client.get("/api/v1/game").json()["game"]["mode"] == "farkle"

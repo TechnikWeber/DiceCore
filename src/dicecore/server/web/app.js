@@ -48,7 +48,7 @@ function showTab() {
   document.querySelectorAll("nav a").forEach((a) => a.classList.toggle("on", a.hash === `#${name}`));
   if (name === "camera") { refreshHardware(); refreshPreview(); }
   if (name === "signals") pollOutputs();
-  if (name === "detection") { pollModeSession(); renderPlayState(); }
+  if (name === "detection") { pollModeSession(); renderPlayState(); refreshTrayImage(); }
   if (name === "training") { loadSets(); pollTraining(); }
   if (name === "system") refreshStatus();
 }
@@ -156,84 +156,132 @@ function fillSelect(select, items, selected) {
     .join("");
 }
 
+//: Every assignment guarded, because the alternative bites hard: a single stale path — one
+//: `s.output` left behind by a rename — threw halfway through and left every field after it
+//: silently empty, which looks like a dozen unrelated bugs rather than one.
+function apply(steps) {
+  const failures = [];
+  for (const [name, step] of Object.entries(steps)) {
+    try {
+      step();
+    } catch (err) {
+      failures.push(`${name}: ${err.message}`);
+    }
+  }
+  if (failures.length) {
+    console.error("setup form:", failures);
+    alertBox(`Some settings could not be shown — ${failures[0]}`, "bad");
+  }
+}
+
 function loadForm() {
   const s = state.settings;
-  fillSelect($("cap-source"), state.options.sources, s.capture.source);
-  fillSelect($("eng-mode"), state.options.engines, s.engine.mode);
-  fillSelect($("csi-module"), state.options.csi_modules.map((m) => ({ id: m.id, label: m.label })),
-             s.capture.csi_module);
-  fillSelect($("gd-policy"), state.options.policies, s.guard.policy);
-  fillSelect($("dp-kind"), state.options.panels, s.output.display.kind);
-  fillSelect($("mode-select"), state.options.modes, s.mode.active);
-  fillSelect($("mode-pick"), state.options.modes, s.mode.active);
-  $("mode-d10").value = s.mode.d10_style;
-  $("mode-zero").value = s.mode.d10_zero_counts_as_ten ? "ten" : "zero";
-  $("play-players").value = (s.play.players || []).join("\n");
-  $("play-enabled").checked = s.play.enabled;
-  renderModeEditor();
-  renderModeBlurb();
-  $("cap-folder").value = s.capture.folder;
-  $("cap-device").value = s.capture.device;
-  $("cap-width").value = s.capture.width;
-  $("cap-height").value = s.capture.height;
-  $("cap-rotation").value = s.capture.rotation;
-  $("cap-tuning").value = s.capture.tuning_file;
-  $("cap-focus").value = s.capture.focus_mode;
-  $("cap-dioptre").value = s.capture.focus_dioptre;
-  $("eng-model").value = s.engine.model_path;
-  $("eng-remote").value = s.engine.remote_url;
-  $("eng-conf").value = s.engine.min_confidence;
-  $("tray-x").value = s.tray.x; $("tray-y").value = s.tray.y;
-  $("tray-w").value = s.tray.w; $("tray-h").value = s.tray.h;
-  $("tray-mm").value = s.tray.mm_per_px;
-  $("cl-light").checked = s.classic.dice_are_light;
-  $("cl-min").value = s.classic.min_area_frac;
-  $("cl-max").value = s.classic.max_area_frac;
-  $("cl-blur").value = s.classic.blur;
-  $("gd-enabled").checked = s.guard.enabled;
-  $("gd-hold").value = s.guard.hold_s;
-  $("gd-interval").value = s.guard.interval_s;
-  $("gd-motion").value = s.guard.motion_threshold;
-  $("gd-hand").value = s.guard.hand_area_frac;
-  $("gd-touch").checked = s.guard.void_on_touch;
-  $("gd-throw").checked = s.guard.require_throw;
-  $("dp-enabled").checked = s.output.display.enabled;
-  $("dp-width").value = s.output.display.width;
-  $("dp-height").value = s.output.display.height;
-  $("dp-rotate").value = s.output.display.rotate;
-  $("dp-spiport").value = s.output.display.spi_port;
-  $("dp-spidev").value = s.output.display.spi_device;
-  $("dp-dc").value = s.output.display.gpio_dc;
-  $("dp-rst").value = s.output.display.gpio_rst;
-  $("dp-i2cport").value = s.output.display.i2c_port;
-  $("dp-i2caddr").value = s.output.display.i2c_address;
-  $("sg-enabled").checked = s.output.signals.enabled;
-  $("sg-green").value = s.output.signals.green_pin;
-  $("sg-red").value = s.output.signals.red_pin;
-  $("sg-buzzer").value = s.output.signals.buzzer_pin;
-  $("sg-buzzon").checked = s.output.signals.buzzer_enabled;
-  $("sg-beep").value = s.output.signals.beep_ms;
-  $("sg-high").checked = s.output.signals.active_high;
-  $("sg-celebsound").checked = s.output.signals.celebrate_sound;
-  $("cl-mode").value = s.output.celebrate;
-  $("cl-total").value = s.output.celebrate_total;
-  $("cl-lament").checked = s.output.lament_on_min;
-  $("cl-frames").value = s.output.animation_frames;
-  panelSizes();
-  $("st-enabled").checked = s.settle.enabled;
-  $("st-motion").value = s.settle.motion_threshold;
-  $("st-frames").value = s.settle.stable_frames;
-  $("st-timeout").value = s.settle.timeout_s;
-
-  $("kind-checks").innerHTML = state.options.kinds.map((k) => `
-    <label class="row" style="margin:0;gap:6px">
-      <input type="checkbox" class="kind" value="${k.id}"
-        ${s.engine.expected_kinds.includes(k.id) ? "checked" : ""}> ${k.id}
-    </label>`).join("");
-  updateCsiNote();
-  $("settings-dump").textContent = JSON.stringify(s, null, 2);
-  $("subtitle").textContent = `${s.server.public_name} · ${s.capture.source} → ${s.engine.mode}`
-    + (s.guard.enabled ? ` · fair play: ${s.guard.policy}` : "");
+  apply({
+    mode: () => {
+      fillSelect($("mode-select"), state.options.modes, s.mode.active);
+      fillSelect($("mode-pick"), state.options.modes, s.mode.active);
+      $("mode-d10").value = s.mode.d10_style;
+      $("mode-zero").value = s.mode.d10_zero_counts_as_ten ? "ten" : "zero";
+      renderModeEditor();
+      renderModeBlurb();
+    },
+    players: () => {
+      $("play-players").value = (s.play.players || []).join("\n");
+    },
+    camera: () => {
+      fillSelect($("cap-source"), state.options.sources, s.capture.source);
+      fillSelect($("csi-module"), state.options.csi_modules.map(
+        (m) => ({ id: m.id, label: m.label })), s.capture.csi_module);
+      $("cap-folder").value = s.capture.folder;
+      $("cap-device").value = s.capture.device;
+      $("cap-width").value = s.capture.width;
+      $("cap-height").value = s.capture.height;
+      $("cap-rotation").value = s.capture.rotation;
+      $("cap-tuning").value = s.capture.tuning_file;
+      $("cap-focus").value = s.capture.focus_mode;
+      $("cap-dioptre").value = s.capture.focus_dioptre;
+      updateCsiNote();
+    },
+    engine: () => {
+      fillSelect($("eng-mode"), state.options.engines, s.engine.mode);
+      $("eng-model").value = s.engine.model_path;
+      $("eng-remote").value = s.engine.remote_url;
+      $("eng-conf").value = s.engine.min_confidence;
+      $("kind-checks").innerHTML = state.options.kinds.map((k) => `
+        <label class="row" style="margin:0;gap:6px">
+          <input type="checkbox" class="kind" value="${k.id}"
+            ${s.engine.expected_kinds.includes(k.id) ? "checked" : ""}> ${k.id}
+        </label>`).join("");
+    },
+    tray: () => {
+      $("tray-x").value = s.tray.x; $("tray-y").value = s.tray.y;
+      $("tray-w").value = s.tray.w; $("tray-h").value = s.tray.h;
+      $("tray-mm").value = s.tray.mm_per_px;
+      drawTray(trayFromSettings());
+    },
+    classic: () => {
+      $("cl-light").checked = s.classic.dice_are_light;
+      $("cl-min").value = s.classic.min_area_frac;
+      $("cl-max").value = s.classic.max_area_frac;
+      $("cl-blur").value = s.classic.blur;
+    },
+    guard: () => {
+      fillSelect($("gd-policy"), state.options.policies, s.guard.policy);
+      $("gd-enabled").checked = s.guard.enabled;
+      $("gd-hold").value = s.guard.hold_s;
+      $("gd-interval").value = s.guard.interval_s;
+      $("gd-motion").value = s.guard.motion_threshold;
+      $("gd-hand").value = s.guard.hand_area_frac;
+      $("gd-touch").checked = s.guard.void_on_touch;
+      $("gd-throw").checked = s.guard.require_throw;
+    },
+    settling: () => {
+      $("st-enabled").checked = s.settle.enabled;
+      $("st-motion").value = s.settle.motion_threshold;
+      $("st-frames").value = s.settle.stable_frames;
+      $("st-timeout").value = s.settle.timeout_s;
+    },
+    display: () => {
+      fillSelect($("dp-kind"), state.options.panels, s.panel.display.kind);
+      $("dp-enabled").checked = s.panel.display.enabled;
+      $("dp-width").value = s.panel.display.width;
+      $("dp-height").value = s.panel.display.height;
+      $("dp-rotate").value = s.panel.display.rotate;
+      $("dp-spiport").value = s.panel.display.spi_port;
+      $("dp-spidev").value = s.panel.display.spi_device;
+      $("dp-dc").value = s.panel.display.gpio_dc;
+      $("dp-rst").value = s.panel.display.gpio_rst;
+      $("dp-i2cport").value = s.panel.display.i2c_port;
+      $("dp-i2caddr").value = s.panel.display.i2c_address;
+      panelSizes();
+    },
+    signals: () => {
+      $("sg-enabled").checked = s.panel.signals.enabled;
+      $("sg-green").value = s.panel.signals.green_pin;
+      $("sg-red").value = s.panel.signals.red_pin;
+      $("sg-buzzer").value = s.panel.signals.buzzer_pin;
+      $("sg-buzzon").checked = s.panel.signals.buzzer_enabled;
+      $("sg-beep").value = s.panel.signals.beep_ms;
+      $("sg-high").checked = s.panel.signals.active_high;
+      $("sg-celebsound").checked = s.panel.signals.celebrate_sound;
+      $("sg-chipbtn").value = s.panel.signals.chip_pin;
+      $("sg-nextbtn").value = s.panel.signals.next_pin;
+      $("sg-pullup").checked = s.panel.signals.button_pull_up;
+      $("sg-debounce").value = s.panel.signals.debounce_s;
+    },
+    celebration: () => {
+      $("cl-mode").value = s.panel.celebrate;
+      $("cl-total").value = s.panel.celebrate_total;
+      $("cl-lament").checked = s.panel.lament_on_min;
+      $("cl-frames").value = s.panel.animation_frames;
+    },
+    summary: () => {
+      $("settings-dump").textContent = JSON.stringify(s, null, 2);
+      $("subtitle").textContent =
+        `${s.server.public_name} · ${s.capture.source} → ${s.engine.mode}`
+        + (s.guard.enabled ? ` · fair play: ${s.guard.policy}` : "");
+    },
+  });
 }
 
 function collectForm() {
@@ -267,34 +315,33 @@ function collectForm() {
   s.guard.hand_area_frac = Number($("gd-hand").value);
   s.guard.void_on_touch = $("gd-touch").checked;
   s.guard.require_throw = $("gd-throw").checked;
-  s.output.display.enabled = $("dp-enabled").checked;
-  s.output.display.kind = $("dp-kind").value;
-  s.output.display.width = Number($("dp-width").value);
-  s.output.display.height = Number($("dp-height").value);
-  s.output.display.rotate = Number($("dp-rotate").value);
-  s.output.display.spi_port = Number($("dp-spiport").value);
-  s.output.display.spi_device = Number($("dp-spidev").value);
-  s.output.display.gpio_dc = Number($("dp-dc").value);
-  s.output.display.gpio_rst = Number($("dp-rst").value);
-  s.output.display.i2c_port = Number($("dp-i2cport").value);
-  s.output.display.i2c_address = $("dp-i2caddr").value;
-  s.output.signals.enabled = $("sg-enabled").checked;
-  s.output.signals.green_pin = Number($("sg-green").value);
-  s.output.signals.red_pin = Number($("sg-red").value);
-  s.output.signals.buzzer_pin = Number($("sg-buzzer").value);
-  s.output.signals.buzzer_enabled = $("sg-buzzon").checked;
-  s.output.signals.beep_ms = Number($("sg-beep").value);
-  s.output.signals.active_high = $("sg-high").checked;
-  s.output.signals.celebrate_sound = $("sg-celebsound").checked;
-  s.output.celebrate = $("cl-mode").value;
-  s.output.celebrate_total = Number($("cl-total").value);
-  s.output.lament_on_min = $("cl-lament").checked;
-  s.output.animation_frames = Number($("cl-frames").value);
+  s.panel.display.enabled = $("dp-enabled").checked;
+  s.panel.display.kind = $("dp-kind").value;
+  s.panel.display.width = Number($("dp-width").value);
+  s.panel.display.height = Number($("dp-height").value);
+  s.panel.display.rotate = Number($("dp-rotate").value);
+  s.panel.display.spi_port = Number($("dp-spiport").value);
+  s.panel.display.spi_device = Number($("dp-spidev").value);
+  s.panel.display.gpio_dc = Number($("dp-dc").value);
+  s.panel.display.gpio_rst = Number($("dp-rst").value);
+  s.panel.display.i2c_port = Number($("dp-i2cport").value);
+  s.panel.display.i2c_address = $("dp-i2caddr").value;
+  s.panel.signals.enabled = $("sg-enabled").checked;
+  s.panel.signals.green_pin = Number($("sg-green").value);
+  s.panel.signals.red_pin = Number($("sg-red").value);
+  s.panel.signals.buzzer_pin = Number($("sg-buzzer").value);
+  s.panel.signals.buzzer_enabled = $("sg-buzzon").checked;
+  s.panel.signals.beep_ms = Number($("sg-beep").value);
+  s.panel.signals.active_high = $("sg-high").checked;
+  s.panel.signals.celebrate_sound = $("sg-celebsound").checked;
+  s.panel.celebrate = $("cl-mode").value;
+  s.panel.celebrate_total = Number($("cl-total").value);
+  s.panel.lament_on_min = $("cl-lament").checked;
+  s.panel.animation_frames = Number($("cl-frames").value);
   s.panel.signals.chip_pin = Number($("sg-chipbtn").value);
   s.panel.signals.next_pin = Number($("sg-nextbtn").value);
   s.panel.signals.button_pull_up = $("sg-pullup").checked;
   s.panel.signals.debounce_s = Number($("sg-debounce").value);
-  s.play.enabled = $("play-enabled").checked;
   s.settle.enabled = $("st-enabled").checked;
   s.settle.motion_threshold = Number($("st-motion").value);
   s.settle.stable_frames = Number($("st-frames").value);
@@ -332,6 +379,74 @@ async function applyModule() {
 }
 
 // --- hardware / status ------------------------------------------------------
+
+// --- the tray, drawn rather than typed --------------------------------------
+
+function trayFromSettings() {
+  const t = state.settings.tray;
+  return { x: t.x, y: t.y, w: t.w, h: t.h };
+}
+
+function drawTray(box) {
+  const sel = $("tray-sel");
+  sel.hidden = false;
+  sel.style.left = `${box.x * 100}%`;
+  sel.style.top = `${box.y * 100}%`;
+  sel.style.width = `${box.w * 100}%`;
+  sel.style.height = `${box.h * 100}%`;
+  $("tray-readout").textContent =
+    `x ${box.x.toFixed(2)} · y ${box.y.toFixed(2)} · w ${box.w.toFixed(2)} · h ${box.h.toFixed(2)}`;
+  $("tray-x").value = box.x.toFixed(3);
+  $("tray-y").value = box.y.toFixed(3);
+  $("tray-w").value = box.w.toFixed(3);
+  $("tray-h").value = box.h.toFixed(3);
+}
+
+function setupTrayEditor() {
+  const view = $("tray-view");
+  let start = null;
+
+  const at = (event) => {
+    const rect = view.getBoundingClientRect();
+    return {
+      x: Math.min(1, Math.max(0, (event.clientX - rect.left) / rect.width)),
+      y: Math.min(1, Math.max(0, (event.clientY - rect.top) / rect.height)),
+    };
+  };
+
+  view.addEventListener("pointerdown", (event) => {
+    start = at(event);
+    view.setPointerCapture(event.pointerId);
+  });
+  view.addEventListener("pointermove", (event) => {
+    if (!start) return;
+    const now = at(event);
+    drawTray({
+      x: Math.min(start.x, now.x), y: Math.min(start.y, now.y),
+      w: Math.abs(now.x - start.x), h: Math.abs(now.y - start.y),
+    });
+  });
+  view.addEventListener("pointerup", (event) => {
+    if (!start) return;
+    const now = at(event);
+    // A tap rather than a drag means "no change" — dragging a zero-sized tray by accident
+    // would blind the engine completely.
+    if (Math.abs(now.x - start.x) > 0.02 && Math.abs(now.y - start.y) > 0.02) {
+      drawTray({
+        x: Math.min(start.x, now.x), y: Math.min(start.y, now.y),
+        w: Math.abs(now.x - start.x), h: Math.abs(now.y - start.y),
+      });
+    } else {
+      drawTray(trayFromSettings());
+    }
+    start = null;
+    view.releasePointerCapture(event.pointerId);
+  });
+}
+
+function refreshTrayImage() {
+  $("tray-image").src = `/api/setup/preview.jpg?t=${Date.now()}`;
+}
 
 function refreshPreview() {
   $("preview-image").src = `/api/setup/preview.jpg?t=${Date.now()}`;
@@ -544,6 +659,17 @@ function renderModeEditor() {
     rule: ["sum", "pool", "best", "under"],
     take: ["high", "low"],
   };
+  // Offered on every mode, not only the ones that declare it: what a zero on a 0-9
+  // ten-sider is worth is a per-game house rule, and the general setting is the fallback
+  // rather than the law.
+  const zero = saved.zero_is_ten;
+  const zeroRow = `<div><label>a zero on a 0–9 die counts as</label>
+    <select class="mp" data-key="zero_is_ten">
+      <option value="" ${zero === undefined ? "selected" : ""}>as set generally
+        (${state.settings.mode.d10_zero_counts_as_ten ? "ten" : "nothing"})</option>
+      <option value="true" ${zero === true ? "selected" : ""}>ten</option>
+      <option value="false" ${zero === false ? "selected" : ""}>nothing — a 0 is a 0</option>
+    </select></div>`;
   $("mode-params").innerHTML = Object.entries(mode.defaults).map(([key, fallback]) => {
     const value = key in saved ? saved[key] : fallback;
     const label = escapeHtml(key.replace(/_/g, " "));
@@ -558,12 +684,18 @@ function renderModeEditor() {
     }
     return `<div><label>${label}</label><input class="mp" data-key="${key}" type="number"
       value="${escapeHtml(value)}"></div>`;
-  }).join("") || `<p class="muted">This mode has nothing to adjust.</p>`;
+  }).join("") + zeroRow;
 }
 
 function collectModeParams() {
   const params = {};
   document.querySelectorAll(".mp").forEach((el) => {
+    if (el.dataset.key === "zero_is_ten") {
+      // An empty choice means "inherit", and inheriting has to be expressible — so the key
+      // is left out rather than sent as a value the mode would then be stuck with.
+      if (el.value !== "") params.zero_is_ten = el.value === "true";
+      return;
+    }
     params[el.dataset.key] = el.type === "checkbox" ? el.checked
       : el.tagName === "SELECT" ? el.value : Number(el.value);
   });
@@ -728,6 +860,9 @@ document.querySelectorAll("[data-save]").forEach((b) => (b.onclick = saveSetting
 $("btn-roll").onclick = roll;
 $("btn-preview").onclick = refreshPreview;
 $("btn-hardware").onclick = refreshHardware;
+$("btn-tray-refresh").onclick = refreshTrayImage;
+$("btn-tray-all").onclick = () => drawTray({ x: 0, y: 0, w: 1, h: 1 });
+setupTrayEditor();
 $("btn-module").onclick = applyModule;
 $("csi-module").addEventListener("change", updateCsiNote);
 $("btn-capture").onclick = captureIntoSet;

@@ -66,12 +66,27 @@ def create_app(settings: Settings | None = None) -> Any:
         reader.game.chip()
 
     def on_next() -> None:
+        """
+        The panel's second button, and what it means depends on where you are.
+
+        In the lobby it starts the configured game — which is the whole keyboard-free path:
+        walk up, press one button, play. In a game it ends the turn, and refuses to where a
+        decision is owed rather than quietly costing somebody their throw.
+        """
+        if not reader.game.running:
+            mode = mode_by_id(state["settings"].mode.active)
+            if mode is not None:
+                params = state["settings"].mode.params.get(mode.id) or {}
+                reader.game.start(mode.id, rules_for(mode, params),
+                                  list(state["settings"].play.players),
+                                  list(state["settings"].play.colours), params)
+            return
         reader.game.finish_turn()
 
     buttons = ButtonPanel(loaded.panel.signals, on_chip, on_next)
     state["buttons"] = buttons
 
-    app = FastAPI(title="DiceCore", version="0.7.0",
+    app = FastAPI(title="DiceCore", version="0.8.0",
                   description="Reads real dice with a camera.")
     app.state.reader = reader
     app.state.training = training
@@ -79,7 +94,8 @@ def create_app(settings: Settings | None = None) -> Any:
     app.state.buttons = buttons
 
     def store() -> DatasetStore:
-        return DatasetStore(state["settings"].dataset_dir)
+        # The printing style travels with the store: it decides which labels are legal.
+        return DatasetStore(state["settings"].dataset_dir, state["settings"].mode.d10_style)
 
     def fail(exc: Exception, code: int = 503) -> Any:
         """Errors are for humans: the UI prints `detail` verbatim, so it must be a sentence."""
@@ -176,9 +192,19 @@ def create_app(settings: Settings | None = None) -> Any:
 
     @app.post("/api/v1/game/next")
     def game_next() -> Any:
-        """End the turn without booking anything. The same call the GPIO button makes."""
+        """
+        End the turn without booking anything. The same call the GPIO button makes.
+
+        Only meaningful where "done" is the whole story — Backgammon, Mäxchen, and anything
+        else where you move your own pieces and DiceCore has nothing to write down. A game
+        with a scorecard refuses: there, ending a turn without booking would throw it away.
+        """
         last = reader.last
-        reader.game.finish_turn((last.reading or {}).get("headline", "") if last else "")
+        headline = (last.reading or {}).get("headline", "") if last else ""
+        ok, problem = reader.game.finish_turn(headline)
+        if not ok:
+            return JSONResponse({"error": "DecisionOwed", "detail": problem,
+                                 "game": reader.game.to_json()}, status_code=409)
         return reader.game.to_json()
 
     @app.post("/api/v1/game/start")

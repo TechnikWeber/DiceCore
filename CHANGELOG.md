@@ -2,6 +2,47 @@
 
 Notable changes, newest first. Dates are the day the work landed.
 
+## 0.8.0 (2026-09-02)
+
+A review pass that turned up more than it was meant to, plus the two things the game screen
+was still missing.
+
+### Fixed
+- **The whole setup form was half empty.** Renaming `output` to `panel` in 0.5.0 left one
+  stale path in the page's JavaScript; it threw, and every field after it — the game mode,
+  settling, the players, the display, the lamps — silently never filled in. The form is now
+  built in guarded sections, so one bad field can never blank the rest again.
+- **The panel's end-turn button could throw a Kniffel turn away.** One press ended the turn
+  without booking anything. Ending a turn is now refused wherever a decision is owed —
+  book a category, bank the points — and only works where "done" is the whole story.
+- **Saving a setting could take a running game away.** A mode change in the setup page
+  turned a Kniffel with points on the card into an empty Farkle, mid-game, without a word.
+  The lobby starts games; nothing else may end one.
+- **"Which dice may appear" did nothing at all.** It is now what names a die the pip
+  counter could not read, instead of a hardcoded d20.
+- **A ten-sided die printed 1–10 could not be labelled as a 10.** The printing style is a
+  setting, and it made its own labels illegal — which left the whole option useless for
+  training.
+- Removed `mode.restrict_kinds` and `play.enabled`: both were saved, shown, and read by
+  nothing.
+
+### Added
+- **A tray you draw rather than type.** Drag a rectangle over the camera picture with a
+  quarter-frame grid behind it; the four fractions follow. Four numbers typed into four
+  boxes was a guess, and this is a measurement.
+- **Colour detection**, optional and off by default: each die comes back named — red,
+  blue, white, black — and the game screen draws them in their real colours. This is what a
+  colour-dependent game (Qwixx, Sagrada, King of Tokyo) would be built on.
+- **A game survives a restart.** The session is written to one small file after every move
+  and read back when the service comes up. A file that cannot be read is a lost game, never
+  a service that will not start.
+- **What a zero on a 0–9 die is worth is now settable per game**, overriding the general
+  answer — because that is genuinely a per-game house rule.
+- Short explanations under every setting that names a thing nobody has met: what the
+  classic engine is, what settling does, what each engine mode means, what the tray is for.
+- The panel's end-turn button starts the configured game while in the lobby, which is the
+  keyboard-free path: walk up, press one button, play.
+
 ## 0.7.0 (2026-09-02)
 
 The game screen becomes a game screen. It had no lobby: it opened into whatever mode was

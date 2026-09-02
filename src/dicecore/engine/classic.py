@@ -21,6 +21,7 @@ from typing import Any
 
 from ..config import ClassicSettings, Settings, TraySettings
 from ..dice import Box, Die, Frame, RollResult
+from . import colour as colours
 from . import geometry as geo
 from .base import Engine, EngineError
 
@@ -92,11 +93,20 @@ class ClassicEngine(Engine):
             cv2.drawContours(die_mask, [contour], -1, 255, -1)
             count, areas = self._count_pips(gray, die_mask, box, cfg)
             confidence = geo.pip_confidence(count, areas)
+            name = None
+            if cfg.detect_colour and crop.ndim == 3:
+                # Sampled from the whole die, pips and highlights trimmed off inside
+                # `colour.sample` — see there for why the median and not the mean.
+                inset = cv2.erode(die_mask, cv2.getStructuringElement(
+                    cv2.MORPH_ELLIPSE, (5, 5)), iterations=2)
+                name = colours.sample(crop, inset)[0]
             if confidence > 0:
-                dice.append(Die("d6", count, geo.offset(box, roi.x, roi.y), confidence))
+                dice.append(Die("d6", count, geo.offset(box, roi.x, roi.y), confidence,
+                                colour=name))
             else:
-                kind = geo.kind_from_size(box, tray.mm_per_px) or "d20"
-                dice.append(Die(kind, 0, geo.offset(box, roi.x, roi.y), 0.0))
+                kind = geo.guess_unread_kind(box, tray.mm_per_px,
+                                             self.settings.engine.expected_kinds)
+                dice.append(Die(kind, 0, geo.offset(box, roi.x, roi.y), 0.0, colour=name))
 
         order = geo.sort_reading_order([d.box for d in dice])
         dice = [dice[i] for i in order]
@@ -151,7 +161,10 @@ class ClassicEngine(Engine):
         spread = float(face.max()) - float(face.min())
         if spread < 30:
             return 0, []  # a blank face, or a die too small to resolve pips
-        pips = np.where((sub < threshold) & (sub_mask > 0), 255, 0).astype(np.uint8)
+        # Which side of the threshold the pips are on is a property of the dice, not of the
+        # light: a black die with white pips has no dark blobs to find at all.
+        inked = sub < threshold if cfg.pips_are_dark else sub > threshold
+        pips = np.where(inked & (sub_mask > 0), 255, 0).astype(np.uint8)
         pips = cv2.morphologyEx(pips, cv2.MORPH_OPEN,
                                 cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3)))
 
@@ -175,7 +188,8 @@ class ClassicEngine(Engine):
         return len(areas), areas
 
     def describe(self) -> dict[str, Any]:
-        return {"name": self.name, "reads": ["pips (d6)"], "trained": False}
+        return {"name": self.name, "reads": ["pips (d6)"], "trained": False,
+                "colour": self.settings.classic.detect_colour}
 
 
 def tray_preview(settings: TraySettings, frame_w: int, frame_h: int) -> Box:

@@ -96,11 +96,23 @@ shadows short, which matters because a long shadow reads as part of the die's ou
 Whatever you choose, keep it **constant**. A model trained under a desk lamp and used under
 daylight is a model trained on the desk lamp.
 
+## Colours
+
+DiceCore can name each die's colour as well as its face — red, blue, white, black and the
+rest — under **Detection → Classic engine**. It is off by default because it costs a little
+work per die and most games do not care; turn it on for the games that are *about* the
+colours, or to tell one player's dice from another's on a shared tray.
+
+It wants what everything else here wants: even light and a tray the dice do not match. A
+black die on a black tray is invisible to a camera and to a person, and no engine can be
+blamed for that.
+
 ## Calibrating the tray
 
 Once, in the **Detection** tab:
 
-1. Set the tray rectangle so it covers the landing area and nothing else.
+1. **Drag a rectangle** over the picture under *Detection → Tray*, covering the landing
+   area and nothing else. The four fractions follow; there is nothing to type.
 2. Measure one die with a ruler (a standard d6 is 16 mm) and read its pixel width off a
    captured frame. `mm_per_px = 16 / pixels`. This lets the engine use physical size as a
    hint when telling die kinds apart.

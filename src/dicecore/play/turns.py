@@ -55,13 +55,16 @@ class DieSlot:
     kind: str
     value: int
     held: bool = False
+    #: What colour the die is, when the engine was asked to look. None otherwise.
+    colour: str | None = None
     #: Where it was, so the next throw can tell "kept" from "rerolled".
     x: int = 0
     y: int = 0
     size: int = 1
 
     def to_json(self) -> dict[str, Any]:
-        return {"kind": self.kind, "value": self.value, "held": self.held}
+        return {"kind": self.kind, "value": self.value, "held": self.held,
+                "colour": self.colour}
 
 
 @dataclass
@@ -145,7 +148,8 @@ def slots_from(dice: list[Die], held: list[bool] | None = None) -> list[DieSlot]
     slots = []
     for die, flag in zip(dice, flags, strict=False):
         x, y = die.box.center
-        slots.append(DieSlot(die.kind, die.value, flag, x, y, max(die.box.w, die.box.h)))
+        slots.append(DieSlot(die.kind, die.value, flag, die.colour, x, y,
+                             max(die.box.w, die.box.h)))
     return slots
 
 

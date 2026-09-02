@@ -75,6 +75,30 @@ def pip_confidence(count: int, areas: list[float]) -> float:
     return round(min(1.0, 0.55 + 0.45 * uniformity), 3)
 
 
+#: Kinds whose faces are numerals rather than pips — the ones the classic engine cannot
+#: read and has to name some other way.
+NUMERAL_KINDS = ("d4", "d8", "d10", "d100", "d12", "d20")
+
+
+def guess_unread_kind(box: Box, mm_per_px: float, expected: list[str]) -> str:
+    """
+    Name a die the pip counter could not read.
+
+    It has three things to go on, in order of how much they are worth: the table said which
+    dice are in play, the die has a physical size if the tray was calibrated, and failing
+    both, a d20 is the numeral die people actually own. Before this, "which dice may appear"
+    was a checkbox list that changed nothing at all — a control that does nothing is worse
+    than no control.
+    """
+    numerals = [kind for kind in expected if kind in NUMERAL_KINDS]
+    if len(numerals) == 1:
+        return numerals[0]
+    sized = kind_from_size(box, mm_per_px)
+    if sized and (not numerals or sized in expected):
+        return sized
+    return numerals[0] if numerals else "d20"
+
+
 def kind_from_size(box: Box, mm_per_px: float) -> str | None:
     """
     Guess the kind from physical size alone.

@@ -259,11 +259,33 @@ def test_changing_the_players_starts_a_new_game():
 
 
 def test_a_game_without_a_scorecard_still_counts_turns():
+    # Backgammon and Mäxchen: you throw, you move your own pieces, and "done" is the whole
+    # story. This is the only case where a plain end-turn button means anything.
     session = GameSession("normal", TurnRules(), ["A"])
     session.observe(result(4, 2))
     assert not session.cards
-    session.finish_turn("6")
+    assert session.finish_turn("6") == (True, None)
     assert session.turn.number == 2 and session.to_json()["log"][0]["headline"] == "6"
+
+
+def test_ending_a_kniffel_turn_without_booking_is_refused():
+    # One press on the panel used to cost a player their whole turn, which is the worst
+    # thing a physical button can do.
+    session = game()
+    session.observe(result(3, 3, 3, 5, 5))
+    ok, problem = session.finish_turn()
+    assert not ok and "Book a category" in problem
+    assert session.turn.number == 1 and session.turn.rolls_used == 1
+
+
+def test_ending_a_farkle_turn_without_banking_is_refused():
+    from dicecore.modes.catalogue import mode_by_id
+
+    mode = mode_by_id("farkle")
+    session = GameSession("farkle", rules_for(mode, mode.defaults), ["A"], mode.defaults)
+    session.observe(result(1, 1, 1, 3, 4, 2))
+    ok, problem = session.finish_turn()
+    assert not ok and "Bank the points" in problem
 
 
 # --- chips belong to a player, for the whole game ---------------------------------
@@ -439,3 +461,69 @@ def test_the_winner_is_only_named_when_there_is_one():
     assert kniffel.leader(cards) is None          # nobody has scored: a tie
     cards[1].book("chance", [6, 6, 6, 6, 6])
     assert kniffel.leader(cards) == 1
+
+
+# --- surviving a restart ----------------------------------------------------------
+
+
+def test_a_game_in_progress_is_written_out_and_read_back(tmp_path):
+    from dicecore.play import store
+
+    path = tmp_path / "game.json"
+    session = game()
+    session.on_change = lambda s: store.save(s, path)
+    session.start("yahtzee", KNIFFEL, ["Ada", "Bob"])
+    session.observe(result(3, 3, 3, 5, 5))
+    session.book("full_house")
+
+    back = store.load(path)
+    assert back is not None
+    assert back.running and back.players == ["Ada", "Bob"]
+    assert back.cards[0].total == 25 and back.cards[0].scores["full_house"] == 25
+    assert back.turn.player == 1 and back.turn.number == 2
+    assert back.log[0].booked == "full_house"
+    assert back.chips == [2, 2]
+
+
+def test_a_farkle_game_survives_too(tmp_path):
+    from dicecore.modes.catalogue import mode_by_id
+    from dicecore.play import store
+
+    mode = mode_by_id("farkle")
+    path = tmp_path / "game.json"
+    session = GameSession("farkle", rules_for(mode, mode.defaults), ["A"], mode.defaults)
+    session.on_change = lambda s: store.save(s, path)
+    session.start("farkle", session.rules, ["A"], params=mode.defaults)
+    session.observe(result(1, 1, 1, 3, 4, 2))
+    for slot in session.turn.dice:
+        slot.held = slot.value == 1
+    session.set_aside()
+
+    back = store.load(path)
+    assert back.farkle.turn_points == 1000 and back.farkle.dice_left == 3
+
+
+def test_a_missing_or_broken_game_file_is_simply_no_game(tmp_path):
+    # Losing a game is bad; losing the machine that reads the dice is worse.
+    from dicecore.play import store
+
+    assert store.load(tmp_path / "nothing.json") is None
+    broken = tmp_path / "broken.json"
+    broken.write_text("{ not json")
+    assert store.load(broken) is None
+    wrong = tmp_path / "old.json"
+    wrong.write_text('{"version": 0, "mode": "yahtzee"}')
+    assert store.load(wrong) is None
+
+
+def test_the_dice_colours_survive_the_round_trip(tmp_path):
+    from dicecore.play import store
+
+    path = tmp_path / "game.json"
+    session = game()
+    session.on_change = lambda s: store.save(s, path)
+    session.start("yahtzee", KNIFFEL, ["A"])
+    rolled = result(1, 2, 3, 4, 5)
+    rolled.dice[0].colour = "red"
+    session.observe(rolled)
+    assert store.load(path).turn.dice[0].colour == "red"

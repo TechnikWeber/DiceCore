@@ -45,11 +45,12 @@ const PIPS = {
   6: [0, 2, 3, 5, 6, 8],
 };
 
-function dieFace(die) {
+function dieFace(die, paint) {
   if (die.kind === "d6" && PIPS[die.value]) {
     const on = new Set(PIPS[die.value]);
+    const ink = paint ? `style="background:${paint[1]}"` : "";
     return `<span class="face">${Array.from({ length: 9 }, (_, i) =>
-      `<span class="${on.has(i) ? "" : "off"}"></span>`).join("")}</span>`;
+      `<span class="${on.has(i) ? "" : "off"}" ${on.has(i) ? ink : ""}></span>`).join("")}</span>`;
   }
   return escapeHtml(die.value === 0 && die.kind !== "d10" ? "?" : die.value);
 }
@@ -295,10 +296,24 @@ function renderTurn(game) {
   $("turnbar").innerHTML = chunks.join(" ");
 }
 
+//: Swatches for the colours the engine can name, so a screen can show the dice as they
+//: actually are rather than as five identical white squares.
+const DIE_COLOURS = {
+  white: ["#eef1f5", "#14181f"], black: ["#23262c", "#eef1f5"],
+  grey: ["#8b93a1", "#14181f"], red: ["#e5484d", "#fff"], orange: ["#f0862a", "#14181f"],
+  yellow: ["#f5d020", "#14181f"], green: ["#3ecf8e", "#14181f"],
+  cyan: ["#3fc5d8", "#14181f"], blue: ["#4f7ff5", "#fff"], purple: ["#a56ef0", "#fff"],
+  pink: ["#f472b6", "#14181f"],
+};
+
 function renderDice(game) {
-  $("dice").innerHTML = game.turn.dice.map((die, index) => `
-    <div class="die ${die.held ? "held" : ""}" data-index="${index}"
-         title="${escapeHtml(die.kind)}">${dieFace(die)}</div>`).join("");
+  $("dice").innerHTML = game.turn.dice.map((die, index) => {
+    const paint = DIE_COLOURS[die.colour];
+    const style = paint ? `background:${paint[0]};color:${paint[1]}` : "";
+    return `<div class="die ${die.held ? "held" : ""}" data-index="${index}"
+      style="${style}" title="${escapeHtml(die.kind)}${
+        die.colour ? `, ${escapeHtml(die.colour)}` : ""}">${dieFace(die, paint)}</div>`;
+  }).join("");
   if (game.rules.holds) {
     $("dice").querySelectorAll(".die").forEach((node) => {
       node.onclick = () => post("/api/v1/game/hold", { index: Number(node.dataset.index) });
