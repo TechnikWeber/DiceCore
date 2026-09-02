@@ -2,6 +2,54 @@
 
 Notable changes, newest first. Dates are the day the work landed.
 
+## 0.14.0 (2026-09-02)
+
+### Added
+- **Playing against other DiceCores.** One instance opens a table, the others join it over
+  the network, and one game runs across all of them turn by turn — every roll appearing on
+  every screen as it lands. Each player throws on **their own** tray, their own camera or
+  their own simulator, so nobody has to share a tower. `Play online` in the lobby, the
+  address the host screen shows, done. Works on a LAN, over Tailscale, over anything where
+  one machine can open a socket to another; [docs/ONLINE.md](docs/ONLINE.md) has the detail.
+- **Sim dice: a capture source with no recognition in front of it.** Pick `sim` under
+  *Setup → Camera* and a `Throw` button appears on the game screen. It is not a random
+  number generator with a scoreboard attached: it **draws the dice and reads the picture
+  back through the real engine**, so the settling, the modes, the boards, the panel and the
+  screens all behave exactly as they do with a camera — and a bug in any of them shows up on
+  a laptop rather than only on hardware. A game night with no tower, no camera and no dice
+  at all now plays.
+- Every combination works and none is a special case: everyone round one screen with a real
+  tower, everyone round one screen with none, four people in four rooms with towers, four
+  with none, or a mix of the two in the same game.
+- `POST /api/v1/throw`, `GET /api/v1/table`, `POST /api/v1/table/{host,close,join,leave,act}`
+  and the guest websocket at `/api/v1/table`, all versioned and documented.
+- The host screen lists **every address it can actually be reached at**, best first — the
+  LAN address, the Tailscale `100.x` one, and the `.local` name — because `localhost` is the
+  one address guaranteed not to work for the other players.
+
+### Fixed
+- **The host did not broadcast its own moves.** Guests only ever heard about rolls, so every
+  remote screen sat one move behind — and, worse, a guest whose mirror still said it was
+  somebody else's turn did not send its dice up at all. Persisting and broadcasting now both
+  hang off the session's change hook, which is a list rather than a single callback.
+- **A host could throw for a guest.** The play screen treated "not away" as "my turn", so the
+  hosting instance offered a `Throw` button during a remote player's turn. The host now
+  plays only the seats that are actually at its own screen.
+- **The simulator was never stale.** Staleness was inferred from motion, and a simulator does
+  not move — so polling `/roll` against one would have spent a Kniffel throw per poll. It now
+  reports the fact directly: it knows exactly whether anybody has thrown since it was read.
+- The dice pool came from the configured mode rather than the running game, so a game started
+  from the lobby while the API was left on another mode threw the wrong number of dice.
+- The table address reported the configured port, not the port the service was started on.
+- `Join` answered "joining…" before it had tried, so a typo left the screen spinning at an
+  address that would never answer. It now waits out the first attempt, reports what happened,
+  and only keeps retrying an address that has worked at least once.
+- The "Throw the dice" prompt printed its letters on top of each other: `letter-spacing` is
+  inherited as an absolute length resolved where it was declared, and the headline's `-.03em`
+  is `-5px` at 168px — which is half a glyph at 18px.
+- An open scorecard box shows what it is worth to everyone at the table, not only to the
+  player whose turn it is. Watching somebody decide is most of the game.
+
 ## 0.13.0 (2026-09-02)
 
 ### Added

@@ -173,7 +173,11 @@ button.quiet { background: transparent; border-color: var(--line); font-size: 14
                padding: 6px 12px; }
 
 /* --- waiting, and the result --------------------------------------------- */
-.waiting { color: var(--ink-soft); display: flex; align-items: center; gap: 10px; font-size: 18px; }
+/* `letter-spacing` is inherited as an absolute length, resolved where it was declared: the
+   headline's -.03em is -5px at 168px, and 18px letters spaced -5px apart print on top of
+   each other. Reset it rather than shrinking it. */
+.waiting { color: var(--ink-soft); display: flex; align-items: center; gap: 10px;
+           font-size: 18px; letter-spacing: normal; }
 .waiting i {
   width: 12px; height: 12px; border-radius: 50%; background: var(--good); display: block;
   animation: breathe 1.6s ease-in-out infinite;
@@ -233,3 +237,56 @@ th .dot, td .dot { margin-right: 6px; vertical-align: -2px; }
 }
 .livecam img { display: block; width: 100%; border-radius: 8px; background: #000; }
 .livecam span { display: block; font-size: 12px; color: var(--ink-soft); padding: 6px 2px 0; }
+
+/* --- playing against other DiceCores -------------------------------------- */
+
+/* The lobby says who you are playing with before it says what. Somebody walking up to the
+   screen should not have to open a panel to find out that four people are already sitting
+   at this table. */
+.strip {
+  display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+  background: var(--panel); border: 1px solid var(--accent); border-radius: 12px;
+  padding: 12px 16px; margin-bottom: 22px;
+}
+.strip.quiet-strip { border-color: var(--line); }
+.strip b { font-size: 17px; }
+.strip span { color: var(--ink-soft); font-size: 14px; flex: 1; }
+.strip code { color: var(--ink); background: var(--panel-2); padding: 2px 6px;
+              border-radius: 6px; font-size: 14px; }
+
+/* The address is the one thing guests have to copy off the screen, so it is set at the size
+   the rest of the play screen is: readable from where the other players are standing. */
+.address {
+  font: 600 clamp(24px, 4vw, 40px)/1.2 ui-monospace, SFMono-Regular, Menlo, monospace;
+  background: var(--panel); border: 1px solid var(--line); border-radius: 12px;
+  padding: 16px 20px; margin: 0 0 22px; user-select: all; word-break: break-all;
+}
+
+.seats { display: flex; flex-direction: column; gap: 8px; }
+.seat {
+  display: flex; align-items: center; gap: 12px;
+  background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
+  padding: 10px 14px;
+}
+.seat.me { border-color: var(--accent); }
+.seat.gone { opacity: .5; }
+.seat b { font-size: 17px; }
+.seat span:last-child { color: var(--ink-soft); font-size: 14px; margin-left: auto; }
+
+.join { display: flex; gap: 10px; flex-wrap: wrap; }
+.join input {
+  flex: 1 1 220px; min-width: 0; font-size: 17px; padding: 12px 14px;
+  background: var(--panel-2); color: var(--ink);
+  border: 1px solid var(--line); border-radius: 10px;
+}
+.join input:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+.join #join-name { flex: 0 1 160px; }
+
+/* Whose turn it is, on a screen where it is not always yours. */
+.seat-badge {
+  font-size: 13px; padding: 3px 10px; border-radius: 999px;
+  border: 1px solid var(--line); color: var(--ink-soft);
+}
+.seat-badge.on { border-color: var(--good); color: var(--good); }
+.lead code { color: var(--ink); background: var(--panel-2); padding: 2px 7px;
+             border-radius: 6px; font-size: 15px; user-select: all; }

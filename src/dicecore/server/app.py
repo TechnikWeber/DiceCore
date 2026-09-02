@@ -20,6 +20,7 @@ is what makes "git pull && systemctl restart" a complete update on a Pi over a b
 # and every POST body would be rejected as a missing query parameter (422).
 
 import asyncio
+import contextlib
 import json
 import time
 from pathlib import Path
@@ -44,6 +45,7 @@ from ..reader import Reader
 from ..system import boot_config, diagnostics
 from ..system.network import HotspotProfile, Network, is_country_code
 from ..system.portal import CaptivePortal, Watcher, auto_hotspot_wanted
+from ..table import Guest, Table, addresses
 from ..training import TrainingManager
 from ..training.data import readiness
 
@@ -68,7 +70,26 @@ def create_app(settings: Settings | None = None) -> Any:
     state: dict[str, Any] = {"settings": loaded, "complaints": complaints, "hub": None}
     hub = OutputHub(loaded.panel)
     state["hub"] = hub
-    reader = Reader(loaded, on_phase=lambda p: state["hub"].update(p))
+    table = Table(None, loaded.server.public_name)
+    guest = Guest(None)
+
+    def on_roll(result: Any) -> None:
+        """A roll landed here. Tell whichever table this instance belongs to."""
+        if table.open:
+            table.broadcast()
+        elif guest.connected and guest.my_turn:
+            # A tray that has not changed is not a throw. Locally the session refuses those
+            # itself; a guest has to, or standing still would burn a throw on the host.
+            if not result.stale:
+                guest.report_roll(result)
+
+    reader = Reader(loaded, on_phase=lambda p: state["hub"].update(p), on_roll=on_roll)
+    table.reader = reader
+    guest.reader = reader
+    # Every change to the host's game reaches the guests, not only the ones they asked for.
+    reader.game.listeners.append(lambda _: table.broadcast())
+    state["table"] = table
+    state["guest"] = guest
     training = TrainingManager(loaded)
 
     def on_chip() -> None:
@@ -95,8 +116,17 @@ def create_app(settings: Settings | None = None) -> Any:
     buttons = ButtonPanel(loaded.panel.signals, on_chip, on_next)
     state["buttons"] = buttons
 
+    @contextlib.asynccontextmanager
+    async def lifespan(_: Any) -> Any:
+        # The reader runs on its own thread and needs the server's event loop to push state
+        # to guests at the table; this is the only place it can be got hold of.
+        table.bind_loop(asyncio.get_running_loop())
+        yield
+        table.stop()
+        guest.leave()
+
     app = FastAPI(title="DiceCore", version="0.13.0",
-                  description="Reads real dice with a camera.")
+                  description="Reads real dice with a camera.", lifespan=lifespan)
     app.state.reader = reader
     app.state.training = training
     app.state.hub = hub
@@ -119,6 +149,10 @@ def create_app(settings: Settings | None = None) -> Any:
     if auto_hotspot_wanted(loaded.network.auto_hotspot, diagnostics.pi_model() is not None):
         watcher.start()
     app.state.network = network
+    app.state.table = table
+    app.state.guest = guest
+
+
 
     def store() -> DatasetStore:
         # The printing style travels with the store: it decides which labels are legal.
@@ -219,7 +253,8 @@ def create_app(settings: Settings | None = None) -> Any:
         """
         return {"game": reader.game.to_json(),
                 "last": reader.last.to_json() if reader.last else None,
-                "buttons": state["buttons"].describe()}
+                "buttons": state["buttons"].describe(),
+                "can_throw": reader.can_throw()}
 
     @app.post("/api/v1/game/hold")
     async def game_hold(request: Request) -> Any:
@@ -396,6 +431,20 @@ def create_app(settings: Settings | None = None) -> Any:
         except (CaptureError, EngineError) as exc:
             return fail(exc)
 
+    @app.post("/api/v1/throw")
+    def throw() -> Any:
+        """
+        Roll simulated dice and read them — the button on the play screen.
+
+        Only the simulator can do this. A camera cannot: the dice on its tray are the ones
+        somebody threw, and no amount of asking changes them.
+        """
+        try:
+            # A guest has no game of its own to ask, so the pool comes down from the host.
+            return reader.throw(guest.dice_wanted if guest.connected else None).to_json()
+        except (CaptureError, EngineError) as exc:
+            return fail(exc, 400)
+
     @app.get("/api/v1/state")
     def last_state() -> Any:
         last = reader.last
@@ -427,6 +476,114 @@ def create_app(settings: Settings | None = None) -> Any:
         reader.push.offer(Frame(image=decode(payload), jpeg=payload, source="push"))
         return {"ok": True}
 
+    def table_view() -> Any:
+        """Whether this DiceCore is hosting a table, sitting at one, or neither."""
+        # Every address another machine could reach this one at, not the configured one:
+        # `localhost` is the single address guaranteed not to work for the other players.
+        reachable = addresses(state["settings"].server.port)
+        return {"hosting": table.describe(), "guest": guest.describe(),
+                "can_throw": reader.can_throw(),
+                "name": state["settings"].server.public_name,
+                "address": reachable[0] if reachable else "",
+                "addresses": reachable}
+
+    @app.get("/api/v1/table")
+    def table_status() -> Any:
+        return table_view()
+
+    @app.post("/api/v1/table/host")
+    async def table_host(request: Request) -> Any:
+        """
+        Open a table other DiceCores can play at.
+
+        This instance owns the game from here on: guests mirror it and ask it for things.
+        One answer to "whose turn is it" is the whole difficulty of a turn-based game played
+        in three rooms, and one owner is how it is had.
+        """
+        body = await request.json() if await request.body() else {}
+        if guest.active:
+            guest.leave()
+        return table.start(str(body.get("name", "") or "").strip()[:24])
+
+    @app.post("/api/v1/table/close")
+    def table_close() -> Any:
+        return table.stop()
+
+    @app.post("/api/v1/table/join")
+    async def table_join(request: Request) -> Any:
+        """Sit down at somebody else's table. Their game, your dice."""
+        body = await request.json()
+        if table.open:
+            table.stop()
+        ok, message = guest.join(str(body.get("address", "")),
+                                 str(body.get("name", "") or "").strip()[:24])
+        if not ok:
+            return fail(RuntimeError(message), 400)
+        return {"ok": True, "detail": message, "guest": guest.describe()}
+
+    @app.post("/api/v1/table/leave")
+    def table_leave() -> Any:
+        guest.leave()
+        return guest.describe()
+
+    @app.post("/api/v1/table/act")
+    async def table_act(request: Request) -> Any:
+        """
+        Do something at the table this instance is a guest at.
+
+        The guest's screen cannot touch its own game — there is no game here, only a mirror
+        of somebody else's — so every button goes through this.
+        """
+        body = await request.json()
+        name = str(body.get("action", ""))
+        payload = {k: v for k, v in body.items() if k != "action"}
+        if not guest.connected:
+            return fail(RuntimeError("Not connected to a table."), 409)
+        from ..table import protocol as table_protocol
+
+        if not guest.send(table_protocol.action(name, **payload)):
+            return fail(RuntimeError("The message could not be sent."), 503)
+        return {"ok": True}
+
+    @app.websocket("/api/v1/table")
+    async def table_socket(socket: WebSocket) -> None:
+        """
+        A guest's connection. One socket, one seat, until they leave.
+
+        Everything a guest may ask for goes through `protocol.check` first, and every refusal
+        comes back as words: a button that does nothing is the worst thing a game played at a
+        distance can offer.
+        """
+        await socket.accept()
+        table.bind_loop(asyncio.get_running_loop())
+        seat: int | None = None
+        try:
+            while True:
+                message = json.loads(await socket.receive_text())
+                if message.get("type") == "hello":
+                    from ..table import protocol as table_protocol
+
+                    problem = table_protocol.version_problem(message.get("version"))
+                    if problem:
+                        await socket.send_text(json.dumps(table_protocol.refused(problem)))
+                        return
+                    seat, refusal = table.seat_for(str(message.get("name", ""))[:24], socket)
+                    if seat is None:
+                        await socket.send_text(json.dumps(table_protocol.refused(refusal or "")))
+                        return
+                    await socket.send_text(json.dumps(table_protocol.welcome(
+                        seat, table.seats, table.game_json())))
+                    table.broadcast()
+                    continue
+                answer = table.apply(seat, message)
+                if answer is not None:
+                    await socket.send_text(json.dumps(answer))
+        except Exception:
+            pass
+        finally:
+            if seat is not None:
+                table.leave(seat)
+
     @app.websocket("/api/v1/events")
     async def events(socket: WebSocket) -> None:
         """
@@ -437,16 +594,61 @@ def create_app(settings: Settings | None = None) -> Any:
         """
         await socket.accept()
         previous: str | None = None
+        seen: int | None = None
         try:
             while True:
+                # Re-asked every pass: switching the source in Setup must take effect on the
+                # screen that is already open, not at the next reload.
+                camera = not reader.can_throw()
+                if guest.active:
+                    # Sitting at somebody else's table: there is no game on this instance to
+                    # read, only their mirror of one. It changes when they move, so the
+                    # screen follows the mirror rather than the tray. Cheap — it is already
+                    # in memory here, so this watches a counter instead of asking the host.
+                    if guest.revision != seen or previous is None:
+                        seen = guest.revision
+                        previous = ""
+                        await socket.send_text(json.dumps({
+                            "idle": not guest.my_turn, "manual": not camera, "away": True,
+                            "game": guest.game, "table": table_view()}))
+                    if camera and guest.my_turn:
+                        # A guest with a real tower throws real dice on their own turn, and
+                        # `on_roll` sends what landed up to the host. Only on their turn:
+                        # nobody else's camera should be running during your throw.
+                        try:
+                            await asyncio.to_thread(reader.read, True, False)
+                        except (CaptureError, EngineError) as exc:
+                            await socket.send_text(json.dumps({"error": str(exc)}))
+                            await asyncio.sleep(2.0)
+                        continue
+                    await asyncio.sleep(0.2)
+                    continue
+                if not camera:
+                    # A simulator throws when somebody presses the button, never because it
+                    # was looked at. Polling one would be a random number generator with a
+                    # picture attached — so this watches the game instead of the tray, and
+                    # sends only when it actually changed. Quarter of a second because a
+                    # guest's move has to appear on the host's screen while they are still
+                    # looking at it.
+                    payload = json.dumps({"idle": not reader.game.running, "manual": True,
+                                          "table": table_view(),
+                                          "game": reader.game.to_json()}, sort_keys=True)
+                    if payload != previous:
+                        previous = payload
+                        await socket.send_text(payload)
+                    await asyncio.sleep(0.25)
+                    seen = None
+                    continue
                 if not reader.game.running:
                     # Nothing is being played, so nothing is looked at. This is what makes
                     # the lobby honest — and it is also why the Pi is not capturing all
                     # night for an empty table.
                     await socket.send_text(json.dumps({"idle": True,
+                                                       "table": table_view(),
                                                        "game": reader.game.to_json()}))
                     await asyncio.sleep(1.0)
                     previous = None
+                    seen = None
                     continue
                 try:
                     # Two messages per roll on purpose: the number as soon as the dice
@@ -458,6 +660,7 @@ def create_app(settings: Settings | None = None) -> Any:
                     # Additive: consumers reading `total` and `dice` are untouched, and a
                     # play screen gets the turn state in the same message as the number.
                     body["game"] = reader.game.to_json()
+                    body["table"] = table_view()
                     payload = json.dumps(body, sort_keys=True)
                     if payload != previous:
                         previous = payload
@@ -466,6 +669,7 @@ def create_app(settings: Settings | None = None) -> Any:
                             verified = await asyncio.to_thread(reader.verify_last)
                             after = verified.to_json()
                             after["game"] = reader.game.to_json()
+                            after["table"] = table_view()
                             previous = json.dumps(after, sort_keys=True)
                             await socket.send_text(previous)
                 except (CaptureError, EngineError) as exc:

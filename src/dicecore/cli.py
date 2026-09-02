@@ -67,6 +67,9 @@ def _cmd_serve(args, settings: Settings) -> int:
 
     host = args.host or settings.server.host
     port = args.port or settings.server.port
+    # In memory only, not written back: everything that reports where this DiceCore can be
+    # reached — the table address most of all — has to name the port it is really on.
+    settings.server.port = port
     print(f"DiceCore {__version__} — setup page on http://{host}:{port}/")
     print(f"config: {config_path()}   state: {state_dir()}")
     uvicorn.run(create_app(settings), host=host, port=port, log_level="info")

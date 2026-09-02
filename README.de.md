@@ -10,7 +10,7 @@ als JSON-API und als Live-Stream, den ein Bot oder ein Spiel abonnieren kann.
 > **Status: es spielt, aber nichts davon lief bisher an einem echten Turm.** Von der Kamera
 > bis zum Spielblock funktioniert alles Ende zu Ende auf simulierten Bildern: Aufnahme,
 > Ruhe-Erkennung, Augenzählen, fünfzehn Spielmodi, drei Spielbretter, Züge und Chips, die
-> Fair-Play-Wache, die Label-Schleife, das Panel, die API und beide Weboberflächen — 310
+> Fair-Play-Wache, die Label-Schleife, das Panel, die API und beide Weboberflächen — 386
 > Tests, von denen keiner Hardware braucht.
 >
 > Es fehlt die Hälfte, die nur ein echter Turm liefern kann: **ein trainiertes Modell** (das
@@ -57,7 +57,7 @@ kurzen Assistenten durchtippen, werfen.*
   vierten. Zwei optionale GPIO-Taster tun dasselbe ohne Browser.
 - **Spielmodi.** Dieselben Würfel, gelesen wie das Spiel an deinem Tisch sie liest: als
   Summe, als Anzahl Erfolge, als Kniffel-Kombination, als Prozentwurf, als Unterwürfeln
-  gegen einen Zielwert. Vierzehn Stück, von normalen Sechsseitern bis zum Chi-Quadrat-Test,
+  gegen einen Zielwert. Fünfzehn Stück, von normalen Sechsseitern bis zum Chi-Quadrat-Test,
   ob ein Würfel gezinkt ist — plus *Selbst bauen* für das Spiel, das nicht dabei ist.
 - **Ein Display und zwei Lampen.** ST7789, ILI9341 oder SSD1306 über dem Turm zeigt die Zahl,
   sobald die Würfel liegen, mit kleiner Animation bei einer natürlichen 20; eine grüne und
@@ -70,6 +70,16 @@ kurzen Assistenten durchtippen, werfen.*
 - **Schickt Würfe hinaus.** Ein fertiger Wurf kann direkt in einen Discord-Kanal gehen, in
   eine Avrae-Variable, die ein `!phys`-Alias zurückliest, oder als JSON an eine beliebige
   URL — die Zahl vom Tisch landet dort, wo das Spiel ohnehin stattfindet.
+- **Gegeneinander spielen, jeder an seinem DiceCore.** Einer macht einen Tisch auf, die
+  anderen treten mit der angezeigten Adresse bei, und ein Spiel läuft Zug für Zug über alle
+  Geräte — jeder Wurf erscheint bei allen, während er fällt. Jeder würfelt auf seiner
+  eigenen Landefläche, niemand muss sich einen Turm teilen. Im selben WLAN und über
+  Tailscale. Siehe [docs/ONLINE.md](docs/ONLINE.md).
+- **Würfeln ohne Würfel.** Die Quelle `sim` zeichnet die Würfel und liest das Bild durch die
+  echte Erkennung zurück; auf dem Spielbildschirm ersetzt ein `Throw`-Knopf den Turm. Alles
+  dahinter — Modi, Blöcke, Panel, Zettel — verhält sich exakt wie mit Kamera. Ein Spieleabend
+  ganz ohne Hardware geht damit, und ein Tisch, an dem zwei einen Turm haben und zwei nicht,
+  ebenso.
 - **Eine versionierte API** und ein WebSocket-Stream, gedacht zum Einbinden in andere Projekte.
 - **CSI-Kameramodule als Einstellung** — inklusive Arducam IMX519 / 64MP / Owlsight /
   Pivariety, die ein Pi nicht selbst erkennt. Die Auswahl in der Oberfläche schreibt den
@@ -80,6 +90,17 @@ kurzen Assistenten durchtippen, werfen.*
 ![Die Lobby: jeder Modus als Kachel, gruppiert in Spiele für den Tisch, reine Anzeigen und Werkzeuge](docs/screenshots/lobby.jpg)
 
 *Die Lobby. Von der Landefläche wird nichts gelesen, bevor ein Spiel läuft.*
+
+![Der Tisch-Bildschirm des Gastgebers: „Your table is open" über der Adresse dicecore.local:8099 in großer Schreibmaschinenschrift, darunter die LAN- und Tailscale-Adresse, und eine Platzliste mit Philipp an diesem Bildschirm und Marie verbunden](docs/screenshots/table.jpg)
+
+*Einen Tisch aufmachen. Eine der Adressen vorlesen; die Platzliste füllt sich, während die
+anderen beitreten, und die Plätze sind die Spieler.*
+
+![Der Spielbildschirm eines Gastes: „Small Straight" groß über fünf als Augen gezeichneten Würfeln, ein Abzeichen „your turn" neben Maries Namen, ein Knopf zum Nochmal-Würfeln und rechts der gespiegelte Spielblock des Gastgebers](docs/screenshots/away.jpg)
+
+*An einem fremden Tisch spielen. Der Block gehört dem Gastgeber, die Würfel gehören dir —
+geworfen auf dem eigenen DiceCore, auf der eigenen Landefläche oder per Simulator, und auf
+allen Bildschirmen in dem Moment, in dem sie liegen.*
 
 ![Fünf Panels nebeneinander, von DiceCore selbst gerendert: ein ST7789 240x240 mit NICE ROLL über einer 20, ein ILI9341 320x240 mit HANDS OFF über 18, ein schmales ST7789 135x240 mit rotem VOID und zwei SSD1306-OLEDs](docs/screenshots/displays.png)
 
@@ -197,6 +218,7 @@ erreicht.*
 | [docs/TRAINING.md](docs/TRAINING.md) | Ihm die eigenen Würfel beibringen |
 | [docs/ANTI-CHEAT.md](docs/ANTI-CHEAT.md) | Was die Fair-Play-Überwachung erkennt — und was nicht |
 | [docs/PLAYING.md](docs/PLAYING.md) | Spielbildschirm, Züge, Chips und die beiden Taster |
+| [docs/ONLINE.md](docs/ONLINE.md) | Gegeneinander spielen, und Würfeln ohne Würfel |
 | [docs/AVRAE.md](docs/AVRAE.md) | Würfe an Avrae, an Discord oder sonstwohin schicken |
 | [docs/GAME-MODES.md](docs/GAME-MODES.md) | Die Modi, was jeder wertet, und wie ein weiterer dazukommt |
 | [docs/DISPLAYS.md](docs/DISPLAYS.md) | Display, Lampen und Summer — Panels, Pins, Verdrahtung |

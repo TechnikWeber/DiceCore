@@ -542,3 +542,74 @@ def test_a_roll_with_a_die_the_engine_could_not_read_is_left_for_a_person(client
     client.post(f"/api/setup/sets/{set_id}/capture")
     answer = client.post(f"/api/setup/sets/{set_id}/confirm-read").json()
     assert answer["confirmed"] + answer["needs_you"] >= 1
+
+
+# --- the simulator and the table, over HTTP ------------------------------------------
+
+
+@pytest.fixture
+def sim(tmp_path, monkeypatch):
+    """A DiceCore with no camera at all — dice thrown from the screen."""
+    monkeypatch.setenv("DICECORE_STATE", str(tmp_path))
+    settings = Settings()
+    settings.capture.source = "sim"
+    settings.engine.expected_kinds = ["d6"]
+    settings.guard.enabled = False
+    with TestClient(create_app(settings)) as client:
+        yield client
+
+
+def test_a_simulator_throws_from_the_screen(sim):
+    assert sim.get("/api/v1/table").json()["can_throw"] is True
+    sim.post("/api/v1/game/start", json={"mode": "yahtzee", "players": ["A"]})
+    body = sim.post("/api/v1/throw").json()
+    assert body["count"] == 5
+    assert sim.get("/api/v1/game").json()["game"]["turn"]["rolls_used"] == 1
+
+
+def test_a_camera_says_so_rather_than_inventing_a_roll(client):
+    assert client.get("/api/v1/table").json()["can_throw"] is False
+    answer = client.post("/api/v1/throw")
+    assert answer.status_code == 400
+    assert "simulator" in answer.json()["detail"]
+
+
+def test_hosting_a_table_seats_the_host(sim):
+    body = sim.post("/api/v1/table/host", json={"name": "Alice"}).json()
+    assert body["open"] is True
+    assert [seat["name"] for seat in body["seats"]] == ["Alice"]
+    assert sim.get("/api/v1/table").json()["hosting"]["open"] is True
+    sim.post("/api/v1/table/close")
+    assert sim.get("/api/v1/table").json()["hosting"]["open"] is False
+
+
+def test_acting_at_a_table_you_are_not_at_is_refused(sim):
+    answer = sim.post("/api/v1/table/act", json={"action": "roll"})
+    assert answer.status_code == 409
+
+
+def test_joining_something_that_is_not_a_dicecore_says_so(sim):
+    # Port 1 has nothing on it anywhere. The point is the sentence, not the failure.
+    answer = sim.post("/api/v1/table/join", json={"address": "127.0.0.1:1", "name": "Bob"})
+    assert answer.status_code == 400
+    assert "did not answer" in answer.json()["detail"]
+    # And a typo is not retried all evening.
+    assert sim.get("/api/v1/table").json()["guest"]["active"] is False
+
+
+def test_a_guest_at_a_table_plays_the_hosts_game(sim):
+    """One host, one guest, over a real websocket — the whole point of the feature."""
+    sim.post("/api/v1/table/host", json={"name": "Alice"})
+    with sim.websocket_connect("/api/v1/table") as socket:
+        socket.send_json({"type": "hello", "name": "Bob", "version": 1})
+        welcome = socket.receive_json()
+        assert welcome["type"] == "welcome" and welcome["seat"] == 1
+        # Seats are the players, so starting a game now deals Bob a scorecard.
+        sim.post("/api/v1/game/start",
+                 json={"mode": "yahtzee", "players": ["Alice", "Bob"]})
+        socket.send_json({"type": "action", "action": "book", "category": "chance"})
+        while True:
+            message = socket.receive_json()
+            if message["type"] == "refused":
+                assert message["reason"] == "It is not your turn."
+                break

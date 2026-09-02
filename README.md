@@ -10,7 +10,7 @@ event stream a bot or a game can subscribe to.
 > **Status: it plays, but nothing has run on a real tower yet.** Everything from the camera
 > to the scorecard works end to end on simulated frames: capture, settling, pip counting,
 > fifteen game modes, three boards, turns and chips, the fair-play watch, the label loop,
-> the panel, the API and both web front ends — 310 tests, none of which need hardware.
+> the panel, the API and both web front ends — 386 tests, none of which need hardware.
 >
 > What is missing is the half only a real tower can supply: **a trained model** (which needs
 > real dice in front of a real camera, and is what makes a d20 readable at all) and **every
@@ -52,7 +52,7 @@ through a short wizard, throw.*
   DiceCore counts them down, notices which dice you left on the tray, and lets a chip buy a
   fourth. Two optional GPIO buttons do the same without a browser.
 - **Game modes.** The same dice, read the way the game at your table reads them: a sum, a
-  count of successes, a Kniffel combination, a percentile, a roll under a target. Fourteen
+  count of successes, a Kniffel combination, a percentile, a roll under a target. Fifteen
   of them, from plain six-siders to a chi-square test for whether a die is loaded — and a
   *build your own* for the game that is not in the list.
 - **A screen and two lamps.** ST7789, ILI9341 or SSD1306 over the tower shows the number the
@@ -65,6 +65,15 @@ through a short wizard, throw.*
 - **Sends rolls out.** A finished roll can go straight into a Discord channel, into an
   Avrae variable a `!phys` alias reads back, or as JSON to any URL of yours — so the number
   off your table lands where the game already is.
+- **Playing against other DiceCores.** One of you opens a table, the others join with the
+  address it shows, and one game runs across all of them turn by turn — every roll on every
+  screen as it lands. Each player throws on their own tray, so nobody shares a tower. Works
+  on a LAN and over Tailscale. See [docs/ONLINE.md](docs/ONLINE.md).
+- **Dice without dice.** The `sim` source draws the dice and reads the picture back through
+  the real engine, so a `Throw` button on the game screen replaces the tower. Everything
+  downstream — modes, boards, panel, scorecards — behaves exactly as it does with a camera.
+  A game night with no hardware at all plays, and so does a table where two people have
+  towers and two do not.
 - **A versioned API** and a websocket stream, meant to be embedded by other projects.
 - **CSI camera modules as configuration** — including Arducam IMX519 / 64MP / Owlsight /
   Pivariety, which a Pi does not auto-detect. Picking one in the UI writes the `dtoverlay`
@@ -80,6 +89,17 @@ out before anything is soldered.*
 ![The lobby: every mode as a tile, grouped into games you play round a table, readers that only report numbers, and workshop tools](docs/screenshots/lobby.jpg)
 
 *The lobby. Nothing is read from the tray until a game is running.*
+
+![The table screen while hosting: "Your table is open" over the address dicecore.local:8099 in large monospace, the LAN and Tailscale addresses offered underneath, and a seat list showing Philipp at this screen and Marie connected](docs/screenshots/table.jpg)
+
+*Opening a table. Read out one of those addresses; the seat list fills up as people join,
+and the seats become the players.*
+
+![A guest's game screen: "Small Straight" in large letters over five dice drawn as pips, a "your turn" badge beside Marie's name, a Throw again button, and the host's scorecard mirrored down the right-hand side](docs/screenshots/away.jpg)
+
+*Playing at somebody else's table. The scorecard is theirs, the dice are yours — thrown on
+your own DiceCore, on your own tray or with the simulator, and on everyone's screen the
+moment they land.*
 
 ![The Training tab: an explanation of how sets and models fit together, the set picker with export and import buttons, and a collapsed panel of three worked examples](docs/screenshots/training.jpg)
 
@@ -188,6 +208,7 @@ does instead is put your number where an alias can reach it.*
 | [docs/TRAINING.md](docs/TRAINING.md) | Teaching it your own dice |
 | [docs/ANTI-CHEAT.md](docs/ANTI-CHEAT.md) | What the fair-play watch catches, and what it cannot |
 | [docs/PLAYING.md](docs/PLAYING.md) | The game screen, turns, chips and the two buttons |
+| [docs/ONLINE.md](docs/ONLINE.md) | Playing against other DiceCores, and dice without dice |
 | [docs/AVRAE.md](docs/AVRAE.md) | Sending rolls to Avrae, to Discord, or anywhere else |
 | [docs/GAME-MODES.md](docs/GAME-MODES.md) | The modes, what each one scores, and how to add another |
 | [docs/DISPLAYS.md](docs/DISPLAYS.md) | The screen, the lamps and the buzzer — panels, pins, wiring |

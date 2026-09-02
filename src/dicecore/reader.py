@@ -16,6 +16,7 @@ from typing import Any
 
 from .capture import CaptureError, FrameSource, PushSource, open_source
 from .capture.settle import wait_for_settle
+from .capture.sim import SimSource, require_sim
 from .config import Settings
 from .dice import Frame, RollResult
 from .engine import Engine, EngineError, build_engine
@@ -29,7 +30,7 @@ from .integrity import (
     compare_readings,
     frame_hash,
 )
-from .modes import ModeSession, interpret
+from .modes import ModeSession, expected_count, interpret
 from .modes.catalogue import mode_by_id, rules_for
 from .panel import state as phases
 from .play import GameSession
@@ -39,8 +40,12 @@ from .publish import Publisher
 
 class Reader:
     def __init__(self, settings: Settings,
-                 on_phase: Callable[[phases.Presentation], None] | None = None) -> None:
+                 on_phase: Callable[[phases.Presentation], None] | None = None,
+                 on_roll: Callable[[RollResult], None] | None = None) -> None:
         self.settings = settings
+        #: Called once a roll is read and interpreted. Used to send it to a table this
+        #: DiceCore is a guest at, or to tell the guests at a table it is hosting.
+        self.on_roll = on_roll
         #: Called on every change worth showing on a screen or a lamp. Set by whoever owns
         #: the outputs; the reader itself neither knows nor cares what is attached.
         self.on_phase = on_phase
@@ -54,6 +59,9 @@ class Reader:
         #: Hash of the previous frame's JPEG. Two byte-identical captures cannot happen with
         #: a real sensor, so a repeat means a frozen or replayed feed.
         self._last_frame_hash: str | None = None
+        #: How many times the simulator had been thrown at the previous reading. For a
+        #: simulator "did the dice change" is not a guess from motion — it is a fact.
+        self._last_throws: int | None = None
         #: Events established while reading, waiting for a hold window to judge them.
         self._pending_events: list[Event] = []
         #: The live game: whose turn it is, how many throws are left, what has been scored.
@@ -126,6 +134,41 @@ class Reader:
             self._engine = None
 
     # --- reading ------------------------------------------------------------
+    def can_throw(self) -> bool:
+        """Whether dice can be thrown from the screen — true only for the simulator."""
+        try:
+            return isinstance(self.source(), SimSource)
+        except Exception:
+            return False
+
+    def throw(self, count: int | None = None) -> RollResult:
+        """
+        Roll simulated dice and read them.
+
+        What to throw comes from the game rather than from a second setting: "Kniffel is five
+        six-siders" is written down once already, and a copy is a copy to keep in step. In
+        Farkle it is however many dice are still in play this turn, which changes as they are
+        set aside.
+        """
+        with self._lock:
+            source = require_sim(self.source())
+            source.set_plan(list(self.settings.engine.expected_kinds) or ["d6"],
+                            count if count and count > 0 else self.dice_wanted())
+            source.throw()
+        return self.read(wait_for_still=False)
+
+    def dice_wanted(self) -> int:
+        """How many dice the game expects on the tray right now. Public because a guest's
+        simulator has to throw the host's pool, not its own idea of one."""
+        game = self.game
+        if game.farkle is not None:
+            return max(1, game.farkle.dice_left)
+        # The running game decides, not the configured mode: the lobby can start Kniffel
+        # while the API is left on something else, and five dice is a property of the game.
+        mode = mode_by_id(game.mode if game.running else self.settings.mode.active)
+        bounds = expected_count(mode.dice) if mode else None
+        return bounds[1] if bounds else 2
+
     def read(self, wait_for_still: bool = True, verify: bool | None = None) -> RollResult:
         """
         Read one roll.
@@ -184,6 +227,11 @@ class Reader:
             # the number arrive together rather than a frame apart.
             self.game.observe(result)
             self._show(result, phases.RESULT)
+            if self.on_roll is not None:
+                try:
+                    self.on_roll(result)
+                except Exception:
+                    pass  # a table that will not listen must not stop a roll being read
             if not guard.enabled:
                 # Nothing is being watched, so it is already your turn again.
                 self._show(result, phases.READY)
@@ -386,7 +434,17 @@ class Reader:
                 ))
             self._last_frame_hash = digest
 
-        if (self.settings.guard.require_throw and threw is False and previous is not None
+        source = self.source()
+        if isinstance(source, SimSource):
+            # No motion to measure, and none needed: the simulator knows exactly whether
+            # anybody has thrown since it was last read. Without this, polling `/roll`
+            # against a simulator would spend a Kniffel throw per poll.
+            if self.settings.guard.require_throw and self._last_throws == source.throws:
+                result.stale = True
+                events.append(Event("stale", INFO, "nothing has been thrown since the "
+                                                   "last reading"))
+            self._last_throws = source.throws
+        elif (self.settings.guard.require_throw and threw is False and previous is not None
                 and not compare_readings(previous.dice, result.dice)):
             result.stale = True
             events.append(Event("stale", INFO,

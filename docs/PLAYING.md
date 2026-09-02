@@ -203,6 +203,19 @@ It is not proof of anything on its own; see [ANTI-CHEAT.md](ANTI-CHEAT.md) for w
 is not demonstrable. But a number that appears on a screen while everyone watches the dice
 land is about as convincing as dice get.
 
+## Playing without dice
+
+Under **Setup → Camera**, the source **`sim`** replaces the tray with drawn dice and puts a
+`Throw` button on the game screen. It is the same pipeline — the dice are rendered, then read
+back through the real engine — so everything else behaves exactly as it does with a camera.
+Useful for a game night before the tower is built, and for playing at a PC.
+
+## Playing against other DiceCores
+
+`Play online` in the lobby: one of you opens a table, the rest join it with the address it
+shows, and each player throws on their own DiceCore while everyone watches live. Full
+instructions, including Tailscale, in [ONLINE.md](ONLINE.md).
+
 ## Several players
 
 Chosen in the wizard, and that is the only place they need to be chosen. The tower passes
@@ -230,6 +243,16 @@ curl -X POST .../api/v1/game/book  -d '{"category": "full_house"}'
 curl -X POST .../api/v1/game/next                      # end the turn
 curl -X POST .../api/v1/game/reset -d '{"players": ["A", "B"]}'
 curl -X POST .../api/v1/game/stop                      # back to the lobby; reading stops
+curl -X POST .../api/v1/throw                          # sim source only: roll and read
+```
+
+Playing across instances is the same five POSTs behind two more:
+
+```bash
+curl -X POST .../api/v1/table/host -d '{"name": "Ada"}'
+curl -X POST .../api/v1/table/join -d '{"address": "pi.local:8099", "name": "Bob"}'
+curl -X POST .../api/v1/table/act  -d '{"action": "book", "category": "chance"}'
+curl http://dicecore.local:8099/api/v1/table           # seats, and which one is yours
 ```
 
 The websocket at `/api/v1/events` carries the same game state alongside every roll, so a

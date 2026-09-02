@@ -98,6 +98,61 @@ With fair play on, **every roll arrives twice**: first with `verdict: "pending"`
 the dice settle, then again with its verdict once the tray has been watched. A scoreboard
 renders the first; anything that must not honour a tampered roll acts on the second.
 
+### `POST /api/v1/throw`
+
+Roll simulated dice and read them, as the `Throw` button on the game screen does. Answers
+with the same shape as `/roll`. **400 unless the capture source is `sim`** — a camera cannot
+be asked to roll, because the dice on its tray are the ones somebody threw.
+
+### `GET /api/v1/table`
+
+Who this DiceCore is playing with.
+
+```json
+{
+  "hosting": {"open": true, "seats": [{"name": "Ada", "index": 0, "remote": false,
+                                       "connected": true}], "max_seats": 8},
+  "guest": {"active": false, "connected": false, "seat": null, "my_turn": false,
+            "address": "", "game": null},
+  "can_throw": true,
+  "address": "192.168.1.40:8099",
+  "addresses": ["192.168.1.40:8099", "100.83.2.11:8099", "dicecore.local:8099"]
+}
+```
+
+`addresses` is every address this instance can find itself at, best first — hand one of them
+to the other players. While this instance is a guest, `guest.game` is the host's game,
+mirrored: that is what a guest's screen draws, because there is no game of its own here.
+
+### `POST /api/v1/table/host` · `/close` · `/join` · `/leave` · `/act`
+
+`host` takes `{"name": …}` and opens a table with that name in seat one. `join` takes
+`{"address": …, "name": …}` and sits down at somebody else's; it answers only once the first
+attempt has succeeded or failed, so a typo says so instead of retrying all evening. `act`
+takes `{"action": …}` plus whatever that action needs (`{"action": "book", "category":
+"chance"}`) and sends it to the host — it is the guest's version of the `/api/v1/game/…`
+POSTs, which touch a game a guest does not have.
+
+Only the player whose turn it is may act, decided at the host. A refusal comes back on the
+websocket as `{"type": "refused", "reason": "It is not your turn."}` and shows up in
+`guest.problem`.
+
+### `WebSocket /api/v1/table`
+
+The connection a guest holds open. Say hello, get a seat, then receive the whole game every
+time it changes:
+
+```json
+→ {"type": "hello", "name": "Bob", "version": 1}
+← {"type": "welcome", "seat": 1, "version": 1, "seats": [...], "game": {...}}
+← {"type": "state", "game": {...}, "seats": [...], "last": {...}}
+→ {"type": "action", "action": "roll", "dice": [{"kind": "d6", "value": 4, ...}]}
+```
+
+Rolls travel as numbers, never as pictures: each player's own engine reads their own tray.
+Reconnecting with the same name gets the same seat back, scorecard column and all. See
+[ONLINE.md](ONLINE.md).
+
 ### `GET /api/v1/stream.mjpg`
 
 A live view of the tray as `multipart/x-mixed-replace`, for playing with people who are not

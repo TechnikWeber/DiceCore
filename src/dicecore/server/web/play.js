@@ -15,7 +15,28 @@ const $ = (id) => document.getElementById(id);
 const state = {
   view: "loading", options: null, game: null, last: null,
   wizard: null, socket: null, retry: 1000,
+  //: Who this DiceCore is playing with: hosting a table, sitting at one, or neither.
+  table: null,
 };
+
+//: This instance is a guest at somebody else's table. Everything changes when it is: there
+//: is no game here to touch, only a mirror of theirs, and every move is a request.
+const away = () => Boolean(state.table && state.table.guest && state.table.guest.connected);
+const hosting = () => Boolean(state.table && state.table.hosting && state.table.hosting.open);
+//: Whether this screen may make the current move. Locally everyone shares one screen, so
+//: it always may. At a table it may not: a guest waits for its seat, and — the one that is
+//: easy to miss — the *host* must not throw for a guest either. The host's tray has nothing
+//: to do with the dice in somebody else's room.
+const myTurn = () => {
+  if (away()) return Boolean(state.table.guest.my_turn);
+  if (!hosting()) return true;
+  const game = state.game;
+  if (!game || !game.running) return true;
+  const seat = (state.table.hosting.seats || [])[game.turn.player];
+  return !seat || !seat.remote;
+};
+//: Simulated dice, thrown from the screen. A camera cannot be asked to roll.
+const canThrow = () => Boolean(state.table && state.table.can_throw);
 
 const escapeHtml = (text) => String(text).replace(/[&<>"]/g,
   (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
@@ -34,6 +55,14 @@ async function post(path, body) {
   if (data.detail) state.flash = data.detail;
   route();
   return data;
+}
+
+//: Every move goes through here, and only this function knows where it goes: to this
+//: instance's own game, or up the wire to the host of the table it is sitting at. Without
+//: it every button would need to know whether it is playing at home or away.
+async function act(name, body) {
+  if (away()) return post("/api/v1/table/act", { action: name, ...(body || {}) });
+  return post(`/api/v1/game/${name}`, body);
 }
 
 // --- pips -------------------------------------------------------------------
@@ -63,10 +92,32 @@ const GROUPS = [
   ["Tools", ["tool"], "For the workshop rather than the table."],
 ];
 
+//: One line at the top of the lobby saying who this DiceCore is playing with. It is the
+//: only place online play is visible before a game starts, so it is never hidden.
+function onlineStrip() {
+  const table = state.table || {};
+  const seats = ((table.hosting || {}).seats || []).length;
+  if (hosting()) {
+    return `<div class="strip"><b>Hosting a table</b>
+      <span>${seats} seat${seats === 1 ? "" : "s"} · others join at
+      <code>${escapeHtml(table.address || "—")}</code></span>
+      <button class="quiet" id="btn-table">Manage table</button></div>`;
+  }
+  if (away()) {
+    return `<div class="strip"><b>At ${escapeHtml(state.table.guest.address || "a table")}</b>
+      <span>waiting for the host to start a game</span>
+      <button class="quiet" id="btn-table">Leave</button></div>`;
+  }
+  return `<div class="strip quiet-strip"><b>Playing here</b>
+    <span>Everyone at this screen. Others can join over the network instead.</span>
+    <button class="quiet" id="btn-table">Play online</button></div>`;
+}
+
 function renderLobby() {
   const modes = state.options.modes;
   $("app").className = "lobby";
   $("app").innerHTML = `
+    ${onlineStrip()}
     <h1>What are we playing?</h1>
     <p class="lead">Pick a game. Nothing is read from the tray until one is running.</p>
     ${GROUPS.map(([title, families, blurb]) => {
@@ -85,6 +136,143 @@ function renderLobby() {
   $("app").querySelectorAll("[data-mode]").forEach((tile) => {
     tile.onclick = () => openWizard(tile.dataset.mode);
   });
+  $("btn-table").onclick = () => { state.view = "table"; route(); };
+}
+
+// --- 1b. the table: playing against other DiceCores --------------------------
+
+//: Addresses that have worked before, so a table with no keyboard can re-join by tapping.
+const KNOWN = "dicecore.tables";
+const known = () => { try { return JSON.parse(localStorage.getItem(KNOWN)) || []; }
+                      catch (e) { return []; } };
+const remember = (address) => {
+  try {
+    localStorage.setItem(KNOWN,
+      JSON.stringify([address, ...known().filter((a) => a !== address)].slice(0, 6)));
+  } catch (e) { /* a browser that refuses storage still plays; it just forgets. */ }
+};
+
+function seatList(seats, mySeat) {
+  if (!seats || !seats.length) return `<p class="lead">Nobody has sat down yet.</p>`;
+  return `<div class="seats">${seats.map((seat, index) => `
+    <div class="seat ${seat.connected ? "" : "gone"} ${index === mySeat ? "me" : ""}">
+      <span class="dot" style="background:${PALETTE[index % PALETTE.length]}"></span>
+      <b>${escapeHtml(seat.name)}</b>
+      <span>${seat.remote ? (seat.connected ? "connected" : "lost the connection")
+                          : "at this screen"}</span>
+    </div>`).join("")}</div>`;
+}
+
+function renderTable() {
+  const table = state.table || {};
+  const host = table.hosting || {};
+  const visitor = table.guest || {};
+  $("app").className = "wizard";
+
+  if (host.open) {
+    const others = (table.addresses || []).slice(1);
+    $("app").innerHTML = `
+      <h1>Your table is open</h1>
+      <p class="lead">Others open their own DiceCore, tap <b>Play online</b> → <b>Join</b>
+         and type this address. Same network, or the same Tailscale/Hamachi network.</p>
+      <div class="address">${escapeHtml(table.address || "not reachable from anywhere")}</div>
+      ${others.length ? `<p class="lead" style="margin:-12px 0 22px">Also reachable as
+        ${others.map((a) => `<code>${escapeHtml(a)}</code>`).join(" · ")}</p>` : ""}
+      <section class="step"><h2>Seats (${host.seats.length} of ${host.max_seats})</h2>
+        ${seatList(host.seats, 0)}</section>
+      <p class="lead">The seats are the players. Pick a game and start it — everyone at the
+         table gets the same board, and each of them throws on their own DiceCore.</p>
+      <div class="start-row">
+        <button class="primary big" id="btn-pick">Pick a game</button>
+        <button class="quiet" id="btn-close">Close the table</button>
+      </div>`;
+    $("btn-pick").onclick = () => { state.view = "lobby"; route(); };
+    $("btn-close").onclick = async () => {
+      await post("/api/v1/table/close");
+      await refreshTable();
+      state.view = "lobby";
+      route();
+    };
+    return;
+  }
+
+  if (visitor.active) {
+    $("app").innerHTML = `
+      <h1>${visitor.connected ? "You are at the table" : "Connecting…"}</h1>
+      <p class="lead">${escapeHtml(visitor.address || "")} —
+        ${visitor.connected
+          ? `you are seat ${visitor.seat + 1}. The host starts the game.`
+          : "trying again; leave the page open."}</p>
+      ${visitor.problem ? `<div class="note warn">${escapeHtml(visitor.problem)}</div>` : ""}
+      <section class="step"><h2>Seats</h2>${seatList(visitor.seats, visitor.seat)}</section>
+      <div class="start-row">
+        <button class="quiet" id="btn-leave-table">Leave the table</button>
+      </div>`;
+    $("btn-leave-table").onclick = async () => {
+      await post("/api/v1/table/leave");
+      await refreshTable();
+      state.view = "lobby";
+      route();
+    };
+    return;
+  }
+
+  const name = (state.game && state.game.players && state.game.players[0]) || "Player 1";
+  $("app").innerHTML = `
+    <h1>Play online</h1>
+    <p class="lead">Two or more DiceCores on the same network play one game, turn by turn.
+       Everyone sees every roll as it lands. One of you hosts; the rest join.</p>
+
+    <section class="step">
+      <h2>Host it here</h2>
+      <p class="lead" style="margin:-6px 0 12px">This DiceCore owns the game. Your scorecard
+         is the real one, and it survives a guest losing their connection.</p>
+      <div class="start-row"><button class="primary big" id="btn-open">Open a table</button></div>
+    </section>
+
+    <section class="step">
+      <h2>Or join somebody else's</h2>
+      <div class="join">
+        <input id="join-address" placeholder="dicecore.local:8099 or 100.x.y.z:8099"
+               spellcheck="false" autocapitalize="off">
+        <input id="join-name" value="${escapeHtml(name)}" maxlength="24" spellcheck="false">
+        <button class="primary" id="btn-join">Join</button>
+      </div>
+      ${known().length ? `<div class="choices" style="margin-top:12px">${known().map((a) =>
+        `<button class="choice" data-known="${escapeHtml(a)}">${escapeHtml(a)}</button>`)
+        .join("")}</div>` : ""}
+      <p class="lead" style="margin-top:14px">You keep your own dice — camera or
+         simulator — and throw on this DiceCore when it is your turn.</p>
+    </section>
+
+    <div class="start-row"><button class="quiet" id="btn-back">Back</button></div>`;
+
+  $("btn-open").onclick = async () => {
+    await post("/api/v1/table/host", { name });
+    await refreshTable();
+    route();
+  };
+  const doJoin = async () => {
+    const address = $("join-address").value.trim();
+    if (!address) return;
+    $("btn-join").disabled = true;
+    const answer = await post("/api/v1/table/join",
+      { address, name: $("join-name").value.trim() || name });
+    $("btn-join").disabled = false;
+    if (answer.ok) remember(address);
+    await refreshTable();
+    route();
+  };
+  $("btn-join").onclick = doJoin;
+  $("join-address").onkeydown = (event) => { if (event.key === "Enter") doJoin(); };
+  $("app").querySelectorAll("[data-known]").forEach((button) => {
+    button.onclick = () => { $("join-address").value = button.dataset.known; doJoin(); };
+  });
+  $("btn-back").onclick = () => { state.view = "lobby"; route(); };
+}
+
+async function refreshTable() {
+  state.table = await (await fetch("/api/v1/table")).json().catch(() => state.table);
 }
 
 // --- 2. the setup wizard ----------------------------------------------------
@@ -115,15 +303,19 @@ function freeColour(players, after = -1, skip = -1) {
 function openWizard(modeId) {
   const mode = state.options.modes.find((m) => m.id === modeId);
   const previous = state.game && state.game.mode === modeId ? state.game : null;
-  const count = previous ? previous.players.length : 2;
+  // At an open table the players are whoever sat down. Offering a player count there would
+  // be a control that quietly disagrees with the seat list.
+  const seats = hosting() ? state.table.hosting.seats : null;
+  const count = seats ? seats.length : (previous ? previous.players.length : 2);
   const players = [];
   for (let i = 0; i < count; i += 1) {
     players.push({
-      name: (previous && previous.players[i]) || `Player ${i + 1}`,
+      name: (seats && seats[i].name) || (previous && previous.players[i]) || `Player ${i + 1}`,
       colour: (previous && previous.colours[i]) || freeColour(players, i - 1),
+      fixed: Boolean(seats),
     });
   }
-  state.wizard = { mode, players, params: { ...mode.defaults } };
+  state.wizard = { mode, players, params: { ...mode.defaults }, seated: Boolean(seats) };
   state.view = "wizard";
   route();
 }
@@ -143,21 +335,22 @@ function renderWizard() {
     <p class="lead">${escapeHtml(mode.blurb)} Uses ${escapeHtml(mode.dice)} dice.</p>
 
     ${needsPlayers(mode) ? `
+      ${wizard.seated ? "" : `
       <section class="step">
         <h2>How many are playing?</h2>
         <div class="choices">${[1, 2, 3, 4, 5, 6].map((n) =>
           `<button class="choice ${n === wizard.players.length ? "on" : ""}"
              data-count="${n}">${n}</button>`).join("")}</div>
-      </section>
+      </section>`}
       <section class="step">
-        <h2>Who</h2>
+        <h2>${wizard.seated ? "Who is at the table" : "Who"}</h2>
         <div class="roster">${wizard.players.map((player, index) => `
           <div class="player">
             <button class="swatch" data-swatch="${index}"
                     style="background:${player.colour}" title="Tap for another colour"></button>
             <input data-name="${index}" value="${escapeHtml(player.name)}"
-                   maxlength="24" spellcheck="false">
-            <span class="hint">tap to rename</span>
+                   maxlength="24" spellcheck="false" ${player.fixed ? "disabled" : ""}>
+            <span class="hint">${player.fixed ? "from the table" : "tap to rename"}</span>
           </div>`).join("")}</div>
       </section>` : ""}
 
@@ -241,6 +434,7 @@ function renderGame() {
       <div class="dice" id="dice"></div>
       <div id="notes"></div>
       <div class="actions">
+        <button class="primary big" id="btn-throw" hidden>Throw</button>
         <button class="primary" id="btn-aside" hidden>Set aside</button>
         <button id="btn-bank" hidden>Bank</button>
         <button class="chip" id="btn-chip" hidden>Spend a chip</button>
@@ -271,9 +465,12 @@ function renderGame() {
   $("detail").textContent = reading.detail || (!game.rules.multi && roll ? roll.notation : "");
   if (waiting && !headline) {
     // A visible "your throw" beats a blank screen: the tray is being watched and the
-    // player should be able to see that without being told.
+    // player should be able to see that without being told. Online it names whoever it is
+    // waiting for, because on your screen "Throw the dice" would be an instruction to you.
+    const label = myTurn() ? "Throw the dice"
+      : `${escapeHtml(game.current_player)} is throwing`;
     $("headline").innerHTML =
-      `<span class="waiting"><i style="background:${colour}"></i>Throw the dice</span>`;
+      `<span class="waiting"><i style="background:${colour}"></i>${label}</span>`;
   }
 
   renderTurn(game);
@@ -288,6 +485,11 @@ function renderTurn(game) {
   const colour = game.colours[turn.player] || PALETTE[0];
   const chunks = [`<span class="dot" style="background:${colour}"></span>`,
                   `<span><b>${escapeHtml(game.current_player)}</b></span>`];
+  if (away()) {
+    chunks.push(myTurn()
+      ? `<span class="seat-badge on">your turn</span>`
+      : `<span class="seat-badge">watching</span>`);
+  }
   if (turn.unlimited) {
     const farkle = game.farkle || {};
     chunks.push(`<span>· turn ${turn.number} · ${farkle.turn_points || 0} at stake`
@@ -327,9 +529,9 @@ function renderDice(game) {
       style="${style}" title="${escapeHtml(die.kind)}${
         die.colour ? `, ${escapeHtml(die.colour)}` : ""}">${dieFace(die, paint)}</div>`;
   }).join("");
-  if (game.rules.holds) {
+  if (game.rules.holds && myTurn()) {
     $("dice").querySelectorAll(".die").forEach((node) => {
-      node.onclick = () => post("/api/v1/game/hold", { index: Number(node.dataset.index) });
+      node.onclick = () => act("hold", { index: Number(node.dataset.index) });
     });
   } else {
     $("dice").querySelectorAll(".die").forEach((n) => (n.style.cursor = "default"));
@@ -338,27 +540,49 @@ function renderDice(game) {
 
 function renderActions(game, roll) {
   const show = (id, visible) => ($(id).hidden = !visible);
-  show("btn-chip", Boolean(game.rules.chips));
+  const mine = myTurn();
+  // Somebody else is throwing. Their move is not yours to make, and a live button that
+  // would only come back refused is worse than no button.
+  const turn = game.turn;
+  const spent = turn.unlimited ? false : turn.rolls_used >= turn.rolls_allowed;
+  show("btn-throw", canThrow() && mine && !spent && !(game.farkle && game.farkle.farkled));
+  $("btn-throw").textContent = turn.rolls_used === 0 || turn.unlimited
+    ? "Throw the dice" : `Throw again (${turn.rolls_used} of ${turn.rolls_allowed})`;
+  $("btn-throw").onclick = async () => {
+    $("btn-throw").disabled = true;
+    try {
+      // The dice come back from the throw itself rather than being waited for on the
+      // stream: the button was pressed here, and a delay between pressing it and seeing
+      // the dice is the one thing a simulator has no excuse for.
+      const thrown = await post("/api/v1/throw");
+      if (thrown && thrown.dice) { state.last = thrown; route(); }
+    } finally { $("btn-throw").disabled = false; }
+  };
+
+  show("btn-chip", Boolean(game.rules.chips) && mine);
   $("btn-chip").disabled = !game.turn.can_spend_chip;
-  show("btn-aside", Boolean(game.farkle));
-  show("btn-bank", Boolean(game.farkle));
+  show("btn-aside", Boolean(game.farkle) && mine);
+  show("btn-bank", Boolean(game.farkle) && mine);
   if (game.farkle) {
     $("btn-aside").disabled = !(game.selection && game.selection.points) || game.farkle.farkled;
     $("btn-bank").disabled = game.turn.rolls_used === 0;
     $("btn-bank").textContent = game.farkle.farkled
       ? "Take the loss" : `Bank ${game.farkle.turn_points}`;
   }
-  show("btn-next", !game.farkle && !game.cards.length);
+  show("btn-next", !game.farkle && !game.cards.length && mine);
   $("btn-next").disabled = game.turn.rolls_used === 0;
-  show("btn-undo", Boolean(game.can_undo));
+  // Undo reaches back into a finished turn, so only the host may use it: a guest undoing
+  // somebody else's booking from across the network is not a game, it is an argument.
+  show("btn-undo", Boolean(game.can_undo) && !away());
   $("btn-undo").onclick = () => post("/api/v1/game/undo");
 
-  $("btn-chip").onclick = () => post("/api/v1/game/chip");
-  $("btn-aside").onclick = () => post("/api/v1/game/aside");
-  $("btn-bank").onclick = () => post("/api/v1/game/bank");
-  $("btn-next").onclick = () => post("/api/v1/game/next");
+  $("btn-chip").onclick = () => act("chip");
+  $("btn-aside").onclick = () => act("aside");
+  $("btn-bank").onclick = () => act("bank");
+  $("btn-next").onclick = () => act("next");
 
   const message = state.flash || game.message
+    || (away() && state.table.guest.problem)
     || (roll && roll.verdict === "void"
         ? "That roll was voided — the dice changed after they were read." : "");
   $("notes").innerHTML = message
@@ -387,10 +611,13 @@ function renderCard(game) {
         }
         if (!active) return `<td></td>`;
         const worth = game.options[category];
-        const playable = game.turn.rolls_used > 0;
+        // What each open box is worth is shown to everyone, whoever's turn it is: watching
+        // somebody decide is most of the game, and a row of dots says nothing.
+        const rolled = game.turn.rolls_used > 0;
+        const playable = rolled && myTurn();
         return `<td class="you open"><button data-book="${category}"
           class="${worth ? "worth" : ""}" ${playable ? "" : "disabled"}
-          title="Book ${escapeHtml(label(category))}">${playable ? (worth || "—") : "·"}</button></td>`;
+          title="Book ${escapeHtml(label(category))}">${rolled ? (worth || "—") : "·"}</button></td>`;
       }).join("");
       rows.push(`<tr><td>${escapeHtml(label(category))}</td>${cells}</tr>`);
     }
@@ -415,7 +642,7 @@ function renderCard(game) {
       const worth = game.options[button.dataset.book] || 0;
       // Booking a zero is a real move — crossing a box out — but it should be deliberate.
       if (!worth && !confirm(`Cross out ${label(button.dataset.book)} for 0?`)) return;
-      post("/api/v1/game/book", { category: button.dataset.book, cross_out: !worth });
+      act("book", { category: button.dataset.book, cross_out: !worth });
     };
   });
   return true;
@@ -508,18 +735,50 @@ async function leaveGame() {
   route();
 }
 
+//: One line in the header saying what this DiceCore is doing right now. Written after the
+//: screen is decided rather than when a message arrives, so it cannot contradict it.
+function linkState() {
+  const data = state.link;
+  if (!data) return "…";
+  if (data.error) return data.error;
+  const game = state.game;
+  const playing = game && game.running;
+  if (playing && !myTurn()) return `waiting for ${game.current_player}`;
+  if (data.idle) return away() ? "at the table" : "idle";
+  return data.manual ? "your throw" : "watching the tray";
+}
+
 function route() {
+  // A guest has no game of its own: what it draws is the host's, mirrored. Deciding that
+  // here rather than in each renderer is what keeps "at home" and "away" from being two
+  // screens that drift apart.
+  if (away()) {
+    const mirror = state.table.guest.game;
+    if (mirror) state.game = mirror;
+    $("btn-quit").hidden = false;
+    $("btn-quit").textContent = "Leave the table";
+    $("who").textContent = "";
+    $("game-name").textContent = mirror && mirror.running
+      ? `${mirror.mode.replace(/_/g, " ")} · away` : "at a table";
+    $("link-state").textContent = linkState();
+    if (mirror && mirror.running) return renderGame();
+    return renderTable();
+  }
+  $("btn-quit").textContent = "Leave game";
+
   const game = state.game;
   if (state.view === "playing" && game && game.complete) state.view = "over";
   if (state.view === "playing" && game && !game.running) state.view = "lobby";
 
   $("btn-quit").hidden = state.view !== "playing" && state.view !== "over";
   $("game-name").textContent = state.view === "playing" && game
-    ? game.mode.replace(/_/g, " ") : "";
-  $("who").textContent = { lobby: "DiceCore", wizard: "New game", playing: "", over: "Result" }
-    [state.view] ?? "DiceCore";
+    ? game.mode.replace(/_/g, " ") + (hosting() ? " · hosting" : "") : "";
+  $("who").textContent = { lobby: "DiceCore", wizard: "New game", table: "Play online",
+                           playing: "", over: "Result" }[state.view] ?? "DiceCore";
 
+  $("link-state").textContent = linkState();
   if (state.view === "lobby") return renderLobby();
+  if (state.view === "table") return renderTable();
   if (state.view === "wizard") return renderWizard();
   if (state.view === "over") return renderResultScreen();
   if (state.view === "playing" && game) return renderGame();
@@ -557,13 +816,14 @@ function connect() {
   if (state.socket && state.socket.readyState <= 1) return;
   const socket = new WebSocket(`${location.origin.replace(/^http/, "ws")}/api/v1/events`);
   state.socket = socket;
-  socket.onopen = () => { $("link-state").textContent = "watching the tray"; state.retry = 1000; };
+  socket.onopen = () => { state.retry = 1000; };
   socket.onmessage = (event) => {
     const data = JSON.parse(event.data);
-    if (data.error) { $("link-state").textContent = data.error; return; }
+    if (data.error) { state.link = data; $("link-state").textContent = data.error; return; }
+    if (data.table) state.table = data.table;
     if (data.game) state.game = data.game;
-    if (!data.idle) state.last = data;
-    $("link-state").textContent = data.idle ? "idle" : "watching the tray";
+    if (!data.idle && !data.away) state.last = data;
+    state.link = data;
     route();
   };
   socket.onclose = () => {
@@ -591,18 +851,27 @@ async function setupCamera() {
   };
 }
 
-$("btn-quit").onclick = () => {
+$("btn-quit").onclick = async () => {
+  if (away()) {
+    if (!confirm("Leave this table? The game carries on without you.")) return;
+    await post("/api/v1/table/leave");
+    await refreshTable();
+    state.view = "lobby";
+    return route();
+  }
   if (confirm("Leave this game? The scores are lost.")) leaveGame();
 };
 
 (async function boot() {
   state.options = await (await fetch("/api/v1/modes")).json();
+  await refreshTable();
   const info = await (await fetch("/api/v1/game")).json();
   state.game = info.game;
   state.last = info.last;
   // Coming back to a game that is still running should land you back in it, not in a lobby
   // that throws it away.
   state.view = info.game.running ? "playing" : "lobby";
+  if (away()) state.view = "table";
   route();
   connect();
   setupCamera();

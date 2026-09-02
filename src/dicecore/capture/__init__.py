@@ -6,10 +6,12 @@ from ..config import Settings
 from .base import CaptureError, FrameSource
 from .folder import FolderSource
 from .push import PushSource
+from .sim import SimSource
 
 #: What the UI offers, in the order it offers it.
 SOURCES = (
-    ("folder", "Folder of images (simulator)"),
+    ("sim", "Simulated dice — no camera, throw from the screen"),
+    ("folder", "Folder of images (played back in order)"),
     ("picamera2", "CSI camera via picamera2"),
     ("rpicam", "CSI camera via rpicam-still"),
     ("v4l2", "USB camera via /dev/video*"),
@@ -29,6 +31,8 @@ def open_source(settings: Settings, push: PushSource | None = None) -> FrameSour
     cap = settings.capture
     kind = cap.source
 
+    if kind == "sim":
+        return SimSource(cap.width or 900, cap.height or 600)
     if kind == "folder":
         return FolderSource(cap.folder or str(settings.frames_dir))
     if kind == "push":
@@ -54,4 +58,5 @@ def open_source(settings: Settings, push: PushSource | None = None) -> FrameSour
                        + ", ".join(name for name, _ in SOURCES))
 
 
-__all__ = ["CaptureError", "FrameSource", "FolderSource", "PushSource", "SOURCES", "open_source"]
+__all__ = ["CaptureError", "FrameSource", "FolderSource", "PushSource", "SimSource",
+           "SOURCES", "open_source"]

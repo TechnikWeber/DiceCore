@@ -69,8 +69,9 @@ class GameSession:
     lock over the whole object is the right amount of machinery.
     """
 
-    #: Called after anything that changes the game, so it survives a restart. Set by
-    #: whoever owns the session; a session with no store simply does not persist.
+    #: Called after anything that changes the game. More than one thing listens — the store
+    #: that makes it survive a restart, and the table that tells the other players — and a
+    #: single callback meant the second one to be added silently replaced the first.
     on_change: Any = None
 
     def __init__(self, mode: str = "normal", rules: TurnRules | None = None,
@@ -108,6 +109,8 @@ class GameSession:
         #: a bank, a finished turn. One step only: "I hit the wrong box" is the mistake this
         #: exists for, and a deeper history would invite using it to re-decide a game.
         self._undo: dict[str, Any] | None = None
+        #: Everything that wants to know when the game changed.
+        self.listeners: list[Any] = []
         self._reset_cards()
 
     # --- lifecycle ----------------------------------------------------------
@@ -353,13 +356,18 @@ class GameSession:
             return True, None
 
     def touch(self) -> None:
-        """Something changed. Persist it, and never let persisting break the game."""
-        if self.on_change is None:
-            return
-        try:
-            self.on_change(self)
-        except Exception:
-            pass
+        """
+        Something changed. Tell everyone who cares, and let none of them break the game.
+
+        Persisting and broadcasting both hang off this, which is why it is a list: the host
+        not telling its guests about its *own* moves left every remote screen a move behind,
+        and a guest that thinks it is not its turn does not send its dice up at all.
+        """
+        for listener in ([self.on_change] if self.on_change else []) + self.listeners:
+            try:
+                listener(self)
+            except Exception:
+                pass
 
     def _advance(self) -> None:
         end_turn(self.turn)

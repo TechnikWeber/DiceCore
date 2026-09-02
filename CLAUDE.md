@@ -14,8 +14,9 @@ Owner: Philipp Weber · GitHub: TechnikWeber/DiceCore
   Pure data, no dependencies. Everything else speaks this.
 - `src/dicecore/config.py` — one JSON file, one dataclass tree. Unknown keys survive a round
   trip; a broken file degrades to defaults with a complaint.
-- `src/dicecore/capture/` — `base` (interface) plus `folder` (sim), `v4l2`, `rpicam`,
-  `picamera2_src`, `push`, and `settle` (wait for the dice to stop).
+- `src/dicecore/capture/` — `base` (interface) plus `folder` (replay), `sim` (drawn dice,
+  thrown from the screen), `v4l2`, `rpicam`, `picamera2_src`, `push`, and `settle` (wait for
+  the dice to stop).
 - `src/dicecore/engine/` — `classic` (pips, no training), `model` (ONNX), `remote` (another
   node reads), `geometry` (every decision that can be made on numbers instead of pixels).
 - `src/dicecore/dataset/` — labelled rolls on disk: one JPEG plus one JSON per frame.
@@ -37,6 +38,9 @@ Owner: Philipp Weber · GitHub: TechnikWeber/DiceCore
   pure), `render` (PIL, one renderer for every panel), `displays` (ST7789 / ILI9341 /
   SSD1306 via luma, plus an always-on PNG preview), `signals` (LEDs and buzzer via gpiozero),
   and the hub that fans out on its own thread.
+- `src/dicecore/table/` — one game across several DiceCores: `protocol` (the messages and
+  the turn rule, pure), `host` (the instance that owns the game), `guest` (the one that
+  mirrors it), `reach` (the addresses others can find this one at).
 - `src/dicecore/server/` — FastAPI, plus `web/` (one HTML, one JS, one CSS; no build step).
 - `src/dicecore/synth.py` — synthetic dice, for tests and for a first run without hardware.
 
@@ -139,6 +143,29 @@ python3 -m venv .venv && .venv/bin/pip install -e '.[vision,server,dev]'
 - **Rotation augmentation is not optional.** Dice land in any orientation; a model trained
   without full 360° rotation learns the orientation of one tower. 6 vs 9 survives it because
   real dice underline them.
+- **The host owns the game; guests own nothing.** One `GameSession` exists, on the host.
+  Guests mirror it and *ask*. Nothing merges, nothing resolves a conflict, and there is
+  exactly one answer to "whose turn is it" — which is the entire difficulty of a turn-based
+  game played in three rooms at once. The cost is stated out loud: the host going away ends
+  the evening.
+- **The turn rule is enforced at the host, never at the button.** A guest whose mirror is out
+  of date does not get to book a box because their copy said it was their turn. Greying the
+  button is courtesy; `protocol.check` is the rule.
+- **Every change to the game is broadcast, not just the rolls.** `session.touch()` fans out
+  to a *list* of listeners — the store that persists it and the table that sends it on. It
+  was a single callback once, and the second thing to be added silently replaced the first:
+  guests heard about rolls and nothing else, and sat a move behind all game.
+- **A host is a player too, and only of its own seats.** "Not a guest" is not the same as "my
+  turn": the hosting screen must not throw for somebody in another room.
+- **A simulator knows what a camera has to guess.** Staleness, for the `sim` source, is not
+  inferred from motion — it is `source.throws`. Anything that reasons about a live sensor
+  (frozen-feed detection, settling, motion) has to be skipped or replaced for it, not reused.
+- **The simulator renders and re-reads on purpose.** Returning random numbers would be less
+  code and would test nothing. Going through `synth` → engine means every mode, board, panel
+  and screen behaves identically with and without a camera, and bugs surface on a laptop.
+- **`localhost` is the one address that never helps another player.** Anything reporting
+  where this DiceCore can be reached uses `table/reach.py` and the port the service was
+  actually started on, not `server.port` from the config.
 - **Never name a module after a stdlib module.** `types.py` inside the package shadows
   `types` for anything run from that directory; that is why the vocabulary lives in
   `dice.py`.

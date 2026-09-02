@@ -33,6 +33,13 @@ class FrameSource(ABC):
     def close(self) -> None:
         """Release the device. Safe to call twice."""
 
+    def throw(self) -> list[tuple[str, int]]:
+        """
+        Roll new dice, for the sources that can. A camera cannot: the dice on its tray are
+        the ones somebody threw, and no amount of asking changes them.
+        """
+        raise CaptureError("This source reads dice; it cannot throw them.")
+
     def hold(self, enabled: bool) -> None:
         """
         Stay on the current scene while the tamper guard watches it.
