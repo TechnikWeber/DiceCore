@@ -32,13 +32,18 @@ def roll(*dice: tuple[str, int]) -> RollResult:
     return RollResult(dice=[Die(kind, value, Box(0, 0, 40, 40), 0.9) for kind, value in dice])
 
 
+def unread(kind: str) -> Die:
+    """A die the engine found but could not read: no value *and* no confidence."""
+    return Die(kind, 0, Box(0, 0, 40, 40), 0.0)
+
+
 # --- what the state says ----------------------------------------------------------
 
 
 def test_green_means_throw_and_nothing_else_does():
-    assert Presentation(IDLE).go and Presentation(READY).go
+    assert Presentation(phase=IDLE).go and Presentation(phase=READY).go
     for phase in (ROLLING, READING, RESULT, VOID, ERROR):
-        assert not Presentation(phase).go, phase
+        assert not Presentation(phase=phase).go, phase
 
 
 def test_the_number_is_still_shown_while_the_tray_is_watched():
@@ -61,8 +66,17 @@ def test_a_total_threshold_is_the_other_way_to_celebrate():
 
 def test_a_die_that_could_not_be_read_never_celebrates():
     # A party over a number the machine could not read is worse than silence.
-    assert not is_celebration(roll(("d20", 20), ("d20", 0)), "max_die", 18)
-    assert not is_lament(roll(("d20", 1), ("d20", 0)), True)
+    good = roll(("d20", 20))
+    good.dice.append(unread("d20"))
+    assert not is_celebration(good, "max_die", 18)
+    bad = roll(("d20", 1))
+    bad.dice.append(unread("d20"))
+    assert not is_lament(bad, True)
+
+
+def test_a_d10_showing_zero_does_not_block_a_celebration():
+    # It is a face, not a failure — see Die.unread.
+    assert is_celebration(roll(("d20", 20), ("d10", 0)), "max_die", 18)
 
 
 def test_celebration_can_be_switched_off():
@@ -92,49 +106,49 @@ def signals(**overrides) -> SignalOutput:
 
 def test_the_lamps_follow_the_phase():
     lamps = signals()
-    lamps.present(Presentation(IDLE))
+    lamps.present(Presentation(phase=IDLE))
     assert lamps.green.state and not lamps.red.state
-    lamps.present(Presentation(RESULT, 4))
+    lamps.present(Presentation(phase=RESULT, total=4))
     assert not lamps.green.state and lamps.red.state
-    lamps.present(Presentation(READY, 4))
+    lamps.present(Presentation(phase=READY, total=4))
     assert lamps.green.state and not lamps.red.state
     lamps.close()
 
 
 def test_the_buzzer_marks_the_number_and_the_turn():
     lamps = signals()
-    lamps.present(Presentation(RESULT, 4))
+    lamps.present(Presentation(phase=RESULT, total=4))
     assert lamps.last_sound == "result"
-    lamps.present(Presentation(READY, 4))
+    lamps.present(Presentation(phase=READY, total=4))
     assert lamps.last_sound == "your turn"
-    lamps.present(Presentation(VOID, 4))
+    lamps.present(Presentation(phase=VOID, total=4))
     assert lamps.last_sound == "void"
     lamps.close()
 
 
 def test_a_great_roll_and_an_awful_one_sound_different():
     lamps = signals()
-    lamps.present(Presentation(RESULT, 20, celebrate=True))
+    lamps.present(Presentation(phase=RESULT, total=20, celebrate=True))
     assert lamps.last_sound == "nice roll"
-    lamps.present(Presentation(IDLE))
-    lamps.present(Presentation(RESULT, 1, lament=True))
+    lamps.present(Presentation(phase=IDLE))
+    lamps.present(Presentation(phase=RESULT, total=1, lament=True))
     assert lamps.last_sound == "ouch"
     lamps.close()
 
 
 def test_the_sound_fires_once_per_phase_not_once_per_frame():
     lamps = signals()
-    lamps.present(Presentation(RESULT, 4))
+    lamps.present(Presentation(phase=RESULT, total=4))
     lamps.last_sound = ""
     for _ in range(5):
-        lamps.present(Presentation(RESULT, 4))
+        lamps.present(Presentation(phase=RESULT, total=4))
     assert lamps.last_sound == ""       # nothing new happened, so nothing beeped
     lamps.close()
 
 
 def test_a_pin_set_to_minus_one_is_simply_left_out():
     lamps = signals(buzzer_pin=-1)
-    lamps.present(Presentation(RESULT, 4))
+    lamps.present(Presentation(phase=RESULT, total=4))
     assert lamps.buzzer.number == -1
     lamps.close()
 
@@ -174,7 +188,8 @@ def test_every_panel_renders_at_its_own_size():
     pytest.importorskip("PIL")
     for kind, sizes in COMMON_SIZES.items():
         for size in sizes:
-            image = render(Presentation(RESULT, 118, "3d20 → 4, 14, 100"),
+            image = render(Presentation(phase=RESULT, total=118,
+                                        notation="3d20 → 4, 14, 100"),
                            size, mono=kind.startswith("ssd1306"))
             assert image.size == size, (kind, size)
 
@@ -182,7 +197,7 @@ def test_every_panel_renders_at_its_own_size():
 def test_a_hub_with_nothing_enabled_costs_nothing():
     hub = OutputHub(OutputSettings())
     assert not hub.enabled and hub.devices == []
-    hub.update(Presentation(RESULT, 4))     # must not raise, must not start a thread
+    hub.update(Presentation(phase=RESULT, total=4))     # must not raise, must not start a thread
     hub.close()
 
 
@@ -193,7 +208,7 @@ def test_the_hub_shows_the_newest_state_even_when_it_falls_behind():
     hub = OutputHub(settings)
     try:
         for total in range(30):
-            hub.update(Presentation(RESULT, total))
+            hub.update(Presentation(phase=RESULT, total=total))
         for _ in range(50):
             if hub.latest.total == 29:
                 break

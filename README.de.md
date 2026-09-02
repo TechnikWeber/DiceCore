@@ -37,6 +37,10 @@ als JSON-API und als Live-Stream, den ein Bot oder ein Spiel abonnieren kann.
 - **Training aus dem Browser**, mit laufender Loss- und Genauigkeitsanzeige, am Ende ein
   ONNX-Modell, das die Engine übernimmt. Training braucht PyTorch und läuft deshalb auf dem
   PC; die Oberfläche sagt das offen, statt auf halbem Weg abzubrechen.
+- **Spielmodi.** Dieselben Würfel, gelesen wie das Spiel an deinem Tisch sie liest: als
+  Summe, als Anzahl Erfolge, als Kniffel-Kombination, als Prozentwurf, als Unterwürfeln
+  gegen einen Zielwert. Vierzehn Stück, von normalen Sechsseitern bis zum Chi-Quadrat-Test,
+  ob ein Würfel gezinkt ist — plus *Selbst bauen* für das Spiel, das nicht dabei ist.
 - **Ein Display und zwei Lampen.** ST7789, ILI9341 oder SSD1306 über dem Turm zeigt die Zahl,
   sobald die Würfel liegen, mit kleiner Animation bei einer natürlichen 20; eine grüne und
   eine rote LED plus Summer sagen, wer dran ist, ganz ohne Hinsehen. Beides optional, beides
@@ -117,6 +121,10 @@ import requests
 roll = requests.get("http://dicecore.local:8099/api/v1/roll", timeout=15).json()
 if roll["usable"]:                               # falsch nur bei manipulierter Landefläche
     print(roll["notation"], "=", roll["total"])  # 1d6+1d20 → 4, 14 = 18
+
+# …oder von einem Spielmodus deuten lassen, ohne den eingestellten zu ändern
+pool = requests.get(".../api/v1/roll?mode=pool").json()
+print(pool["reading"]["headline"])               # 3 successes
 ```
 
 Ein Würfel, der nicht gelesen werden konnte, hat `"value": 0` und erscheint als `?`. Niemals
@@ -131,6 +139,7 @@ mitrechnen.
 | [docs/API.md](docs/API.md) | Der Vertrag, auf den andere Projekte sich verlassen |
 | [docs/TRAINING.md](docs/TRAINING.md) | Ihm die eigenen Würfel beibringen |
 | [docs/ANTI-CHEAT.md](docs/ANTI-CHEAT.md) | Was die Fair-Play-Überwachung erkennt — und was nicht |
+| [docs/GAME-MODES.md](docs/GAME-MODES.md) | Die Modi, was jeder wertet, und wie ein weiterer dazukommt |
 | [docs/DISPLAYS.md](docs/DISPLAYS.md) | Display, Lampen und Summer — Panels, Pins, Verdrahtung |
 
 ## Befehle

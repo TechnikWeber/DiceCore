@@ -17,6 +17,7 @@ Capture and read. This is the one you want.
 |---|---|---|
 | `wait` | `1` | Wait for the dice to settle before reading |
 | `verify` | *(background)* | `1` waits for the fair-play verdict before answering; by default the watch runs behind the answer and the verdict lands on `/state` |
+| `mode` | *(configured)* | Read this roll as that game mode, without changing the configured one |
 | `store_to` | — | Dataset set id; files the frame as an unconfirmed sample |
 
 ```json
@@ -35,6 +36,8 @@ Capture and read. This is the one you want.
   "took_ms": 24.8,
   "warnings": [],
   "frame_id": null,
+  "reading": {"mode": "normal", "headline": "18", "detail": "4, 14", "value": 18,
+              "celebrate": false, "lament": false, "extras": {"values": [4, 14]}},
   "verdict": "clean",
   "usable": true,
   "stale": false,
@@ -56,8 +59,15 @@ Read the fields like this:
 - **`verdict`** starts as `pending` and becomes `clean`, `disturbed`, `void` or `superseded`
   a couple of seconds later — read it from `/state` or the websocket, or ask for
   `?verify=1`. `superseded` means the next throw began first, which is normal play.
+- **`reading`** is what the active game mode made of the roll: `headline` for a screen,
+  `value` for arithmetic, `extras` for the detail. See [GAME-MODES.md](GAME-MODES.md).
 - **`stale`** means nothing was thrown since the last reading. A scoreboard ignores it;
   anything that counts rolls must not count it twice.
+
+### `GET /api/v1/modes`
+
+Every game mode with its expected dice and its parameters, plus which one is active. This is
+what a consumer's own mode picker should be built from rather than a hardcoded list.
 
 ### `POST /api/v1/verify`
 
@@ -150,6 +160,8 @@ Within `v1`:
 
 - Fields are added, never removed or renamed.
 - `kind` values come from a fixed vocabulary: `d4 d6 d8 d10 d100 d12 d20`.
+- Mode ids only ever get added. A consumer that does not recognise one should fall back to
+  `total` and `dice`, which every mode still fills in.
 - `value` is `0` for "not read", `0–9` for a d10, `0/10/…/90` for a d100, `1..faces`
   otherwise.
 - `verdict` is one of `unverified`, `pending`, `clean`, `disturbed`, `void`, `superseded`;

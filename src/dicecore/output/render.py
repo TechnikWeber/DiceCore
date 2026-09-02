@@ -140,7 +140,7 @@ def _compose(draw: Any, presentation: Presentation, width: int, height: int,
         caption = "OUCH"
 
     margin = max(2, int(width * 0.03))
-    number = str(presentation.total) if presentation.total is not None else None
+    number = presentation.big
     bar = max(2, int(height * 0.04)) if presentation.phase in (VOID, RESULT, READY) else 0
 
     # A 128x32 OLED has no room for three stacked rows, so it gets one: the word on the
@@ -163,7 +163,7 @@ def _compose(draw: Any, presentation: Presentation, width: int, height: int,
 
     top_of_body = int(height * 0.20)
     notation = ""
-    if height >= 64 and presentation.notation and presentation.total is not None:
+    if height >= 64 and presentation.notation and number is not None:
         notation = presentation.notation.split("→")[-1].strip()
         if len(notation) > 22:
             notation = notation[:21] + "…"
@@ -180,6 +180,8 @@ def _compose(draw: Any, presentation: Presentation, width: int, height: int,
                  _measure(draw, message, font)[3]) // 2), ink)
         return
 
+    # A headline can be a word ("Full house"), so the fitter decides the size from the text
+    # rather than from a digit count.
     number_font = _fit(draw, number, width - 2 * margin, body_height, int(height * 0.66))
     drawn = _measure(draw, number, number_font)
     _centred(draw, number, number_font, width,

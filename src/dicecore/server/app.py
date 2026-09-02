@@ -31,6 +31,9 @@ from ..dataset.store import DatasetStore
 from ..dice import DIE_FACES, DIE_KINDS, values_for
 from ..engine import MODES, EngineError
 from ..integrity import POLICIES
+from ..modes import DEFAULT as DEFAULT_MODE
+from ..modes import MODES as GAME_MODES
+from ..modes import mode_by_id
 from ..output import OutputHub
 from ..output import state as phases
 from ..output.displays import COMMON_SIZES, PANELS
@@ -58,7 +61,7 @@ def create_app(settings: Settings | None = None) -> Any:
     reader = Reader(loaded, on_phase=lambda p: state["hub"].update(p))
     training = TrainingManager(loaded)
 
-    app = FastAPI(title="DiceCore", version="0.3.0",
+    app = FastAPI(title="DiceCore", version="0.4.0",
                   description="Reads real dice with a camera.")
     app.state.reader = reader
     app.state.training = training
@@ -87,8 +90,27 @@ def create_app(settings: Settings | None = None) -> Any:
         return {"ok": True, "name": state["settings"].server.public_name,
                 "version": app.version, "at": time.time()}
 
+    @app.get("/api/v1/modes")
+    def modes() -> Any:
+        """
+        The game modes and what each one expects. Part of the versioned API, because a
+        consumer that offers a mode picker needs the same list DiceCore has.
+        """
+        return {
+            "active": state["settings"].mode.active,
+            "d10_style": state["settings"].mode.d10_style,
+            "modes": [
+                {"id": m.id, "label": m.label, "blurb": m.blurb, "kinds": list(m.kinds),
+                 "dice": m.dice, "rule": m.rule, "stateful": m.stateful,
+                 "defaults": m.defaults,
+                 "params": state["settings"].mode.params.get(m.id, {})}
+                for m in GAME_MODES
+            ],
+        }
+
     @app.get("/api/v1/roll")
-    def roll(wait: int = 1, store_to: str = "", verify: int | None = None) -> Any:
+    def roll(wait: int = 1, store_to: str = "", verify: int | None = None,
+             mode: str = "") -> Any:
         """
         Read the dice now. `wait=1` waits for them to settle first.
 
@@ -99,10 +121,17 @@ def create_app(settings: Settings | None = None) -> Any:
         `store_to=<set id>` files the frame into a dataset in the same call — that is how
         the label loop collects without a second capture, and how a consumer can contribute
         training data just by asking for rolls.
+
+        `mode=<id>` reads this roll as that game without changing the configured one, so a
+        bot counting successes and a screen showing a total can share one tray.
         """
+        if mode and mode_by_id(mode) is None:
+            raise HTTPException(400, f"Unknown game mode {mode!r}. See /api/v1/modes.")
         try:
             result = reader.read(wait_for_still=bool(wait),
                                  verify=None if verify is None else bool(verify))
+            if mode:
+                reader.apply_mode(result, mode)
         except (CaptureError, EngineError) as exc:
             return fail(exc)
         if store_to:
@@ -227,14 +256,44 @@ def create_app(settings: Settings | None = None) -> Any:
                  "tuning_file": m.tuning_file, "focus": m.focus}
                 for m in boot_config.CSI_MODULES
             ],
-            "kinds": [{"id": k, "faces": DIE_FACES[k], "values": values_for(k)}
+            "kinds": [{"id": k, "faces": DIE_FACES[k],
+                       "values": values_for(k, state["settings"].mode.d10_style)}
                       for k in DIE_KINDS],
+            "modes": [{"id": m.id, "label": m.label, "blurb": m.blurb, "dice": m.dice,
+                       "kinds": list(m.kinds), "rule": m.rule, "stateful": m.stateful,
+                       "defaults": m.defaults} for m in GAME_MODES],
+            "default_mode": DEFAULT_MODE,
             "policies": [{"id": i, "label": name} for i, name in POLICIES],
             "panels": [{"id": i, "label": label, "mono": mono, "bus": bus,
                         "sizes": [list(s) for s in COMMON_SIZES.get(i, ())]}
                        for i, (label, _default, mono, bus) in PANELS.items()],
             "phases": list(phases.PHASES),
         }
+
+    @app.post("/api/setup/mode")
+    async def set_mode(request: Request) -> Any:
+        """Switch the game, and adjust its numbers. Saved, so it survives a restart."""
+        body = await request.json()
+        current = state["settings"]
+        wanted = str(body.get("mode", current.mode.active))
+        if mode_by_id(wanted) is None:
+            raise HTTPException(400, f"Unknown game mode {wanted!r}.")
+        current.mode.active = wanted
+        if isinstance(body.get("params"), dict):
+            current.mode.params[wanted] = body["params"]
+        if body.get("d10_style") in ("0-9", "1-10"):
+            current.mode.d10_style = body["d10_style"]
+        current.save()
+        reader.reload(current)
+        reader.settings = current
+        return {"ok": True, "mode": wanted, "params": current.mode.params.get(wanted, {}),
+                "d10_style": current.mode.d10_style}
+
+    @app.post("/api/setup/mode/reset")
+    def reset_mode_session() -> Any:
+        """Start the fairness tally (or an open exploding roll) again from nothing."""
+        reader.mode_sessions.pop(state["settings"].mode.active, None)
+        return {"ok": True}
 
     @app.get("/api/setup/settings")
     def get_settings() -> Any:
@@ -358,18 +417,21 @@ def create_app(settings: Settings | None = None) -> Any:
         wanted = str(body.get("phase", "")).strip()
         celebrate = bool(body.get("celebrate", True))
         if wanted:
-            hub.update(phases.Presentation(wanted, 20 if wanted != phases.IDLE else None,
-                                           "1d20 → 20", celebrate=celebrate))
+            hub.update(phases.Presentation(
+                phase=wanted, total=None if wanted == phases.IDLE else 20,
+                notation="1d20 → 20", celebrate=celebrate))
             return {"ok": True, "phase": wanted}
 
         async def walk() -> None:
             for phase, pause in ((phases.ROLLING, 0.6), (phases.READING, 0.4),
                                  (phases.RESULT, 1.4), (phases.READY, 1.2)):
                 hub.update(phases.Presentation(
-                    phase, 20 if phase in (phases.RESULT, phases.READY) else None,
-                    "1d20 → 20", celebrate=celebrate and phase in (phases.RESULT, phases.READY)))
+                    phase=phase,
+                    total=20 if phase in (phases.RESULT, phases.READY) else None,
+                    notation="1d20 → 20",
+                    celebrate=celebrate and phase in (phases.RESULT, phases.READY)))
                 await asyncio.sleep(pause)
-            hub.update(phases.Presentation(phases.IDLE))
+            hub.update(phases.Presentation(phase=phases.IDLE))
 
         asyncio.create_task(walk())
         return {"ok": True, "walking": True}

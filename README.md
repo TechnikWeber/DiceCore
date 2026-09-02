@@ -33,6 +33,10 @@ event stream a bot or a game can subscribe to.
 - **Training from the browser**, with live loss and accuracy, exporting an ONNX model the
   engine picks up. Training needs PyTorch and so runs on a PC; the UI says so plainly rather
   than failing halfway through.
+- **Game modes.** The same dice, read the way the game at your table reads them: a sum, a
+  count of successes, a Kniffel combination, a percentile, a roll under a target. Fourteen
+  of them, from plain six-siders to a chi-square test for whether a die is loaded — and a
+  *build your own* for the game that is not in the list.
 - **A screen and two lamps.** ST7789, ILI9341 or SSD1306 over the tower shows the number the
   instant the dice stop, with a small animation for a natural 20; a green and a red LED plus
   a buzzer say whose turn it is without anyone reading anything. Both are optional, both run
@@ -112,6 +116,10 @@ import requests
 roll = requests.get("http://dicecore.local:8099/api/v1/roll", timeout=15).json()
 if roll["usable"]:                               # false only when the tray was interfered with
     print(roll["notation"], "=", roll["total"])  # 1d6+1d20 → 4, 14 = 18
+
+# …or let a game mode read it, without changing anybody else's
+pool = requests.get(".../api/v1/roll?mode=pool").json()
+print(pool["reading"]["headline"])               # 3 successes
 ```
 
 A die that could not be read has `"value": 0` and prints as `?`. Never add it up.
@@ -125,6 +133,7 @@ A die that could not be read has `"value": 0` and prints as `?`. Never add it up
 | [docs/API.md](docs/API.md) | The contract other projects depend on |
 | [docs/TRAINING.md](docs/TRAINING.md) | Teaching it your own dice |
 | [docs/ANTI-CHEAT.md](docs/ANTI-CHEAT.md) | What the fair-play watch catches, and what it cannot |
+| [docs/GAME-MODES.md](docs/GAME-MODES.md) | The modes, what each one scores, and how to add another |
 | [docs/DISPLAYS.md](docs/DISPLAYS.md) | The screen, the lamps and the buzzer — panels, pins, wiring |
 
 ## Commands

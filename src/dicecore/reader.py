@@ -29,6 +29,7 @@ from .integrity import (
     compare_readings,
     frame_hash,
 )
+from .modes import ModeSession, interpret
 from .output import state as phases
 
 
@@ -51,6 +52,11 @@ class Reader:
         self._last_frame_hash: str | None = None
         #: Events established while reading, waiting for a hold window to judge them.
         self._pending_events: list[Event] = []
+        #: What each game mode remembers between throws — an exploding roll still open, a
+        #: fairness tally being built up. One per mode, because two consumers may read the
+        #: same tray differently: a screen in "normal" and a bot in "pool" are both right,
+        #: and neither should be able to reset the other's tally.
+        self.mode_sessions: dict[str, ModeSession] = {}
         #: The hold window runs on its own thread so the number is not held hostage to it.
         self._verifier: threading.Thread | None = None
         self._verify_stop = threading.Event()
@@ -75,7 +81,13 @@ class Reader:
         self.cancel_verification()
         with self._lock:
             if settings is not None:
+                previous = self.settings.mode.active
                 self.settings = settings
+                if settings.mode.active != previous:
+                    # An exploding roll or a fairness tally belongs to the mode that started
+                    # it, and to the settings it was collected under. Changing either starts
+                    # a fresh one rather than mixing the two.
+                    self.mode_sessions.pop(settings.mode.active, None)
             if self._source is not None:
                 try:
                     self._source.close()
@@ -130,6 +142,7 @@ class Reader:
             self._emit(phases.waiting(phases.READING))
             result = engine.read(frame)
             result.warnings = warnings + result.warnings
+            self.apply_mode(result)
             self._last_frame = frame
             self._last_jpeg = None
 
@@ -247,6 +260,35 @@ class Reader:
         # The moment the lamps exist for: the watch is over, throw again.
         self._show(result, phases.VOID if result.verdict == VOID else phases.READY)
 
+    def session_for(self, mode_id: str) -> ModeSession:
+        session = self.mode_sessions.get(mode_id)
+        if session is None:
+            session = ModeSession(mode=mode_id)
+            self.mode_sessions[mode_id] = session
+        return session
+
+    def apply_mode(self, result: RollResult, mode_id: str | None = None) -> RollResult:
+        """
+        Let the active game mode read the roll.
+
+        Deliberately after the engine and before anything is shown: the engine says what the
+        faces are, the mode says what they mean, and everything downstream — screen, lamps,
+        API — sees one answer rather than each working it out again.
+        """
+        mode = self.settings.mode
+        active = mode_id or mode.active
+        score = interpret(result.dice, active, mode.params.get(active),
+                          self.session_for(active), mode.d10_style)
+        result.reading = {
+            "mode": active, "headline": score.headline, "detail": score.detail,
+            "value": score.value, "celebrate": score.celebrate, "lament": score.lament,
+            "extras": score.extras,
+        }
+        for warning in score.warnings:
+            if warning and warning not in result.warnings:
+                result.warnings.append(warning)
+        return result
+
     # --- telling people what is going on -------------------------------------
     def _emit(self, presentation: phases.Presentation) -> None:
         if self.on_phase is not None:
@@ -295,7 +337,7 @@ class Reader:
         """Read a frame that came from outside — an upload, or a push from an agent."""
         with self._lock:
             frame = Frame(image=image, source=source_name)
-            result = self.engine().read(frame)
+            result = self.apply_mode(self.engine().read(frame))
             self._last = result
             self._last_frame = frame
             self._last_jpeg = None

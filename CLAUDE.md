@@ -22,6 +22,8 @@ Owner: Philipp Weber · GitHub: TechnikWeber/DiceCore
 - `src/dicecore/training/` — `data` (crops, readiness, no torch), `trainer` (torch),
   `job` (a watchable background run).
 - `src/dicecore/system/` — `boot_config` (CSI modules in config.txt), `diagnostics`.
+- `src/dicecore/modes/` — game modes: `catalogue` (the table), `scoring` (pure rules, one
+  function per game), `fairness` (the chi-square tally), and `interpret()` in `__init__`.
 - `src/dicecore/integrity.py` — fair play decided on numbers: comparing two readings,
   classifying events, turning them into a verdict. No pixels.
 - `src/dicecore/guard.py` — the hold window after a reading: turns frames into events.
@@ -80,6 +82,17 @@ python3 -m venv .venv && .venv/bin/pip install -e '.[vision,server,dev]'
   the dice landing and anyone seeing a number, which is the opposite of what a dice tower is
   for. A new read cancels the previous watch and marks that roll `superseded` — throwing
   again immediately is normal play and must never void anything.
+- **`Die.unread` is not `value == 0`.** A d10 printed 0–9 has a zero face; filtering on
+  `value == 0` dropped it out of every sum. Unread means no value *and* no confidence.
+- **A mode is data.** New game → an entry in `catalogue.py` and a function in `scoring.py`.
+  The web UI builds its settings form from the mode's own `defaults`, so a new mode needs no
+  UI work at all. If a mode needs a change to the reader, the design is wrong.
+- **A mode reads, it does not rule.** No modifiers, no turn order, no character sheets. The
+  moment a mode needs to know something DiceCore cannot see on the tray, it belongs in the
+  consuming game instead.
+- **Modes with memory keep it per mode** (`Reader.mode_sessions`). Two consumers may read
+  one tray differently — a screen in `normal` and a bot in `pool` are both right, and
+  neither may reset the other's fairness tally.
 - **One `Presentation` drives every output.** The screen and the lamps must not be able to
   disagree about whose turn it is, so both are derived from the same value rather than each
   interpreting the reader's events. `presentation.go` is what the green lamp means.

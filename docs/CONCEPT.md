@@ -150,6 +150,20 @@ train can still *collect* (dataset stays on the Pi, or is pushed to the trainer)
 still *run* the exported model if it is a Pi 4/5. The UI states plainly which of those
 this machine can do rather than failing halfway through.
 
+### Game modes
+
+Reading the dice and reading the *result* are two jobs. A mode says which dice may appear,
+how the faces become an answer, and what belongs on a screen in big letters — as a table
+entry plus a pure function, never as a change to the reader.
+
+This is what keeps the project from being about one game. The camera does not care whether
+five sixes are thirty points or a Kniffel; the scoring does not care how the sixes were
+recognised. A mode is also the cheapest accuracy setting there is, because naming the dice a
+game uses narrows what the engine has to consider.
+
+A mode is not a rules engine: DiceCore does not know your modifier, whose turn it is, or
+what you rolled for. See [docs/GAME-MODES.md](GAME-MODES.md).
+
 ## Outputs and modes
 
 The same `RollResult` is served through every output; a mode only chooses what is
@@ -159,7 +173,9 @@ emphasised, never a different pipeline.
 - **API** — `GET /api/v1/roll` (read now), `GET /api/v1/state` (last result), websocket
   `/api/v1/events` (a result pushed as soon as the dice settle, then again with its
   fair-play verdict).
-- **Notation** — a D&D-style summary for consumers that want text: `2d20+1d6 → 14, 3, 5`.
+- **Notation** — a dice-notation summary for consumers that want text: `2d20+1d6 → 14, 3, 5`.
+- **Reading** — what the active mode made of it: a headline for a screen, a value for
+  arithmetic, and the mode's own detail.
 - **Consumers** — a Discord bot, a game, a scoreboard. They live in their own repos and
   depend on this API, not on this code. That direction is the whole point.
 

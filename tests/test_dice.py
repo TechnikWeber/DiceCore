@@ -24,8 +24,19 @@ def test_notation_groups_by_kind_and_lists_values_in_the_same_order():
 
 def test_an_unread_die_is_a_question_mark_never_a_zero():
     # A consumer would happily add a 0 into a total; a "?" makes it look before it leaps.
-    result = RollResult(dice=[Die("d20", 0, box()), Die("d6", 4, box())])
+    result = RollResult(dice=[Die("d20", 0, box(), confidence=0.0), Die("d6", 4, box())])
     assert result.notation.split("→")[1].strip() == "4, ?"
+    assert result.to_json()["dice"][0]["unread"] is True     # the d20
+    assert result.to_json()["dice"][1]["unread"] is False    # the d6
+
+
+def test_a_d10_showing_zero_is_a_face_not_a_failure():
+    # The distinction that `value == 0` alone cannot make: a d10 printed 0-9 has a zero
+    # face, and reading it as "could not read" dropped it out of every sum.
+    zero = Die("d10", 0, box(), confidence=0.95)
+    assert not zero.unread
+    assert RollResult(dice=[zero]).notation.endswith("→ 0")
+    assert Die("d10", 0, box(), confidence=0.0).unread
 
 
 def test_empty_result_says_so():

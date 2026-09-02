@@ -165,6 +165,55 @@ def test_capturing_into_a_set_that_does_not_exist_is_a_404(client):
     assert client.post("/api/setup/sets/nope/capture").status_code == 404
 
 
+def test_the_mode_list_is_part_of_the_versioned_api(client):
+    # A consumer offering its own mode picker needs the same list DiceCore has.
+    body = client.get("/api/v1/modes").json()
+    assert body["active"] == "normal"
+    ids = [m["id"] for m in body["modes"]]
+    assert {"normal", "normal_extended", "rpg", "pool", "yahtzee", "custom"} <= set(ids)
+
+
+def test_a_roll_carries_what_the_mode_made_of_it(client):
+    body = client.get("/api/v1/roll").json()
+    assert body["reading"]["mode"] == "normal"
+    assert body["reading"]["headline"] == str(body["total"])
+
+
+def test_one_roll_can_be_read_as_a_different_game_without_switching(client):
+    # A bot counting successes and a screen showing a total can share one tray.
+    body = client.get("/api/v1/roll?mode=pool").json()
+    assert body["reading"]["mode"] == "pool"
+    assert "success" in body["reading"]["headline"]
+    # …and the configured mode is untouched.
+    assert client.get("/api/v1/modes").json()["active"] == "normal"
+
+
+def test_an_unknown_mode_is_refused_rather_than_guessed_at(client):
+    assert client.get("/api/v1/roll?mode=nonsense").status_code == 400
+
+
+def test_switching_mode_sticks(client):
+    assert client.post("/api/setup/mode",
+                       json={"mode": "yahtzee", "d10_style": "1-10"}).status_code == 200
+    modes = client.get("/api/v1/modes").json()
+    assert modes["active"] == "yahtzee" and modes["d10_style"] == "1-10"
+    assert client.get("/api/v1/roll").json()["reading"]["mode"] == "yahtzee"
+
+
+def test_a_mode_parameter_survives_a_save(client):
+    client.post("/api/setup/mode", json={"mode": "pool", "params": {"threshold": 6}})
+    body = client.get("/api/v1/roll").json()
+    assert client.get("/api/v1/modes").json()["modes"][3]["params"] == {"threshold": 6}
+    assert "success" in body["reading"]["headline"]
+
+
+def test_the_d10_printing_style_changes_the_labels_offered(client):
+    client.post("/api/setup/mode", json={"mode": "normal", "d10_style": "1-10"})
+    kinds = client.get("/api/setup/options").json()["kinds"]
+    d10 = next(k for k in kinds if k["id"] == "d10")
+    assert d10["values"] == list(range(1, 11))
+
+
 def test_the_setup_page_tells_the_ui_what_options_exist(client):
     body = client.get("/api/setup/options").json()
     assert any(m["id"] == "imx519" for m in body["csi_modules"])

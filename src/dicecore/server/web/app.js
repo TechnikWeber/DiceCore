@@ -48,6 +48,7 @@ function showTab() {
   document.querySelectorAll("nav a").forEach((a) => a.classList.toggle("on", a.hash === `#${name}`));
   if (name === "camera") { refreshHardware(); refreshPreview(); }
   if (name === "signals") pollOutputs();
+  if (name === "detection") pollModeSession();
   if (name === "training") { loadSets(); pollTraining(); }
   if (name === "system") refreshStatus();
 }
@@ -79,10 +80,15 @@ function renderVerdict(result) {
 }
 
 function renderResult(result) {
-  $("total").textContent = result.count ? result.total : "—";
-  $("notation").textContent = result.notation + (result.engine ? `   ·   ${result.engine}` : "");
+  const reading = result.reading || {};
+  // The mode owns the headline: "Full house" and "3 successes" are answers no generic rule
+  // about totals could ever produce.
+  $("total").textContent = result.count ? (reading.headline ?? result.total) : "—";
+  $("notation").textContent = (reading.detail || result.notation)
+    + (result.engine ? `   ·   ${result.engine}` : "")
+    + (reading.mode && reading.mode !== "normal" ? `   ·   ${reading.mode}` : "");
   const chips = result.dice.map((die) => {
-    const unread = die.value === 0;
+    const unread = die.unread;
     const weak = !unread && die.confidence < (state.settings?.engine?.min_confidence ?? 0.6);
     const label = unread ? `${die.kind} · ?` : `${die.kind} · ${die.value}`;
     const trust = unread ? "not read" : `${Math.round(die.confidence * 100)}%`;
@@ -119,8 +125,8 @@ function drawBoxes(result) {
     box.style.top = `${die.box.y * scale}px`;
     box.style.width = `${die.box.w * scale}px`;
     box.style.height = `${die.box.h * scale}px`;
-    if (die.value === 0) box.classList.add("unread");
-    box.innerHTML = `<b>${die.value === 0 ? "?" : die.value}</b>`;
+    if (die.unread) box.classList.add("unread");
+    box.innerHTML = `<b>${die.unread ? "?" : die.value}</b>`;
     frame.appendChild(box);
   }
 }
@@ -158,6 +164,11 @@ function loadForm() {
              s.capture.csi_module);
   fillSelect($("gd-policy"), state.options.policies, s.guard.policy);
   fillSelect($("dp-kind"), state.options.panels, s.output.display.kind);
+  fillSelect($("mode-select"), state.options.modes, s.mode.active);
+  fillSelect($("mode-pick"), state.options.modes, s.mode.active);
+  $("mode-d10").value = s.mode.d10_style;
+  renderModeEditor();
+  renderModeBlurb();
   $("cap-folder").value = s.capture.folder;
   $("cap-device").value = s.capture.device;
   $("cap-width").value = s.capture.width;
@@ -400,7 +411,7 @@ async function loadSamples() {
         .map((v) => `<option ${v === die.value ? "selected" : ""}>${v}</option>`).join("");
       return `<span class="chip" data-index="${index}">
         <select class="k">${kinds}</select>
-        <select class="v">${die.value === 0 ? '<option selected>?</option>' : ""}${values}</select>
+        <select class="v">${die.unread ? '<option selected>?</option>' : ""}${values}</select>
       </span>`;
     }).join("");
     return `<div class="sample" data-id="${sample.id}">
@@ -500,6 +511,86 @@ async function pollTraining() {
   if (location.hash === "#training") {
     state.timers.training = setTimeout(pollTraining, job && job.state === "running" ? 1500 : 6000);
   }
+}
+
+// --- game modes -------------------------------------------------------------
+
+function modeById(id) {
+  return state.options.modes.find((m) => m.id === id);
+}
+
+function renderModeBlurb() {
+  const mode = modeById($("mode-pick").value);
+  $("mode-blurb").textContent = mode ? `${mode.blurb} (${mode.dice} dice)` : "";
+}
+
+function renderModeEditor() {
+  const mode = modeById($("mode-select").value);
+  if (!mode) return;
+  $("mode-detail").textContent =
+    `${mode.blurb}  Dice: ${mode.dice} of ${mode.kinds.join(", ")}.`;
+
+  // Built from the mode's own defaults, so a new mode needs no UI work at all.
+  const saved = (state.settings.mode.params || {})[mode.id] || {};
+  const choices = {
+    rule: ["sum", "pool", "best", "under"],
+    take: ["high", "low"],
+  };
+  $("mode-params").innerHTML = Object.entries(mode.defaults).map(([key, fallback]) => {
+    const value = key in saved ? saved[key] : fallback;
+    const label = escapeHtml(key.replace(/_/g, " "));
+    if (typeof fallback === "boolean") {
+      return `<div><label>${label}</label><input class="mp" data-key="${key}" type="checkbox"
+        ${value ? "checked" : ""}></div>`;
+    }
+    if (choices[key]) {
+      return `<div><label>${label}</label><select class="mp" data-key="${key}">${
+        choices[key].map((o) => `<option ${o === value ? "selected" : ""}>${o}</option>`).join("")
+      }</select></div>`;
+    }
+    return `<div><label>${label}</label><input class="mp" data-key="${key}" type="number"
+      value="${escapeHtml(value)}"></div>`;
+  }).join("") || `<p class="muted">This mode has nothing to adjust.</p>`;
+}
+
+function collectModeParams() {
+  const params = {};
+  document.querySelectorAll(".mp").forEach((el) => {
+    params[el.dataset.key] = el.type === "checkbox" ? el.checked
+      : el.tagName === "SELECT" ? el.value : Number(el.value);
+  });
+  return params;
+}
+
+async function saveMode(id, params) {
+  try {
+    await api("/api/setup/mode", json("POST", {
+      mode: id, params, d10_style: $("mode-d10").value,
+    }));
+    await boot();
+    alertBox("Mode saved.", "good");
+  } catch (err) { alertBox(err.message); }
+}
+
+async function pollModeSession() {
+  const mode = modeById(state.settings.mode.active);
+  if (!mode || !mode.stateful) { $("mode-session").innerHTML = ""; return; }
+  try {
+    const last = await api("/api/v1/state");
+    const extras = (last.reading && last.reading.extras) || {};
+    if (extras.wording) {
+      $("mode-session").innerHTML =
+        `<div class="msg ${extras.state === "nothing unusual" ? "good" : "warn"}">`
+        + `${escapeHtml(extras.wording)}</div>`
+        + `<p class="muted">${Object.entries(extras.counts || {})
+             .map(([face, n]) => `${face}: ${n}`).join(" · ")}</p>`;
+    } else if (extras.open) {
+      $("mode-session").innerHTML =
+        `<div class="msg warn">${extras.total} so far — a die is showing its maximum, throw again.</div>`;
+    } else {
+      $("mode-session").innerHTML = "";
+    }
+  } catch { /* nothing read yet */ }
 }
 
 // --- screen and lamps -------------------------------------------------------
@@ -636,6 +727,18 @@ $("btn-train").onclick = async () => {
 };
 $("btn-train-stop").onclick = () => api("/api/setup/training/stop", { method: "POST" }).catch(() => {});
 $("btn-ws").onclick = toggleWebsocket;
+$("mode-select").addEventListener("change", renderModeEditor);
+$("btn-mode-save").onclick = () => saveMode($("mode-select").value, collectModeParams());
+$("btn-mode-reset").onclick = async () => {
+  try {
+    await api("/api/setup/mode/reset", { method: "POST" });
+    pollModeSession();
+    alertBox("Started again.", "good");
+  } catch (err) { alertBox(err.message); }
+};
+// The picker on the Roll tab switches the game outright — that is where you are standing
+// when you notice you are playing something else.
+$("mode-pick").onchange = () => saveMode($("mode-pick").value, null);
 $("dp-kind").addEventListener("change", panelSizes);
 $("dp-size").addEventListener("change", () => {
   const [w, h] = $("dp-size").value.split("x").map(Number);

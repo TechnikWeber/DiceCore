@@ -153,6 +153,28 @@ class GuardSettings:
 
 
 @dataclass
+class ModeSettings:
+    """
+    Which game is being played, which decides how the faces are read.
+
+    DiceCore reads dice; a mode reads the *result*. Keeping the two apart is what stops the
+    project being about one game — see `modes/catalogue.py` for the list and
+    `docs/GAME-MODES.md` for what each one does.
+    """
+
+    #: Id from modes.catalogue. "normal" is plain six-siders added up.
+    active: str = "normal"
+    #: How this set's ten-sided dice are printed: "0-9" or "1-10". A property of the dice
+    #: themselves — it decides the labels a model is trained on.
+    d10_style: str = "0-9"
+    #: Per-mode parameter overrides, keyed by mode id: {"pool": {"threshold": 5}}.
+    params: dict[str, Any] = field(default_factory=dict)
+    #: Let a mode narrow engine.expected_kinds by itself. Off only for a mixed table where
+    #: dice from another game are lying around on purpose.
+    restrict_kinds: bool = True
+
+
+@dataclass
 class DisplaySettings:
     """
     A small screen over the tower, so the number is public the moment it is read.
@@ -235,6 +257,7 @@ class Settings:
     classic: ClassicSettings = field(default_factory=ClassicSettings)
     settle: SettleSettings = field(default_factory=SettleSettings)
     guard: GuardSettings = field(default_factory=GuardSettings)
+    mode: ModeSettings = field(default_factory=ModeSettings)
     output: OutputSettings = field(default_factory=OutputSettings)
     server: ServerSettings = field(default_factory=ServerSettings)
     #: Keys we did not recognise, kept verbatim so a downgrade is not a data loss.

@@ -48,6 +48,9 @@ class Presentation:
     """One frame of "what is going on", as shown by every output at once."""
 
     phase: str = IDLE
+    #: What belongs on the panel in big letters. A mode decides this — "18", "3 successes",
+    #: "Full house". Falls back to the plain total when no mode has spoken.
+    headline: str | None = None
     total: int | None = None
     notation: str = ""
     dice: list[tuple[str, int]] = field(default_factory=list)
@@ -71,9 +74,17 @@ class Presentation:
     def busy(self) -> bool:
         return self.phase in WAIT
 
+    @property
+    def big(self) -> str | None:
+        """The one string the screen shows large."""
+        if self.headline:
+            return self.headline
+        return None if self.total is None else str(self.total)
+
     def to_json(self) -> dict[str, Any]:
         return {
-            "phase": self.phase, "total": self.total, "notation": self.notation,
+            "phase": self.phase, "headline": self.headline, "big": self.big,
+            "total": self.total, "notation": self.notation,
             "dice": [{"kind": k, "value": v} for k, v in self.dice],
             "verdict": self.verdict, "celebrate": self.celebrate, "lament": self.lament,
             "message": self.message, "go": self.go, "at": self.at,
@@ -89,12 +100,12 @@ def is_celebration(result: RollResult, mode: str, total_at_least: int) -> bool:
 
     `max_die` is the default because it is the moment everyone at the table reacts to
     anyway — a natural 20, a six. A total threshold is for games where the sum is the
-    thing. Unread dice (`value == 0`) never celebrate: the machine has no idea what it is
+    thing. Unread dice never celebrate: the machine has no idea what it is
     looking at, and a party over a number it could not read is worse than silence.
     """
     if mode == "off" or not result.dice:
         return False
-    if any(die.value == 0 for die in result.dice):
+    if any(die.unread for die in result.dice):
         return False
     if mode == "total":
         return result.total >= total_at_least
@@ -113,7 +124,7 @@ def is_lament(result: RollResult, enabled: bool) -> bool:
     """
     if not enabled or not result.dice:
         return False
-    if any(die.value == 0 for die in result.dice):
+    if any(die.unread for die in result.dice):
         return False
     return any(die.value == 1 and min(dicevocab.values_for(die.kind)) == 1
                for die in result.dice)
@@ -121,15 +132,25 @@ def is_lament(result: RollResult, enabled: bool) -> bool:
 
 def presentation_for(result: RollResult, phase: str, celebrate_mode: str = "max_die",
                      celebrate_total: int = 18, lament_on_min: bool = True) -> Presentation:
-    """Build the frame for a finished (or in-flight) roll."""
+    """
+    Build the frame for a finished (or in-flight) roll.
+
+    When a game mode has read the roll, *it* decides what goes on the screen and what is
+    worth celebrating — a Kniffel and four successes are not things a generic rule about
+    maximum faces could ever recognise. Without a mode, the old rule still applies.
+    """
+    reading = result.reading or {}
     return Presentation(
         phase=phase,
+        headline=reading.get("headline"),
         total=result.total if result.dice else None,
-        notation=result.notation,
+        notation=reading.get("detail") or result.notation,
         dice=[(d.kind, d.value) for d in result.dice],
         verdict=result.verdict,
-        celebrate=is_celebration(result, celebrate_mode, celebrate_total),
-        lament=is_lament(result, lament_on_min),
+        celebrate=bool(reading["celebrate"]) if "celebrate" in reading
+        else is_celebration(result, celebrate_mode, celebrate_total),
+        lament=bool(reading["lament"]) if "lament" in reading
+        else is_lament(result, lament_on_min),
     )
 
 

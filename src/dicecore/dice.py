@@ -40,17 +40,24 @@ READING = {
 DIE_KINDS = tuple(DIE_FACES)
 
 
-def values_for(kind: str) -> list[int]:
+#: How the ten-sided dice in this set are printed. Modern ones show 0–9 and let the game
+#: decide what the 0 is worth; older ones are printed 1–10, where the 10 is a two-digit
+#: glyph on one face. It changes the class list a model is trained on, so it is a property
+#: of the dice, not of the game.
+D10_STYLES = ("0-9", "1-10")
+
+
+def values_for(kind: str, d10_style: str = "0-9") -> list[int]:
     """The values a kind can show. Needed by the label UI and by the classifier head."""
     if kind == "d100":
         return [0, 10, 20, 30, 40, 50, 60, 70, 80, 90]
     if kind == "d10":
-        return list(range(0, 10))
+        return list(range(1, 11)) if d10_style == "1-10" else list(range(0, 10))
     return list(range(1, DIE_FACES[kind] + 1))
 
 
-def is_valid(kind: str, value: int) -> bool:
-    return kind in DIE_FACES and value in values_for(kind)
+def is_valid(kind: str, value: int, d10_style: str = "0-9") -> bool:
+    return kind in DIE_FACES and value in values_for(kind, d10_style)
 
 
 # --- Results ----------------------------------------------------------------------
@@ -92,6 +99,17 @@ class Die:
         """`d20:14` — the short form used in logs and in the notation string."""
         return f"{self.kind}:{self.value}"
 
+    @property
+    def unread(self) -> bool:
+        """
+        The engine found this die but could not read it.
+
+        Not the same as `value == 0`, which a d10 legitimately shows: a die printed 0–9 has
+        a zero face, and treating it as "unknown" quietly dropped it out of every sum. An
+        unread die is one with no confidence in its value at all.
+        """
+        return self.value == 0 and self.confidence == 0.0
+
 
 @dataclass
 class RollResult:
@@ -108,6 +126,9 @@ class RollResult:
     warnings: list[str] = field(default_factory=list)
     #: Where the frame was stored, if it was.
     frame_id: str | None = None
+    #: What the active game mode made of these faces — headline, detail, extras. None when
+    #: no mode ran. Additive: a consumer that ignores it still gets `total` and `dice`.
+    reading: dict[str, Any] | None = None
     #: Fair play, see integrity.py: unverified | pending | clean | disturbed | void. A
     #: consumer that ignores this field still gets a number; one that cares can refuse a
     #: `void` without knowing anything about how the watching works.
@@ -144,12 +165,16 @@ class RollResult:
         # list them in an order that does not match the groups it just announced. A die the
         # engine located but could not read is a "?", never a 0 — printing 0 for "I don't
         # know" is the kind of number a consumer would happily add up.
-        rolled = ", ".join("?" if d.value == 0 else str(d.value)
+        rolled = ", ".join("?" if d.unread else str(d.value)
                            for k in order for d in self.dice if d.kind == k)
         return f"{groups} → {rolled}"
 
     def to_json(self) -> dict[str, Any]:
         out = asdict(self)
+        # `unread` is a property, so asdict does not carry it — and the UI and every
+        # consumer need it to tell "could not read" from "a d10 showing zero".
+        for die, raw in zip(self.dice, out["dice"], strict=True):
+            raw["unread"] = die.unread
         out["total"] = self.total
         out["count"] = self.count
         out["notation"] = self.notation

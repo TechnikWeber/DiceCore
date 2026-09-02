@@ -11,7 +11,10 @@ def store(tmp_path) -> DatasetStore:
 
 
 def result() -> RollResult:
-    return RollResult(dice=[Die("d20", 0, Box(0, 0, 30, 30)), Die("d6", 4, Box(40, 0, 30, 30))],
+    # The d20 is unread — no value and no confidence — which is what the classic engine
+    # produces for a numeral die and what the label loop exists to fix.
+    return RollResult(dice=[Die("d20", 0, Box(0, 0, 30, 30), confidence=0.0),
+                            Die("d6", 4, Box(40, 0, 30, 30), confidence=0.99)],
                       engine="classic")
 
 
@@ -26,8 +29,9 @@ def test_a_stored_roll_starts_unconfirmed_but_pre_filled(store):
     record = store.create_set("set")
     sample = store.add_sample(record.id, b"jpeg", result())
     assert [d.confirmed for d in sample.dice] == [False, False]
-    # The engine's guess is kept so the page opens pre-filled and only wrong dice are touched.
-    assert [d.predicted for d in sample.dice] == [0, 4]
+    # The engine's guess is kept so the page opens pre-filled and only wrong dice are
+    # touched — and a die it could not read is stored as "no guess", not as a zero.
+    assert [d.predicted for d in sample.dice] == [None, 4]
 
 
 def test_correcting_a_die_keeps_what_the_engine_had_said(store):
@@ -37,7 +41,7 @@ def test_correcting_a_die_keeps_what_the_engine_had_said(store):
                         [{"kind": "d20", "value": 17}, {"kind": "d6", "value": 4}])
     stored = store.get_sample(record.id, sample.id)
     assert [d.value for d in stored.dice] == [17, 4]
-    assert [d.predicted for d in stored.dice] == [0, 4]
+    assert [d.predicted for d in stored.dice] == [None, 4]
     assert all(d.confirmed for d in stored.dice)
 
 

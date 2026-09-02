@@ -2,6 +2,42 @@
 
 Notable changes, newest first. Dates are the day the work landed.
 
+## 0.4.0 (2026-09-02)
+
+Game modes. DiceCore reads dice; a mode reads the *result* — which is the difference between
+a project about one game and one that is useful at any table.
+
+### Added
+- **Fourteen game modes**, as a table plus one pure function each: plain pips, pips with
+  ten-siders, the polyhedral set, a dice pool counting successes, best-or-worst of several,
+  exploding dice, roll-under-a-target, Kniffel, Farkle, Backgammon, Mäxchen, a single die
+  shown large, a fairness test, and a build-your-own for everything else.
+- **A dice pool covers a family, not a game**: Warhammer, Shadowrun, World of Darkness and
+  Blades in the Dark are one mode with two settings between them.
+- **A fairness test**: a chi-square goodness-of-fit against a flat distribution, with the
+  critical values written out rather than pulled from a statistics stack. Three answers —
+  not enough data, nothing unusual, unusual — and deliberately no "fair", because the test
+  cannot show that.
+- **Exploding rolls keep their state between throws** and the display says `16…` while one
+  is still open.
+- `reading` on every result — headline, value and the mode's own detail — and the screen
+  shows the headline, so a Kniffel reads "Full house" rather than "19".
+- `GET /api/v1/modes`, and `?mode=` on a roll to read it as another game **without changing
+  the configured one**: a bot counting successes and a screen showing a total can share one
+  tray, each with its own memory.
+- **Ten-sided dice can be printed 0–9 or 1–10**, set once for the dice you own — it decides
+  the labels a model is trained on. Whether a zero counts as ten is separately a per-mode
+  setting, because that one genuinely is the game's business.
+- The web UI builds a mode's settings form from the mode's own defaults, so the next game is
+  a table entry and no UI work.
+- `docs/GAME-MODES.md`.
+- 179 tests; the scoring rules are pure functions, so every game is testable on its own.
+
+### Fixed
+- **`value == 0` meant two different things**: "could not be read" and "a d10 showing zero".
+  A ten-sider's zero face was being dropped out of every sum. `Die.unread` now says which is
+  which, and the dataset records an unread die as *no guess* rather than as a zero.
+
 ## 0.3.0 (2026-09-02)
 
 A number nobody can see is not much use at a table, and the fair-play watch was making

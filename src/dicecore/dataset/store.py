@@ -183,7 +183,8 @@ class DatasetStore:
         sample = Sample(
             id=new_id(),
             dice=[SampleDie(d.kind, d.value, d.box, confirmed=False,
-                            predicted=d.value, predicted_kind=d.kind) for d in result.dice],
+                            predicted=None if d.unread else d.value,
+                            predicted_kind=d.kind) for d in result.dice],
             source=source,
             engine=result.engine,
             note=note,
