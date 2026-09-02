@@ -2,6 +2,17 @@
 
 Notable changes, newest first. Dates are the day the work landed.
 
+## 0.12.1 (2026-09-02)
+
+### Changed
+- Fresh screenshots throughout: the game screen mid-Kniffel with three players and their
+  colours, the lobby, the Training page with the sets-and-models explanation, the Avrae
+  panel, and the workshop's Roll tab. Four of the five were still showing v0.1 interfaces
+  that no longer exist.
+- The status paragraph in both READMEs describes what the project is now rather than what
+  it was at the first commit — and keeps saying the part that matters: nothing has run on a
+  real tower yet.
+
 ## 0.12.0 (2026-09-02)
 
 ### Added

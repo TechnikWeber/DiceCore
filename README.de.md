@@ -7,15 +7,24 @@ Landefläche eines Würfelturms und macht aus dem, was dort liegt, Daten: wie vi
 welcher Art, mit welchem Wert, und was das zusammen ergibt — als Zahl auf dem Bildschirm,
 als JSON-API und als Live-Stream, den ein Bot oder ein Spiel abonnieren kann.
 
-> **Status: früh. Nichts davon lief bisher an einem echten Turm.** Die Kette funktioniert
-> Ende zu Ende auf synthetischen und simulierten Bildern — Aufnahme, Ruhe-Erkennung,
-> Augenzählen, die Label-Schleife, die API und die Weboberfläche sind da und getestet. Es
-> fehlt ein trainiertes Modell (dafür braucht es echte Würfel vor einer echten Kamera) und
-> jeder Hardware-Pfad, der sich nur auf einem Pi überprüfen lässt.
+> **Status: es spielt, aber nichts davon lief bisher an einem echten Turm.** Von der Kamera
+> bis zum Spielblock funktioniert alles Ende zu Ende auf simulierten Bildern: Aufnahme,
+> Ruhe-Erkennung, Augenzählen, fünfzehn Spielmodi, drei Spielbretter, Züge und Chips, die
+> Fair-Play-Wache, die Label-Schleife, das Panel, die API und beide Weboberflächen — 310
+> Tests, von denen keiner Hardware braucht.
+>
+> Es fehlt die Hälfte, die nur ein echter Turm liefern kann: **ein trainiertes Modell** (das
+> braucht echte Würfel vor einer echten Kamera und ist das, was einen W20 überhaupt lesbar
+> macht) und **jeder Hardware-Pfad** — Kameramodule, das kleine Display, Lampen und Taster
+> sind geschrieben und ungeprüft, bis sie an einem Pi hängen.
+>
 > [docs/CONCEPT.md](docs/CONCEPT.md) ist die Referenz für das Ziel,
 > [docs/HARDWARE.md](docs/HARDWARE.md) sagt, was zu kaufen ist und wohin es gehört.
 
-![Der Reiter „Roll“: die Summe, die Notation, pro Würfel ein Chip mit Konfidenz, und darunter das aufgenommene Bild mit dem erkannten Würfel als beschriftetem Kasten](docs/screenshots/roll.jpg)
+![Der Spielbildschirm während eines Kniffel-Zugs: „Large Straight“ groß und grün über den fünf als Augen gezeichneten Würfeln, der Wurfzähler bei drei von drei mit zwei Chips, und rechts ein Spielblock für drei Spieler mit je einer Farbe neben dem Namen](docs/screenshots/play.jpg)
+
+*Der Spielbildschirm — die Seite für den Fernseher. Spiel in der Lobby aussuchen, einen
+kurzen Assistenten durchtippen, werfen.*
 
 ## Was heute funktioniert
 
@@ -64,16 +73,23 @@ als JSON-API und als Live-Stream, den ein Bot oder ein Spiel abonnieren kann.
 - **Alles davon ohne Hardware.** `dicecore synth` zeichnet Würfel, die Quelle `folder` spielt
   sie ab, und alles oben Genannte läuft damit auf dem Laptop.
 
-![Die Lobby: jeder Modus als Kachel, gruppiert in Spiele, reine Anzeigen und Werkzeuge](docs/screenshots/lobby.jpg)
+![Die Lobby: jeder Modus als Kachel, gruppiert in Spiele für den Tisch, reine Anzeigen und Werkzeuge](docs/screenshots/lobby.jpg)
 
-![Der Spielbildschirm während eines Kniffel-Zugs: die Kombination groß, die fünf Würfel als Augen gezeichnet, der Wurfzähler mit Chips und rechts der Spielblock](docs/screenshots/play.jpg)
+*Die Lobby. Von der Landefläche wird nichts gelesen, bevor ein Spiel läuft.*
 
 ![Fünf Panels nebeneinander, von DiceCore selbst gerendert: ein ST7789 240x240 mit NICE ROLL über einer 20, ein ILI9341 320x240 mit HANDS OFF über 18, ein schmales ST7789 135x240 mit rotem VOID und zwei SSD1306-OLEDs](docs/screenshots/displays.png)
 
 *Derselbe Renderer bedient jedes Panel und die Browser-Vorschau — das Layout lässt sich
 festlegen, bevor irgendetwas gelötet ist.*
 
-![Der Reiter „Training“: gespeicherte Würfe, pro Würfel die Schätzung der Engine vorausgefüllt, bereit zum Korrigieren und Bestätigen](docs/screenshots/training.jpg)
+![Der Reiter „Training“: eine Erklärung, wie Sets und Modelle zusammenhängen, die Set-Auswahl mit Export- und Import-Knöpfen und ein zugeklappter Kasten mit drei durchgerechneten Beispielen](docs/screenshots/training.jpg)
+
+*Ihm die eigenen Würfel beibringen. Ein Set ist eine Ladung Würfel unter einem Licht; ein
+Modell wird aus einem oder mehreren Sets trainiert und kennt genau deren Flächen.*
+
+![Der Reiter „Roll“ der Einrichtungsseite: die aus den Würfeln gelesene Kombination, pro Würfel ein Chip mit Konfidenz, das Fair-Play-Urteil und darunter das Bild mit jedem erkannten Würfel als beschriftetem Kasten](docs/screenshots/roll.jpg)
+
+*Die Werkstattseite: was die Erkennung tatsächlich gesehen hat, mit ihrer Sicherheit je Würfel.*
 
 ## Fünf Minuten, ohne Hardware
 
@@ -159,6 +175,12 @@ print(pool["reading"]["headline"])               # 3 successes
 
 Ein Würfel, der nicht gelesen werden konnte, hat `"value": 0` und erscheint als `?`. Niemals
 mitrechnen.
+
+![Der Avrae-Bereich der Einrichtungsseite, der mit dem Satz „The honest answer first, because it is the question everybody asks“ beginnt und erklärt, dass Avrae nicht stillschweigend deine Zahl würfelt](docs/screenshots/avrae.jpg)
+
+*Würfe hinausschicken. Avrae würfelt selbst und kann nicht dazu gebracht werden, deine
+Würfel zu benutzen — was hier passiert, ist deine Zahl dorthin zu legen, wo ein Alias sie
+erreicht.*
 
 ## Dokumentation
 

@@ -93,7 +93,7 @@ def create_app(settings: Settings | None = None) -> Any:
     buttons = ButtonPanel(loaded.panel.signals, on_chip, on_next)
     state["buttons"] = buttons
 
-    app = FastAPI(title="DiceCore", version="0.12.0",
+    app = FastAPI(title="DiceCore", version="0.12.1",
                   description="Reads real dice with a camera.")
     app.state.reader = reader
     app.state.training = training

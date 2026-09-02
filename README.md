@@ -7,14 +7,23 @@ tower and turns what lands there into data: how many dice, of which kind, showin
 value, and what they add up to — as a number on a screen, as a JSON API, and as a live
 event stream a bot or a game can subscribe to.
 
-> **Status: early. Nothing has run on a real tower yet.** The pipeline works end to end on
-> synthetic and simulated frames — capture, settling, pip counting, the label loop, the API
-> and the web UI are all in and tested. What is missing is a trained model (that needs real
-> dice in front of a real camera) and every hardware path, which is only verifiable on a Pi.
+> **Status: it plays, but nothing has run on a real tower yet.** Everything from the camera
+> to the scorecard works end to end on simulated frames: capture, settling, pip counting,
+> fifteen game modes, three boards, turns and chips, the fair-play watch, the label loop,
+> the panel, the API and both web front ends — 310 tests, none of which need hardware.
+>
+> What is missing is the half only a real tower can supply: **a trained model** (which needs
+> real dice in front of a real camera, and is what makes a d20 readable at all) and **every
+> hardware path** — the camera modules, the little screen, the lamps and buttons are written
+> and unverified until they are on a Pi.
+>
 > [docs/CONCEPT.md](docs/CONCEPT.md) is the reference for where this is going;
 > [docs/HARDWARE.md](docs/HARDWARE.md) is what to buy and where to put it.
 
-![The Roll tab: the total, the notation, a confidence chip per die, and the captured frame with the recognised die boxed and labelled](docs/screenshots/roll.jpg)
+![The game screen during a Kniffel turn: "Large Straight" in large green letters over the five dice drawn as pips, the throw counter showing three of three with two chips left, and a three-player scorecard down the right-hand side with a colour beside each name](docs/screenshots/play.jpg)
+
+*The game screen — the page you put on the television. Pick a game from the lobby, tap
+through a short wizard, throw.*
 
 ## What works today
 
@@ -65,11 +74,18 @@ event stream a bot or a game can subscribe to.
 *The same renderer drives every panel and the browser preview, so the layout can be worked
 out before anything is soldered.*
 
-![The lobby: every mode as a tile, grouped into games, plain readers and workshop tools](docs/screenshots/lobby.jpg)
+![The lobby: every mode as a tile, grouped into games you play round a table, readers that only report numbers, and workshop tools](docs/screenshots/lobby.jpg)
 
-![The game screen during a Kniffel turn: the combination in large letters, the five dice drawn as pips, the throw counter with chips, and the scorecard down the side](docs/screenshots/play.jpg)
+*The lobby. Nothing is read from the tray until a game is running.*
 
-![The Training tab: a set of stored rolls, each with the engine's guess pre-filled per die, ready to be corrected and confirmed](docs/screenshots/training.jpg)
+![The Training tab: an explanation of how sets and models fit together, the set picker with export and import buttons, and a collapsed panel of three worked examples](docs/screenshots/training.jpg)
+
+*Teaching it your dice. A set is one lot of dice under one light; a model is trained from
+one or more sets and knows exactly the faces that were in them.*
+
+![The Roll tab of the setup page: the combination read from the dice, a confidence chip per die, the fair-play verdict, and the captured frame with every die boxed and labelled](docs/screenshots/roll.jpg)
+
+*The workshop side: what the engine actually saw, with its confidence per die.*
 
 ## Five minutes, no hardware
 
@@ -152,6 +168,11 @@ print(pool["reading"]["headline"])               # 3 successes
 ```
 
 A die that could not be read has `"value": 0` and prints as `?`. Never add it up.
+
+![The Avrae panel in the setup page, opening with the sentence "The honest answer first, because it is the question everybody asks" and explaining that Avrae will not silently roll your number](docs/screenshots/avrae.jpg)
+
+*Sending rolls out. Avrae rolls its own dice and cannot be made to use yours — what this
+does instead is put your number where an alias can reach it.*
 
 ## Documentation
 
