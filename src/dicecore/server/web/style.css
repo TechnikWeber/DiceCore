@@ -141,3 +141,21 @@ pre {
 .events li.fault::before { content: "!"; font-weight: 700; }
 .events li.warn { color: var(--warn); }
 .voided .total { color: var(--bad); text-decoration: line-through; }
+
+/* The screen preview: a panel on a desk, not an image in a document. */
+.screen {
+  display: inline-block; padding: 10px; border-radius: 12px;
+  background: #101216; border: 1px solid var(--line);
+}
+/* Scaled up so a 128x64 OLED is legible on a desktop; `pixelated` keeps it honest about
+   how few pixels the real panel has. */
+.screen img { display: block; image-rendering: pixelated; width: min(320px, 100%);
+              border-radius: 4px; }
+.lamps { display: flex; gap: 18px; align-items: center; flex-wrap: wrap; }
+.lamp { display: flex; gap: 8px; align-items: center; font-size: 13px; color: var(--ink-soft); }
+.lamp i {
+  width: 16px; height: 16px; border-radius: 50%; display: block;
+  border: 1px solid var(--line); background: var(--panel-2);
+}
+.lamp.on.green i { background: var(--good); box-shadow: 0 0 10px var(--good); }
+.lamp.on.red i { background: var(--bad); box-shadow: 0 0 10px var(--bad); }

@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import threading
 import time
+from collections.abc import Callable
 from typing import Any
 
 from .capture import CaptureError, FrameSource, PushSource, open_source
@@ -22,16 +23,22 @@ from .guard import TamperGuard
 from .integrity import (
     INFO,
     PENDING,
+    VOID,
     WARN,
     Event,
     compare_readings,
     frame_hash,
 )
+from .output import state as phases
 
 
 class Reader:
-    def __init__(self, settings: Settings) -> None:
+    def __init__(self, settings: Settings,
+                 on_phase: Callable[[phases.Presentation], None] | None = None) -> None:
         self.settings = settings
+        #: Called on every change worth showing on a screen or a lamp. Set by whoever owns
+        #: the outputs; the reader itself neither knows nor cares what is attached.
+        self.on_phase = on_phase
         self.push = PushSource()
         self._lock = threading.RLock()
         self._source: FrameSource | None = None
@@ -44,6 +51,9 @@ class Reader:
         self._last_frame_hash: str | None = None
         #: Events established while reading, waiting for a hold window to judge them.
         self._pending_events: list[Event] = []
+        #: The hold window runs on its own thread so the number is not held hostage to it.
+        self._verifier: threading.Thread | None = None
+        self._verify_stop = threading.Event()
         #: Why the source or engine is unavailable, in words the UI can show.
         self.problems: list[str] = []
 
@@ -62,6 +72,7 @@ class Reader:
 
     def reload(self, settings: Settings | None = None) -> None:
         """Apply changed settings. Closes the camera, so it is not free — call it on save."""
+        self.cancel_verification()
         with self._lock:
             if settings is not None:
                 self.settings = settings
@@ -75,6 +86,7 @@ class Reader:
             self.problems = []
 
     def close(self) -> None:
+        self.cancel_verification()
         with self._lock:
             if self._source is not None:
                 self._source.close()
@@ -94,6 +106,10 @@ class Reader:
         prints them verbatim, because "no camera bound to dtoverlay=imx519" is a repair
         instruction and "read failed" is not.
         """
+        # Outside the lock on purpose: the running watch holds it, and this is what makes
+        # it let go.
+        self.cancel_verification()
+        self._emit(phases.waiting(phases.ROLLING if wait_for_still else phases.READING))
         with self._lock:
             source = self.source()
             engine = self.engine()
@@ -111,6 +127,7 @@ class Reader:
             else:
                 frame = source.grab()
 
+            self._emit(phases.waiting(phases.READING))
             result = engine.read(frame)
             result.warnings = warnings + result.warnings
             self._last_frame = frame
@@ -130,10 +147,53 @@ class Reader:
                 # true — while knowing the verdict has not landed.
                 result.verdict = PENDING
 
-            verify = guard.enabled if verify is None else verify
-            if verify and guard.enabled:
-                self._run_guard(result, frame)
+            self._show(result, phases.RESULT)
+            if not guard.enabled:
+                # Nothing is being watched, so it is already your turn again.
+                self._show(result, phases.READY)
+
+            if guard.enabled:
+                if verify:
+                    self._run_guard(result, frame)
+                elif verify is None:
+                    # The default: hand the number over now and watch the tray on a thread.
+                    # Making every caller wait out the hold window would put two seconds
+                    # between the dice landing and anyone seeing a number, which is the
+                    # opposite of what a dice tower is for.
+                    self._start_verification(result, frame)
             return result
+
+    # --- verification, in the background ------------------------------------
+    def _start_verification(self, result: RollResult, frame: Frame) -> None:
+        self._verify_stop.clear()
+        self._verifier = threading.Thread(
+            target=self._verify_quietly, args=(result, frame),
+            name="dicecore-guard", daemon=True,
+        )
+        self._verifier.start()
+
+    def _verify_quietly(self, result: RollResult, frame: Frame) -> None:
+        try:
+            self._run_guard(result, frame)
+        except Exception as exc:
+            # A watch that fails must not take the number down with it.
+            result.warnings.append(f"Fair play could not finish: {exc}")
+
+    def cancel_verification(self) -> None:
+        """
+        Stop watching the previous roll, because a new one is starting.
+
+        Throwing again straight away is normal play. Without this the next throw would run
+        into the previous roll's hold window, be seen as interference, and void a roll
+        nobody was cheating on — and the new read would block behind it.
+        """
+        if self._verifier is not None and self._verifier.is_alive():
+            self._verify_stop.set()
+            self._verifier.join(timeout=max(2.0, self.settings.guard.interval_s * 4))
+        self._verifier = None
+
+    def verification_running(self) -> bool:
+        return self._verifier is not None and self._verifier.is_alive()
 
     def verify_last(self) -> RollResult:
         """
@@ -148,6 +208,17 @@ class Reader:
             if result is None or frame is None:
                 raise EngineError("Nothing has been read yet, so there is nothing to verify.")
             if result.integrity is None and self.settings.guard.enabled:
+                if self.verification_running():
+                    # A background watch is already on it; wait for that one rather than
+                    # starting a second camera reader.
+                    verifier = self._verifier
+                    if verifier is not None:
+                        self._lock.release()
+                        try:
+                            verifier.join(timeout=self.settings.guard.hold_s + 2.0)
+                        finally:
+                            self._lock.acquire()
+                    return result
                 self._run_guard(result, frame)
             return result
 
@@ -164,6 +235,7 @@ class Reader:
                 jpeg=self.last_jpeg(),
                 prior_events=self._pending_events,
                 live=source.is_live,
+                should_stop=self._verify_stop.is_set,
             )
         finally:
             source.hold(False)
@@ -172,6 +244,21 @@ class Reader:
         for event in integrity.events:
             if event.severity != INFO and event.detail not in result.warnings:
                 result.warnings.append(event.detail)
+        # The moment the lamps exist for: the watch is over, throw again.
+        self._show(result, phases.VOID if result.verdict == VOID else phases.READY)
+
+    # --- telling people what is going on -------------------------------------
+    def _emit(self, presentation: phases.Presentation) -> None:
+        if self.on_phase is not None:
+            try:
+                self.on_phase(presentation)
+            except Exception:
+                pass  # a screen must never be able to break a reading
+
+    def _show(self, result: RollResult, phase: str) -> None:
+        output = self.settings.output
+        self._emit(phases.presentation_for(result, phase, output.celebrate,
+                                           output.celebrate_total, output.lament_on_min))
 
     def _pre_roll_events(self, result: RollResult, frame: Frame,
                          threw: bool | None) -> list[Event]:

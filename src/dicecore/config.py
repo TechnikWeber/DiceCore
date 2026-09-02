@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import json
 import os
-from dataclasses import asdict, dataclass, field, fields
+from dataclasses import asdict, dataclass, field, fields, is_dataclass
 from pathlib import Path
 from typing import Any
 
@@ -153,6 +153,73 @@ class GuardSettings:
 
 
 @dataclass
+class DisplaySettings:
+    """
+    A small screen over the tower, so the number is public the moment it is read.
+
+    Which matters more than it looks: a number everyone can see the instant the dice stop
+    cannot be quietly changed afterwards, because everybody already read it.
+    """
+
+    enabled: bool = False
+    #: preview | st7789 | ili9341 | ssd1306 | ssd1306-spi — see output/displays.py
+    kind: str = "preview"
+    #: 0 uses the panel's own default (240x240 for ST7789, 320x240 for ILI9341, 128x64 OLED).
+    width: int = 0
+    height: int = 0
+    #: Quarter turns, 0-3, for a panel mounted sideways.
+    rotate: int = 0
+    spi_port: int = 0
+    spi_device: int = 0
+    #: BCM numbers. These are the pins nearly every breakout board's guide uses.
+    gpio_dc: int = 25
+    gpio_rst: int = 24
+    i2c_port: int = 1
+    #: Hex string, because that is how every OLED's documentation writes it.
+    i2c_address: str = "0x3C"
+    contrast: int = 255
+
+
+@dataclass
+class SignalSettings:
+    """
+    Two lamps and a buzzer: the answer to "is it my turn yet" without looking at a screen.
+
+    Green means throw. Red means the tray is being read or watched — hands off. The buzzer
+    marks the two moments worth hearing: the number is in, and you may throw again.
+    """
+
+    enabled: bool = False
+    #: BCM pin numbers. -1 disables that one signal without disabling the rest.
+    green_pin: int = 17
+    red_pin: int = 27
+    buzzer_pin: int = 22
+    buzzer_enabled: bool = True
+    #: False for the common transistor/relay boards that pull the pin low to switch on.
+    active_high: bool = True
+    beep_ms: int = 70
+    #: A natural 20 gets a small flourish; a natural 1 gets a low one. Set false for a
+    #: table that has decided the beeping is enough.
+    celebrate_sound: bool = True
+
+
+@dataclass
+class OutputSettings:
+    """The screen, the lamps, and what counts as a roll worth celebrating."""
+
+    display: DisplaySettings = field(default_factory=DisplaySettings)
+    signals: SignalSettings = field(default_factory=SignalSettings)
+    #: off | max_die (a natural maximum on any die) | total (the sum reaches a threshold)
+    celebrate: str = "max_die"
+    celebrate_total: int = 18
+    #: A natural 1 gets its own, quieter acknowledgement.
+    lament_on_min: bool = True
+    #: Frames in the celebration animation, and how fast they run.
+    animation_frames: int = 12
+    animation_interval_s: float = 0.06
+
+
+@dataclass
 class ServerSettings:
     host: str = "0.0.0.0"
     port: int = 8099
@@ -168,6 +235,7 @@ class Settings:
     classic: ClassicSettings = field(default_factory=ClassicSettings)
     settle: SettleSettings = field(default_factory=SettleSettings)
     guard: GuardSettings = field(default_factory=GuardSettings)
+    output: OutputSettings = field(default_factory=OutputSettings)
     server: ServerSettings = field(default_factory=ServerSettings)
     #: Keys we did not recognise, kept verbatim so a downgrade is not a data loss.
     extra: dict[str, Any] = field(default_factory=dict)
@@ -231,10 +299,22 @@ class Settings:
 
 
 def _build(prototype: Any, value: dict[str, Any]) -> Any:
-    """Fill a settings dataclass from a dict, ignoring keys it does not have."""
-    names = {f.name for f in fields(prototype)}
+    """
+    Fill a settings dataclass from a dict, ignoring keys it does not have.
+
+    Recurses, because settings nest: `output.display.kind` is two levels down, and a
+    non-recursive version quietly left it as a plain dict — which then failed much later,
+    at the point where something tried to use it as a settings object.
+    """
+    names = {f.name: f for f in fields(prototype)}
     for key, val in value.items():
-        if key in names:
+        field_spec = names.get(key)
+        if field_spec is None:
+            continue
+        current = getattr(prototype, key, None)
+        if is_dataclass(current) and isinstance(val, dict):
+            setattr(prototype, key, _build(current, val))
+        else:
             setattr(prototype, key, val)
     return prototype
 

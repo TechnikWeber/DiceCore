@@ -4,6 +4,8 @@ world? Both are about the relationship between *this* roll and the previous one,
 can live in the guard, which only ever sees one hold window.
 """
 
+import time
+
 import pytest
 
 pytest.importorskip("cv2")
@@ -82,16 +84,16 @@ def test_staleness_can_be_switched_off():
 
 def test_a_live_camera_repeating_one_frame_exactly_is_reported_as_frozen():
     reader = reader_over(StillSource(tray(), live=True, noise=False), freeze_frames=99)
-    reader.read()
-    second = reader.read()
+    reader.read(verify=True)
+    second = reader.read(verify=True)
     kinds = [e["kind"] for e in second.integrity["events"]]
     assert "frozen" in kinds
 
 
 def test_sensor_noise_alone_is_not_a_frozen_feed():
     reader = reader_over(StillSource(tray(), live=True, noise=True), freeze_frames=99)
-    reader.read()
-    second = reader.read()
+    reader.read(verify=True)
+    second = reader.read(verify=True)
     kinds = [e["kind"] for e in second.integrity["events"]]
     assert "frozen" not in kinds
 
@@ -120,6 +122,50 @@ def test_with_the_guard_off_a_roll_is_simply_unverified():
 
 def test_a_watched_undisturbed_tray_comes_back_clean():
     reader = reader_over(StillSource(tray(), live=False, noise=True))
-    result = reader.read()
+    result = reader.read(verify=True)
     assert result.verdict == "clean" and result.usable
     assert result.integrity["seal"].startswith("sha256:")
+
+
+def test_the_number_arrives_before_the_verdict_does():
+    # The whole point of the change: a dice tower must not put two seconds between the
+    # dice landing and anyone seeing a number.
+    reader = reader_over(StillSource(tray(), live=False, noise=True))
+    started = time.perf_counter()
+    result = reader.read()
+    assert time.perf_counter() - started < 0.15
+    assert result.verdict == "pending"
+    reader.cancel_verification()
+
+
+def test_the_verdict_catches_up_on_its_own():
+    reader = reader_over(StillSource(tray(), live=False, noise=True))
+    result = reader.read()
+    for _ in range(50):
+        if not reader.verification_running():
+            break
+        time.sleep(0.02)
+    assert result.verdict == "clean"
+
+
+def test_throwing_again_straight_away_supersedes_instead_of_voiding():
+    # Normal play. Without this the next throw would run into the previous roll's hold
+    # window, look like interference, and void a roll nobody was cheating on.
+    source = StillSource(tray(), live=False, noise=True)
+    reader = reader_over(source, hold_s=5.0)
+    first = reader.read()
+    assert first.verdict == "pending"
+    second = reader.read()
+    assert first.verdict == "superseded" and first.usable
+    assert second.verdict == "pending"
+    reader.cancel_verification()
+
+
+def test_a_second_read_is_not_made_to_wait_for_the_first_ones_watch():
+    source = StillSource(tray(), live=False, noise=True)
+    reader = reader_over(source, hold_s=5.0)
+    reader.read()
+    started = time.perf_counter()
+    reader.read()
+    assert time.perf_counter() - started < 0.5
+    reader.cancel_verification()

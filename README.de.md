@@ -37,12 +37,21 @@ als JSON-API und als Live-Stream, den ein Bot oder ein Spiel abonnieren kann.
 - **Training aus dem Browser**, mit laufender Loss- und Genauigkeitsanzeige, am Ende ein
   ONNX-Modell, das die Engine übernimmt. Training braucht PyTorch und läuft deshalb auf dem
   PC; die Oberfläche sagt das offen, statt auf halbem Weg abzubrechen.
+- **Ein Display und zwei Lampen.** ST7789, ILI9341 oder SSD1306 über dem Turm zeigt die Zahl,
+  sobald die Würfel liegen, mit kleiner Animation bei einer natürlichen 20; eine grüne und
+  eine rote LED plus Summer sagen, wer dran ist, ganz ohne Hinsehen. Beides optional, beides
+  gleichzeitig nutzbar, und beides im Browser vorschaubar, bevor ein einziger Draht gelötet ist.
 - **Eine versionierte API** und ein WebSocket-Stream, gedacht zum Einbinden in andere Projekte.
 - **CSI-Kameramodule als Einstellung** — inklusive Arducam IMX519 / 64MP / Owlsight /
   Pivariety, die ein Pi nicht selbst erkennt. Die Auswahl in der Oberfläche schreibt den
   `dtoverlay` in die `config.txt` und sagt, dass neu gestartet werden muss.
 - **Alles davon ohne Hardware.** `dicecore synth` zeichnet Würfel, die Quelle `folder` spielt
   sie ab, und alles oben Genannte läuft damit auf dem Laptop.
+
+![Fünf Panels nebeneinander, von DiceCore selbst gerendert: ein ST7789 240x240 mit NICE ROLL über einer 20, ein ILI9341 320x240 mit HANDS OFF über 18, ein schmales ST7789 135x240 mit rotem VOID und zwei SSD1306-OLEDs](docs/screenshots/displays.png)
+
+*Derselbe Renderer bedient jedes Panel und die Browser-Vorschau — das Layout lässt sich
+festlegen, bevor irgendetwas gelötet ist.*
 
 ![Der Reiter „Training“: gespeicherte Würfe, pro Würfel die Schätzung der Engine vorausgefüllt, bereit zum Korrigieren und Bestätigen](docs/screenshots/training.jpg)
 
@@ -64,9 +73,9 @@ Danach `curl localhost:8099/api/v1/roll`:
  "verdict": "clean", "usable": true, "stale": false}
 ```
 
-Der Aufruf dauert rund zwei Sekunden, und genau die sind der Punkt: so lange wird die
-Landefläche nach dem Lesen bewacht. `?verify=0` antwortet sofort, dann mit
-`verdict: "pending"`.
+Die Zahl kommt rund eine fünftel Sekunde nachdem die Würfel liegen — die Fair-Play-Wache
+läuft dahinter weiter, das Urteil landet ein paar Sekunden später auf `/api/v1/state` und im
+WebSocket. `?verify=1` wartet stattdessen darauf.
 
 ## Auf dem Raspberry Pi
 
@@ -122,6 +131,7 @@ mitrechnen.
 | [docs/API.md](docs/API.md) | Der Vertrag, auf den andere Projekte sich verlassen |
 | [docs/TRAINING.md](docs/TRAINING.md) | Ihm die eigenen Würfel beibringen |
 | [docs/ANTI-CHEAT.md](docs/ANTI-CHEAT.md) | Was die Fair-Play-Überwachung erkennt — und was nicht |
+| [docs/DISPLAYS.md](docs/DISPLAYS.md) | Display, Lampen und Summer — Panels, Pins, Verdrahtung |
 
 ## Befehle
 
@@ -152,6 +162,7 @@ nur importiert. Vor Änderungen [CLAUDE.md](CLAUDE.md) lesen.
 - [ ] Auswahl der oberen Fläche und 6/9-Unterscheidung an echten W20 überprüfen
 - [ ] Überlappende und verkantete Würfel erkennen und melden statt falsch lesen
 - [ ] Fair-Play-Schwellen (`hand_area_frac`, `motion_threshold`) an echten Händen prüfen
+- [ ] Ein echtes ST7789 und ein echtes SSD1306 an einem echten Pi; Treiber geschrieben, ungetestet
 - [ ] Ein Discord-Bot als Referenz, in eigenem Repo, der diese API benutzt
 - [ ] Provisionierung: Installer, systemd-Unit und die IMX519-Tuning-Datei ausliefern
 

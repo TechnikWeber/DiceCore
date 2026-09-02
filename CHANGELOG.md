@@ -2,6 +2,38 @@
 
 Notable changes, newest first. Dates are the day the work landed.
 
+## 0.3.0 (2026-09-02)
+
+A number nobody can see is not much use at a table, and the fair-play watch was making
+everyone wait for it. Both fixed.
+
+### Added
+- **A screen over the tower**: ST7789 and ILI9341 (SPI, colour) and SSD1306 (I²C or SPI,
+  monochrome), in every size they are sold in. One renderer for all of them, measured to
+  fit the panel rather than assuming a shape.
+- **Two lamps and a buzzer** on three GPIOs: green means throw, red means hands off, and
+  the buzzer marks the number arriving and your turn coming round. Any pin set to `-1` is
+  simply left out.
+- A natural maximum gets a short animation and a three-note beep; a natural 1 gets a flat
+  screen and one long note. A die that could not be read never celebrates.
+- **Both are previewed in the browser** — the panel image is rendered whether or not
+  hardware is attached, and the lamps are shown lit. **Screen & lamps → Run through the
+  phases** walks the whole sequence so wiring can be checked without throwing anything.
+- `docs/DISPLAYS.md` with panels, pins and wiring tables.
+- 134 tests, none of which need a camera, a screen or a GPIO header.
+
+### Changed
+- **The number no longer waits for the verdict.** `GET /api/v1/roll` answers as soon as the
+  dice are read (~0.2 s after they stop); the hold window runs in the background and the
+  verdict lands on `/api/v1/state` and the websocket. `?verify=1` waits for it, as the old
+  default did.
+- **Throwing again immediately is normal play**: a new read cancels the previous roll's
+  watch and marks it `superseded` instead of voiding it.
+
+### Fixed
+- Nested settings (`output.display.kind`) came back from the config file as plain dicts —
+  the loader only descended one level.
+
 ## 0.2.0 (2026-09-02)
 
 Fair play: reading the dice was only half of it. Between the camera and the game a hand can

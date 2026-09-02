@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "dicecore"
-version = "0.2.0"
+version = "0.3.0"
 description = "Reads real dice with a camera: pips, polyhedral numerals, totals — as an API."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -26,6 +26,10 @@ server = ["fastapi>=0.110", "uvicorn[standard]>=0.27", "python-multipart>=0.0.9"
 model = ["onnxruntime>=1.17"]
 # Training a model. PyTorch, so: a PC, not a Pi.
 train = ["torch>=2.2", "torchvision>=0.17", "onnx>=1.15"]
+# A small screen over the tower: ST7789 / ILI9341 (SPI) and SSD1306 (I2C or SPI).
+display = ["pillow>=10", "luma.lcd>=2.11", "luma.oled>=3.13"]
+# Two lamps and a buzzer on the GPIO header.
+gpio = ["gpiozero>=2.0"]
 dev = ["pytest>=8.0", "ruff>=0.4"]
 
 [project.scripts]
@@ -56,3 +60,4 @@ select = ["E", "F", "I", "UP", "B"]
 "src/dicecore/server/app.py" = ["B008"]
 "src/dicecore/capture/base.py" = ["B027"]
 "src/dicecore/engine/base.py" = ["B027"]
+"src/dicecore/output/base.py" = ["B027"]

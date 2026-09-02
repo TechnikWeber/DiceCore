@@ -47,6 +47,7 @@ function showTab() {
   document.querySelectorAll("section").forEach((s) => s.classList.toggle("on", s.id === name));
   document.querySelectorAll("nav a").forEach((a) => a.classList.toggle("on", a.hash === `#${name}`));
   if (name === "camera") { refreshHardware(); refreshPreview(); }
+  if (name === "signals") pollOutputs();
   if (name === "training") { loadSets(); pollTraining(); }
   if (name === "system") refreshStatus();
 }
@@ -156,6 +157,7 @@ function loadForm() {
   fillSelect($("csi-module"), state.options.csi_modules.map((m) => ({ id: m.id, label: m.label })),
              s.capture.csi_module);
   fillSelect($("gd-policy"), state.options.policies, s.guard.policy);
+  fillSelect($("dp-kind"), state.options.panels, s.output.display.kind);
   $("cap-folder").value = s.capture.folder;
   $("cap-device").value = s.capture.device;
   $("cap-width").value = s.capture.width;
@@ -181,6 +183,29 @@ function loadForm() {
   $("gd-hand").value = s.guard.hand_area_frac;
   $("gd-touch").checked = s.guard.void_on_touch;
   $("gd-throw").checked = s.guard.require_throw;
+  $("dp-enabled").checked = s.output.display.enabled;
+  $("dp-width").value = s.output.display.width;
+  $("dp-height").value = s.output.display.height;
+  $("dp-rotate").value = s.output.display.rotate;
+  $("dp-spiport").value = s.output.display.spi_port;
+  $("dp-spidev").value = s.output.display.spi_device;
+  $("dp-dc").value = s.output.display.gpio_dc;
+  $("dp-rst").value = s.output.display.gpio_rst;
+  $("dp-i2cport").value = s.output.display.i2c_port;
+  $("dp-i2caddr").value = s.output.display.i2c_address;
+  $("sg-enabled").checked = s.output.signals.enabled;
+  $("sg-green").value = s.output.signals.green_pin;
+  $("sg-red").value = s.output.signals.red_pin;
+  $("sg-buzzer").value = s.output.signals.buzzer_pin;
+  $("sg-buzzon").checked = s.output.signals.buzzer_enabled;
+  $("sg-beep").value = s.output.signals.beep_ms;
+  $("sg-high").checked = s.output.signals.active_high;
+  $("sg-celebsound").checked = s.output.signals.celebrate_sound;
+  $("cl-mode").value = s.output.celebrate;
+  $("cl-total").value = s.output.celebrate_total;
+  $("cl-lament").checked = s.output.lament_on_min;
+  $("cl-frames").value = s.output.animation_frames;
+  panelSizes();
   $("st-enabled").checked = s.settle.enabled;
   $("st-motion").value = s.settle.motion_threshold;
   $("st-frames").value = s.settle.stable_frames;
@@ -228,6 +253,29 @@ function collectForm() {
   s.guard.hand_area_frac = Number($("gd-hand").value);
   s.guard.void_on_touch = $("gd-touch").checked;
   s.guard.require_throw = $("gd-throw").checked;
+  s.output.display.enabled = $("dp-enabled").checked;
+  s.output.display.kind = $("dp-kind").value;
+  s.output.display.width = Number($("dp-width").value);
+  s.output.display.height = Number($("dp-height").value);
+  s.output.display.rotate = Number($("dp-rotate").value);
+  s.output.display.spi_port = Number($("dp-spiport").value);
+  s.output.display.spi_device = Number($("dp-spidev").value);
+  s.output.display.gpio_dc = Number($("dp-dc").value);
+  s.output.display.gpio_rst = Number($("dp-rst").value);
+  s.output.display.i2c_port = Number($("dp-i2cport").value);
+  s.output.display.i2c_address = $("dp-i2caddr").value;
+  s.output.signals.enabled = $("sg-enabled").checked;
+  s.output.signals.green_pin = Number($("sg-green").value);
+  s.output.signals.red_pin = Number($("sg-red").value);
+  s.output.signals.buzzer_pin = Number($("sg-buzzer").value);
+  s.output.signals.buzzer_enabled = $("sg-buzzon").checked;
+  s.output.signals.beep_ms = Number($("sg-beep").value);
+  s.output.signals.active_high = $("sg-high").checked;
+  s.output.signals.celebrate_sound = $("sg-celebsound").checked;
+  s.output.celebrate = $("cl-mode").value;
+  s.output.celebrate_total = Number($("cl-total").value);
+  s.output.lament_on_min = $("cl-lament").checked;
+  s.output.animation_frames = Number($("cl-frames").value);
   s.settle.enabled = $("st-enabled").checked;
   s.settle.motion_threshold = Number($("st-motion").value);
   s.settle.stable_frames = Number($("st-frames").value);
@@ -454,6 +502,58 @@ async function pollTraining() {
   }
 }
 
+// --- screen and lamps -------------------------------------------------------
+
+function panelSizes() {
+  const panel = state.options.panels.find((p) => p.id === $("dp-kind").value);
+  const sizes = (panel && panel.sizes) || [];
+  const current = `${$("dp-width").value}x${$("dp-height").value}`;
+  $("dp-size").innerHTML = [`<option value="0x0">custom / panel default</option>`]
+    .concat(sizes.map(([w, h]) =>
+      `<option value="${w}x${h}" ${`${w}x${h}` === current ? "selected" : ""}>${w} × ${h}</option>`))
+    .join("");
+  // A panel on I2C has no DC or reset pin, and one on SPI has no address; showing both
+  // sets invites wiring to the wrong half.
+  $("dp-spi").hidden = !panel || panel.bus !== "spi";
+  $("dp-i2c").hidden = !panel || panel.bus !== "i2c";
+}
+
+async function pollOutputs() {
+  let info;
+  try { info = await api("/api/setup/outputs"); } catch { return; }
+
+  const signals = info.signals;
+  const lamp = (cls, on, label) =>
+    `<span class="lamp ${cls} ${on ? "on" : ""}"><i></i>${escapeHtml(label)}</span>`;
+  $("lamp-state").innerHTML = [
+    lamp("green", signals && signals.green.on, signals ? `green — throw (pin ${signals.green.pin})` : "lamps off"),
+    lamp("red", signals && signals.red.on, signals ? `red — hands off (pin ${signals.red.pin})` : ""),
+    `<span class="muted">phase: <b>${escapeHtml(info.state.phase)}</b>`
+      + (signals && signals.buzzer.last ? ` · buzzer: ${escapeHtml(signals.buzzer.last)}` : "")
+      + (info.display ? ` · ${escapeHtml(info.display.label)} ${info.display.width}×${info.display.height}`
+         + (info.display.attached ? " (attached)" : " (preview only)") : "")
+      + `</span>`,
+  ].join("");
+
+  const problems = (info.problems || [])
+    .concat([info.display && info.display.problem, signals && signals.problem].filter(Boolean));
+  if (problems.length) {
+    $("lamp-state").innerHTML +=
+      problems.map((p) => `<div class="msg warn" style="width:100%">${escapeHtml(p)}</div>`).join("");
+  }
+  if (info.display) $("display-preview").src = `/api/setup/display.png?t=${Date.now()}`;
+
+  clearTimeout(state.timers.outputs);
+  if (location.hash === "#signals") state.timers.outputs = setTimeout(pollOutputs, 900);
+}
+
+async function testOutputs(phase) {
+  try {
+    await api("/api/setup/outputs/test", json("POST", phase ? { phase } : {}));
+    pollOutputs();
+  } catch (err) { alertBox(err.message); }
+}
+
 // --- API tab ----------------------------------------------------------------
 
 function renderApiExamples() {
@@ -536,6 +636,14 @@ $("btn-train").onclick = async () => {
 };
 $("btn-train-stop").onclick = () => api("/api/setup/training/stop", { method: "POST" }).catch(() => {});
 $("btn-ws").onclick = toggleWebsocket;
+$("dp-kind").addEventListener("change", panelSizes);
+$("dp-size").addEventListener("change", () => {
+  const [w, h] = $("dp-size").value.split("x").map(Number);
+  $("dp-width").value = w;
+  $("dp-height").value = h;
+});
+$("btn-test-walk").onclick = () => testOutputs(null);
+document.querySelectorAll("[data-phase]").forEach((b) => (b.onclick = () => testOutputs(b.dataset.phase)));
 $("live").onchange = (event) => {
   clearInterval(state.timers.live);
   // Live view is a display, not a referee: it takes the number and skips the hold window.

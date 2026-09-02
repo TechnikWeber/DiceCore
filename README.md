@@ -33,12 +33,21 @@ event stream a bot or a game can subscribe to.
 - **Training from the browser**, with live loss and accuracy, exporting an ONNX model the
   engine picks up. Training needs PyTorch and so runs on a PC; the UI says so plainly rather
   than failing halfway through.
+- **A screen and two lamps.** ST7789, ILI9341 or SSD1306 over the tower shows the number the
+  instant the dice stop, with a small animation for a natural 20; a green and a red LED plus
+  a buzzer say whose turn it is without anyone reading anything. Both are optional, both run
+  at once, and both are previewed in the browser before a single wire is soldered.
 - **A versioned API** and a websocket stream, meant to be embedded by other projects.
 - **CSI camera modules as configuration** — including Arducam IMX519 / 64MP / Owlsight /
   Pivariety, which a Pi does not auto-detect. Picking one in the UI writes the `dtoverlay`
   into `config.txt` and tells you to reboot.
 - **The whole thing without hardware.** `dicecore synth` renders dice, the `folder` capture
   source plays them back, and everything above works on a laptop.
+
+![Five panels side by side, rendered by DiceCore itself: an ST7789 240x240 showing NICE ROLL over a 20, an ILI9341 320x240 showing HANDS OFF over 18, a narrow ST7789 135x240 showing VOID in red, and two SSD1306 OLEDs](docs/screenshots/displays.png)
+
+*The same renderer drives every panel and the browser preview, so the layout can be worked
+out before anything is soldered.*
 
 ![The Training tab: a set of stored rolls, each with the engine's guess pre-filled per die, ready to be corrected and confirmed](docs/screenshots/training.jpg)
 
@@ -60,9 +69,9 @@ Then `curl localhost:8099/api/v1/roll`:
  "verdict": "clean", "usable": true, "stale": false}
 ```
 
-That call takes about two seconds, and the two seconds are the point: it is how long the
-tray is watched after the dice are read. `?verify=0` answers at once with
-`verdict: "pending"` instead.
+The number arrives about a fifth of a second after the dice stop — the fair-play watch runs
+behind it and the verdict lands on `/api/v1/state` and the websocket a couple of seconds
+later. `?verify=1` waits for it instead.
 
 ## On a Raspberry Pi
 
@@ -116,6 +125,7 @@ A die that could not be read has `"value": 0` and prints as `?`. Never add it up
 | [docs/API.md](docs/API.md) | The contract other projects depend on |
 | [docs/TRAINING.md](docs/TRAINING.md) | Teaching it your own dice |
 | [docs/ANTI-CHEAT.md](docs/ANTI-CHEAT.md) | What the fair-play watch catches, and what it cannot |
+| [docs/DISPLAYS.md](docs/DISPLAYS.md) | The screen, the lamps and the buzzer — panels, pins, wiring |
 
 ## Commands
 
@@ -146,6 +156,7 @@ imported. See [CLAUDE.md](CLAUDE.md) for the conventions before changing anythin
 - [ ] Top-face selection and 6/9 handling verified on real d20s
 - [ ] Overlapping and cocked dice: detect and report rather than mis-read
 - [ ] Fair-play thresholds (`hand_area_frac`, `motion_threshold`) checked against real hands
+- [ ] A real ST7789 and a real SSD1306 on a real Pi; the drivers are written but untested
 - [ ] A reference Discord bot, in its own repo, consuming this API
 - [ ] Provisioning: installer, systemd unit, and the IMX519 tuning file shipped
 

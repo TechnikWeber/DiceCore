@@ -31,6 +31,9 @@ from ..dataset.store import DatasetStore
 from ..dice import DIE_FACES, DIE_KINDS, values_for
 from ..engine import MODES, EngineError
 from ..integrity import POLICIES
+from ..output import OutputHub
+from ..output import state as phases
+from ..output.displays import COMMON_SIZES, PANELS
 from ..reader import Reader
 from ..system import boot_config, diagnostics
 from ..training import TrainingManager
@@ -49,14 +52,17 @@ def create_app(settings: Settings | None = None) -> Any:
         ) from exc
 
     loaded, complaints = Settings.load() if settings is None else (settings, [])
-    state: dict[str, Any] = {"settings": loaded, "complaints": complaints}
-    reader = Reader(loaded)
+    state: dict[str, Any] = {"settings": loaded, "complaints": complaints, "hub": None}
+    hub = OutputHub(loaded.output)
+    state["hub"] = hub
+    reader = Reader(loaded, on_phase=lambda p: state["hub"].update(p))
     training = TrainingManager(loaded)
 
-    app = FastAPI(title="DiceCore", version="0.2.0",
+    app = FastAPI(title="DiceCore", version="0.3.0",
                   description="Reads real dice with a camera.")
     app.state.reader = reader
     app.state.training = training
+    app.state.hub = hub
 
     def store() -> DatasetStore:
         return DatasetStore(state["settings"].dataset_dir)
@@ -203,6 +209,7 @@ def create_app(settings: Settings | None = None) -> Any:
                 "can_run_model": caps.can_run_model, "can_train": caps.can_train,
                 "advice": caps.advice(),
             },
+            "outputs": state["hub"].describe(),
             "boot": {"auto_detect": boot_state.auto_detect, "overlay": boot_state.overlay,
                      "module": boot_config.module_id_for(boot_state),
                      "path": str(boot_path) if boot_path else None},
@@ -223,6 +230,10 @@ def create_app(settings: Settings | None = None) -> Any:
             "kinds": [{"id": k, "faces": DIE_FACES[k], "values": values_for(k)}
                       for k in DIE_KINDS],
             "policies": [{"id": i, "label": name} for i, name in POLICIES],
+            "panels": [{"id": i, "label": label, "mono": mono, "bus": bus,
+                        "sizes": [list(s) for s in COMMON_SIZES.get(i, ())]}
+                       for i, (label, _default, mono, bus) in PANELS.items()],
+            "phases": list(phases.PHASES),
         }
 
     @app.get("/api/setup/settings")
@@ -236,7 +247,14 @@ def create_app(settings: Settings | None = None) -> Any:
         updated.save()
         state["settings"] = updated
         reader.reload(updated)
+        reader.settings = updated
         training.settings = updated
+        # Rebuild the outputs: a changed pin or panel means new hardware to open, and the
+        # old hub is holding the pins the new one wants.
+        old = state["hub"]
+        state["hub"] = OutputHub(updated.output)
+        old.close()
+        app.state.hub = state["hub"]
         return {"ok": True, "settings": updated.to_dict()}
 
     @app.get("/api/setup/hardware")
@@ -301,6 +319,60 @@ def create_app(settings: Settings | None = None) -> Any:
         if jpeg is None:
             raise HTTPException(404, "Nothing has been read yet.")
         return Response(jpeg, media_type="image/jpeg", headers={"Cache-Control": "no-store"})
+
+    # --- screen, lamps and buzzer -----------------------------------------------------
+
+    @app.get("/api/setup/outputs")
+    def outputs() -> Any:
+        """What the screen is showing and what the lamps are doing, right now."""
+        return state["hub"].describe()
+
+    @app.get("/api/setup/display.png")
+    def display_preview() -> Any:
+        """
+        Exactly what the little screen shows — whether or not one is attached.
+
+        The preview is rendered for every panel, so the layout can be worked out on a laptop
+        and checked against the real thing without a camera pointed at the tower.
+        """
+        display = state["hub"].display
+        if display is None or display.last_png is None:
+            raise HTTPException(404, "No display is enabled.")
+        return Response(display.last_png, media_type="image/png",
+                        headers={"Cache-Control": "no-store"})
+
+    @app.post("/api/setup/outputs/test")
+    async def outputs_test(request: Request) -> Any:
+        """
+        Walk through the phases so you can check the wiring without throwing anything.
+
+        This is the endpoint you use with a screwdriver in hand: press it, watch the red
+        lamp come on, hear the beep, watch it go green. A `phase` in the body shows just
+        that one.
+        """
+        body = await request.json() if await request.body() else {}
+        hub = state["hub"]
+        if not hub.enabled:
+            return fail(RuntimeError("Neither a display nor the lamps are enabled."), 409)
+
+        wanted = str(body.get("phase", "")).strip()
+        celebrate = bool(body.get("celebrate", True))
+        if wanted:
+            hub.update(phases.Presentation(wanted, 20 if wanted != phases.IDLE else None,
+                                           "1d20 → 20", celebrate=celebrate))
+            return {"ok": True, "phase": wanted}
+
+        async def walk() -> None:
+            for phase, pause in ((phases.ROLLING, 0.6), (phases.READING, 0.4),
+                                 (phases.RESULT, 1.4), (phases.READY, 1.2)):
+                hub.update(phases.Presentation(
+                    phase, 20 if phase in (phases.RESULT, phases.READY) else None,
+                    "1d20 → 20", celebrate=celebrate and phase in (phases.RESULT, phases.READY)))
+                await asyncio.sleep(pause)
+            hub.update(phases.Presentation(phases.IDLE))
+
+        asyncio.create_task(walk())
+        return {"ok": True, "walking": True}
 
     # --- dataset ----------------------------------------------------------------------
 

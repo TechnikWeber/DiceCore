@@ -6,6 +6,8 @@ The point of these is the contract in docs/API.md: a game or a bot written again
 have bitten us — POST bodies in particular.
 """
 
+import time
+
 import pytest
 
 pytest.importorskip("fastapi")
@@ -47,11 +49,27 @@ def test_a_roll_carries_everything_a_consumer_needs(client):
     assert set(body["dice"][0]) >= {"kind", "value", "box", "confidence"}
 
 
-def test_a_roll_carries_a_fair_play_verdict(client):
+def test_a_roll_answers_before_the_tray_has_been_watched(client):
+    # The default must not make anyone wait out the hold window: the number exists a
+    # fraction of a second after the dice stop, and that is when it should arrive.
+    started = time.perf_counter()
     body = client.get("/api/v1/roll").json()
-    assert body["verdict"] in ("clean", "disturbed", "void", "pending", "unverified")
-    assert body["usable"] is True
+    assert time.perf_counter() - started < 0.2
+    assert body["verdict"] == "pending" and body["usable"] is True
+
+
+def test_asking_for_the_verdict_up_front_waits_for_it(client):
+    body = client.get("/api/v1/roll?verify=1").json()
+    assert body["verdict"] == "clean"
     assert body["integrity"]["seal"].startswith("sha256:")
+
+
+def test_the_verdict_lands_on_the_last_result_by_itself(client):
+    rolled = client.get("/api/v1/roll").json()
+    time.sleep(0.6)                                    # the hold window is 0.2s here
+    settled = client.get("/api/v1/state").json()
+    assert settled["at"] == rolled["at"]               # the same roll…
+    assert settled["verdict"] == "clean"               # …now carrying its verdict
 
 
 def test_a_caller_in_a_hurry_takes_the_number_and_the_verdict_separately(client):

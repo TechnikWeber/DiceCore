@@ -17,6 +17,7 @@
   <a href="#roll">Roll</a>
   <a href="#camera">Camera</a>
   <a href="#detection">Detection</a>
+  <a href="#signals">Screen &amp; lamps</a>
   <a href="#training">Training</a>
   <a href="#api">API</a>
   <a href="#system">System</a>
@@ -174,6 +175,82 @@
         <div><label>Motion threshold</label><input id="st-motion" type="number" step="0.1"></div>
         <div><label>Still frames required</label><input id="st-frames" type="number"></div>
         <div><label>Give up after (s)</label><input id="st-timeout" type="number" step="0.5"></div>
+      </div>
+      <div class="row" style="margin-top:12px"><button class="primary" data-save>Save</button></div>
+    </div>
+  </section>
+
+  <!-- ------------------------------------------------------- Screen & lamps -->
+  <section id="signals">
+    <div class="card">
+      <h2>What the table sees</h2>
+      <p class="hint">A number on a small screen the instant the dice stop, and two lamps
+        that say whose turn it is. Both are optional and both can run at once — the preview
+        below is rendered whether or not anything is wired up yet.</p>
+      <div class="row">
+        <button class="primary" id="btn-test-walk">Run through the phases</button>
+        <button data-phase="rolling">Rolling</button>
+        <button data-phase="result">Result</button>
+        <button data-phase="ready">Your turn</button>
+        <button data-phase="void">Void</button>
+      </div>
+      <div class="lamps" id="lamp-state" style="margin-top:14px"></div>
+    </div>
+
+    <div class="card">
+      <h2>Display</h2>
+      <div class="grid">
+        <div><label>Show the result on a screen</label><input id="dp-enabled" type="checkbox"></div>
+        <div><label>Panel</label><select id="dp-kind"></select></div>
+        <div><label>Size</label><select id="dp-size"></select></div>
+        <div><label>Width (0 = panel default)</label><input id="dp-width" type="number"></div>
+        <div><label>Height</label><input id="dp-height" type="number"></div>
+        <div><label>Rotation (quarter turns)</label><select id="dp-rotate"><option>0</option><option>1</option><option>2</option><option>3</option></select></div>
+      </div>
+      <div class="grid" id="dp-spi" style="margin-top:12px">
+        <div><label>SPI port</label><input id="dp-spiport" type="number"></div>
+        <div><label>SPI device (CE)</label><input id="dp-spidev" type="number"></div>
+        <div><label>DC pin (BCM)</label><input id="dp-dc" type="number"></div>
+        <div><label>Reset pin (BCM)</label><input id="dp-rst" type="number"></div>
+      </div>
+      <div class="grid" id="dp-i2c" style="margin-top:12px">
+        <div><label>I²C bus</label><input id="dp-i2cport" type="number"></div>
+        <div><label>I²C address</label><input id="dp-i2caddr" placeholder="0x3C"></div>
+      </div>
+      <div class="row" style="margin-top:12px"><button class="primary" data-save>Save</button></div>
+      <p class="hint" style="margin-top:14px">This is exactly what the panel shows:</p>
+      <div class="screen"><img id="display-preview" alt="display preview"></div>
+    </div>
+
+    <div class="card">
+      <h2>Lamps and buzzer</h2>
+      <p class="hint">Green: throw. Red: the tray is being read or watched — hands off. The
+        buzzer marks the number arriving and your turn coming round again. Set a pin to
+        <code>-1</code> to leave that one out.</p>
+      <div class="grid">
+        <div><label>Use the GPIO lamps</label><input id="sg-enabled" type="checkbox"></div>
+        <div><label>Green pin (BCM)</label><input id="sg-green" type="number"></div>
+        <div><label>Red pin (BCM)</label><input id="sg-red" type="number"></div>
+        <div><label>Buzzer pin (BCM)</label><input id="sg-buzzer" type="number"></div>
+        <div><label>Buzzer on</label><input id="sg-buzzon" type="checkbox"></div>
+        <div><label>Beep length (ms)</label><input id="sg-beep" type="number"></div>
+        <div><label>Pin is active high</label><input id="sg-high" type="checkbox"></div>
+        <div><label>Sound for a great or awful roll</label><input id="sg-celebsound" type="checkbox"></div>
+      </div>
+      <div class="row" style="margin-top:12px"><button class="primary" data-save>Save</button></div>
+    </div>
+
+    <div class="card">
+      <h2>What is worth celebrating</h2>
+      <div class="grid">
+        <div><label>Celebrate</label><select id="cl-mode">
+          <option value="off">Nothing</option>
+          <option value="max_die">A natural maximum on any die</option>
+          <option value="total">A total of at least…</option>
+        </select></div>
+        <div><label>…this total</label><input id="cl-total" type="number"></div>
+        <div><label>Mark a natural 1 as well</label><input id="cl-lament" type="checkbox"></div>
+        <div><label>Animation frames</label><input id="cl-frames" type="number"></div>
       </div>
       <div class="row" style="margin-top:12px"><button class="primary" data-save>Save</button></div>
     </div>

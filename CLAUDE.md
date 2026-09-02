@@ -27,6 +27,10 @@ Owner: Philipp Weber · GitHub: TechnikWeber/DiceCore
 - `src/dicecore/guard.py` — the hold window after a reading: turns frames into events.
 - `src/dicecore/reader.py` — capture → settle → engine → guard. The single owner of the
   camera, and the only place that knows about the *previous* roll (staleness, replay).
+- `src/dicecore/output/` — what a person sees: `state` (one `Presentation` for every output,
+  pure), `render` (PIL, one renderer for every panel), `displays` (ST7789 / ILI9341 /
+  SSD1306 via luma, plus an always-on PNG preview), `signals` (LEDs and buzzer via gpiozero),
+  and the hub that fans out on its own thread.
 - `src/dicecore/server/` — FastAPI, plus `web/` (one HTML, one JS, one CSS; no build step).
 - `src/dicecore/synth.py` — synthetic dice, for tests and for a first run without hardware.
 
@@ -71,6 +75,17 @@ python3 -m venv .venv && .venv/bin/pip install -e '.[vision,server,dev]'
   and blur the motion detector uses, two genuinely different captures of a still tray come
   out identical all the time — checking there called every quiet table a fake. And it only
   runs on `source.is_live`; the folder simulator repeats frames by design.
+- **The number goes out before the verdict does.** `read()` returns as soon as the dice are
+  read and the hold window runs on a thread. Making the caller wait put two seconds between
+  the dice landing and anyone seeing a number, which is the opposite of what a dice tower is
+  for. A new read cancels the previous watch and marks that roll `superseded` — throwing
+  again immediately is normal play and must never void anything.
+- **One `Presentation` drives every output.** The screen and the lamps must not be able to
+  disagree about whose turn it is, so both are derived from the same value rather than each
+  interpreting the reader's events. `presentation.go` is what the green lamp means.
+- **An output must never be able to break a reading.** A panel that will not start, a pin
+  that is taken, a screen that stops answering: all reported through the UI, none fatal.
+  The hub runs on its own thread precisely so a slow SPI write cannot delay a roll.
 - **Only confirmed dice are trained on.** Training on the engine's own guesses teaches it its
   own mistakes.
 - **Rotation augmentation is not optional.** Dice land in any orientation; a model trained

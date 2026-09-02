@@ -30,7 +30,16 @@ from typing import Any
 from .capture.settle import WORK_WIDTH, motion_score, prepare
 from .config import GuardSettings
 from .dice import Box, Die, Frame
-from .integrity import FAULT, INFO, WARN, Event, Integrity, decide, seal
+from .integrity import (
+    FAULT,
+    INFO,
+    SUPERSEDED,
+    WARN,
+    Event,
+    Integrity,
+    decide,
+    seal,
+)
 
 
 @dataclass
@@ -120,6 +129,7 @@ class TamperGuard:
         jpeg: bytes | None = None,
         prior_events: list[Event] | None = None,
         live: bool = True,
+        should_stop: Callable[[], bool] = lambda: False,
         sleep: Callable[[float], None] = time.sleep,
         now: Callable[[], float] = time.monotonic,
     ) -> Integrity:
@@ -147,6 +157,14 @@ class TamperGuard:
         latest = reference
 
         while now() - watch.started < cfg.hold_s:
+            if should_stop():
+                # The next roll has begun. Re-reading now would compare this roll against a
+                # tray that is deliberately full of different dice, so stop here and say so
+                # rather than inventing a fault out of normal play.
+                integrity.held_s = now() - watch.started
+                integrity.events = watch.events
+                integrity.verdict = SUPERSEDED
+                return integrity
             sleep(cfg.interval_s)
             try:
                 latest = grab()

@@ -16,6 +16,28 @@ twice. Those are all *visible*, and DiceCore never claims a roll was fair. It sa
 "nothing happened between the throw and this number" or "here is exactly what happened", and
 your game decides what that is worth.
 
+### The watch is the second line, not the first
+
+Worth being clear about what does the real work here. The number is captured **when the dice
+settle**, and nothing done to the tray afterwards can change what DiceCore recorded. So the
+watch does not protect the number — the timing does.
+
+What the watch is actually for:
+
+1. **A die that settles late.** If one was still rocking when the stillness test passed, the
+   reading is wrong and the tray now disagrees with it. The re-read catches that. This is a
+   correctness problem, not a cheating one, and it is probably the most valuable thing here.
+2. **Keeping the screen and the table in agreement.** People believe the dice in front of
+   them. If the API says 6 and the tray says 8 because somebody flipped one, there is an
+   argument; the record settles it.
+3. **The checks that are not about the hold window at all** — `stale`, a frozen feed, a
+   covered lens — which happen at read time and would be worth having on their own.
+
+And the strongest measure of all is not in this file: **a screen showing the number the
+instant it is read** makes post-hoc flipping pointless, because everyone has already seen
+the number. See [DISPLAYS.md](DISPLAYS.md). A red lamp that says "hands off" and a green one
+that says "throw" do more for a fair table than any amount of watching.
+
 Do not use it where money is at stake, and do not make it the referee nobody can overrule.
 
 ## The sequence
@@ -44,6 +66,7 @@ thrown ──► tumbling ──► still ──► READ ──► held ──�
 | `disturbed` | Something reached in — the dice still read the same, or the policy only flags | yes |
 | `void` | The dice are **not** what was read | **no** |
 | `pending` | The number is out; the hold window has not finished | yes |
+| `superseded` | The next throw began before this roll's watch finished | yes |
 | `unverified` | Fair play is switched off, or the caller asked not to wait | yes |
 
 `usable` is false for exactly one verdict, so a consumer can respect this without knowing
@@ -96,6 +119,7 @@ the roll.
 - Tampering under a hand that never leaves: if the tray is covered for the whole hold and
   the dice are unchanged afterwards, the reach is recorded but the reading stands.
 - Anything at all once the hold window closes. `hold_s` is how long the promise lasts.
+- Anything after the next throw begins: that roll is marked `superseded`, and rightly so.
 - Someone with access to the Pi, the camera or the config.
 
 ## Settings
@@ -125,15 +149,22 @@ the roll.
   the rule to people before they learn it the hard way.
 - **`off`** when DiceCore is a display and nobody is competing.
 
-### The cost
+### The cost, and why there is almost none
 
-With fair play on, `GET /api/v1/roll` **blocks for `hold_s`** — that wait *is* the verdict.
-Callers that want the number sooner take it in two steps:
+Watching does not delay the number. `GET /api/v1/roll` answers as soon as the dice are read
+— about a fifth of a second after they stop — with `verdict: "pending"`, and the hold window
+runs on its own thread behind it. The verdict lands on `/api/v1/state` and on the websocket
+a couple of seconds later.
 
 ```bash
-curl "http://dicecore.local:8099/api/v1/roll?verify=0"   # number now, verdict "pending"
-curl -X POST http://dicecore.local:8099/api/v1/verify    # the verdict, hold_s later
+curl http://dicecore.local:8099/api/v1/roll              # number now, verdict "pending"
+curl http://dicecore.local:8099/api/v1/state             # the same roll, with its verdict
+curl "http://dicecore.local:8099/api/v1/roll?verify=1"   # or wait for it up front
 ```
+
+**You never have to wait to throw again.** Starting a new roll cancels the previous watch
+and marks that roll `superseded`; it does not void it. `hold_s` is how long the tray must be
+left alone for a *clean* verdict, not a lockout.
 
 The websocket does this for you: every roll arrives twice, first as `pending` and then with
 its verdict. A scoreboard renders the first; a bot that must not honour a tampered roll acts

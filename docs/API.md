@@ -16,7 +16,7 @@ Capture and read. This is the one you want.
 | Query | Default | Meaning |
 |---|---|---|
 | `wait` | `1` | Wait for the dice to settle before reading |
-| `verify` | *(config)* | Also watch the tray afterwards — **blocks for `guard.hold_s`**. `0` answers at once with `verdict: "pending"` |
+| `verify` | *(background)* | `1` waits for the fair-play verdict before answering; by default the watch runs behind the answer and the verdict lands on `/state` |
 | `store_to` | — | Dataset set id; files the frame as an unconfirmed sample |
 
 ```json
@@ -53,6 +53,9 @@ Read the fields like this:
 - **`usable`** is false for exactly one verdict, `void` — the dice are not what was read.
   Check this and nothing else if you do not want to think about fair play; see
   [ANTI-CHEAT.md](ANTI-CHEAT.md) for the rest.
+- **`verdict`** starts as `pending` and becomes `clean`, `disturbed`, `void` or `superseded`
+  a couple of seconds later — read it from `/state` or the websocket, or ask for
+  `?verify=1`. `superseded` means the next throw began first, which is normal play.
 - **`stale`** means nothing was thrown since the last reading. A scoreboard ignores it;
   anything that counts rolls must not count it twice.
 
@@ -149,8 +152,8 @@ Within `v1`:
 - `kind` values come from a fixed vocabulary: `d4 d6 d8 d10 d100 d12 d20`.
 - `value` is `0` for "not read", `0–9` for a d10, `0/10/…/90` for a d100, `1..faces`
   otherwise.
-- `verdict` is one of `unverified`, `pending`, `clean`, `disturbed`, `void`; `usable` is
-  false only for `void`. New verdicts, if any, will be *more* specific — treat an unknown
+- `verdict` is one of `unverified`, `pending`, `clean`, `disturbed`, `void`, `superseded`;
+  `usable` is false only for `void`. New verdicts, if any, will be *more* specific — treat an unknown
   one as usable and read `usable`.
 - HTTP 200 with a `warnings` list is the normal way a partial reading is reported. A 4xx/5xx
   carries `{"error": …, "detail": …}` where `detail` is a sentence you can show a user.

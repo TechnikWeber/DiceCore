@@ -36,8 +36,12 @@ CLEAN = "clean"
 DISTURBED = "disturbed"
 #: The dice are not what was read. The number must not be used.
 VOID = "void"
+#: The next throw began before this roll's watch finished. The number stands — it was
+#: captured when the dice settled — but nobody promises anything about the tray afterwards.
+#: Throwing again immediately is normal play, not cheating, and must never void a roll.
+SUPERSEDED = "superseded"
 
-VERDICTS = (UNVERIFIED, PENDING, CLEAN, DISTURBED, VOID)
+VERDICTS = (UNVERIFIED, PENDING, CLEAN, DISTURBED, VOID, SUPERSEDED)
 
 #: How bad an event is. `info` is a note, `warn` is worth showing, `fault` voids under a
 #: policy that voids at all.
