@@ -2,6 +2,31 @@
 
 Notable changes, newest first. Dates are the day the work landed.
 
+## 0.15.1 (2026-09-02)
+
+### Fixed
+- **Holding a die did nothing at all with simulated dice.** The simulator threw its whole
+  plan every time, so the two dice you kept back in Kniffel came up with new numbers — the
+  hold mechanic was decoration wherever there was no camera, which since 0.15.0 is the
+  default. A held die is now not thrown again *and not moved*: it keeps its value and its
+  exact place on the tray, because lying still in the same spot is the only signal that
+  tells a reader it was held.
+- The simulator's dice were kept in the order they happened to be drawn in, while the game
+  numbers its dice the way the engine reads them off the tray. `hold[2]` therefore kept an
+  unrelated die, which looks exactly like the hold being ignored at random. It keeps its
+  list in reading order now.
+- Settling ran in front of the simulator, which cannot move — decided on `is_live` rather
+  than on the source's name, so pushed frames are covered too.
+
+### Changed
+- **Kept dice are set aside on the screen** rather than marked where they lie: their own
+  fenced-off area beside the throw, the way a person pushes the ones they are keeping to the
+  edge of the table. Tapping one puts it back in the pile. The old marking was the same
+  information and harder to read — a throw reshuffles the pile, so "which ones am I keeping"
+  meant re-reading five dice every time.
+- `render_scene` takes a `places` argument that pins individual dice down, and hands each
+  die's placement back, so a caller can draw the same die in the same spot again.
+
 ## 0.15.0 (2026-09-02)
 
 ### Added

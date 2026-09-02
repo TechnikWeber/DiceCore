@@ -130,6 +130,15 @@ class Guest:
         return int(game.get("pool") or 0)
 
     @property
+    def held_now(self) -> list[bool]:
+        """Which dice this player is keeping back, according to the host's game."""
+        game = self.game or {}
+        if game.get("farkle"):
+            # A die set aside in Farkle leaves the tray rather than staying on it.
+            return []
+        return [bool(die.get("held")) for die in (game.get("turn") or {}).get("dice", [])]
+
+    @property
     def my_turn(self) -> bool:
         game = self.game
         return bool(game and self.seat is not None

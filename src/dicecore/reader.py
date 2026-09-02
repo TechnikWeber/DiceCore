@@ -144,7 +144,20 @@ class Reader:
         """
         return self.settings.capture.source == "sim"
 
-    def throw(self, count: int | None = None) -> RollResult:
+    def held_now(self) -> list[bool]:
+        """
+        Which dice are staying on the tray for the next throw.
+
+        Farkle is the exception and the reason this is not just `slot.held`: a die set aside
+        there physically leaves the tray, so the next throw is fewer dice rather than the
+        same pool with some of it kept.
+        """
+        game = self.game
+        if game.farkle is not None:
+            return []
+        return [slot.held for slot in game.turn.dice]
+
+    def throw(self, count: int | None = None, hold: list[bool] | None = None) -> RollResult:
         """
         Roll simulated dice and read them.
 
@@ -157,7 +170,7 @@ class Reader:
             source = require_sim(self.source())
             source.set_plan(list(self.settings.engine.expected_kinds) or ["d6"],
                             count if count and count > 0 else self.dice_wanted())
-            source.throw()
+            source.throw(self.held_now() if hold is None else hold)
         return self.read(wait_for_still=False)
 
     def dice_wanted(self) -> int:

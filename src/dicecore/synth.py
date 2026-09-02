@@ -44,6 +44,9 @@ class SynthDie:
     value: int
     box: Box
     angle: float
+    #: Where it was put: (x, y, size, angle). Handing this back is what lets a caller draw
+    #: the same die in the same place again — which is what a die nobody picked up does.
+    place: tuple[int, int, int, float] | None = None
 
 
 #: Seen from above, a polyhedral die is a polygon with a smaller top face inside it.
@@ -158,12 +161,15 @@ def render_scene(
     tray_bgr: tuple[int, int, int] = (35, 40, 45),
     body_bgr: tuple[int, int, int] = (235, 235, 240),
     ink_bgr: tuple[int, int, int] = (25, 25, 30),
+    places: list[tuple[int, int, int, float] | None] | None = None,
 ):
     """
     Draw the given dice on a tray and return `(image, ground_truth)`.
 
     Placement is rejection-sampled so dice never overlap: overlapping dice are a real and
-    interesting failure mode, but a test that hits it by accident is just flaky.
+    interesting failure mode, but a test that hits it by accident is just flaky. `places`
+    pins individual dice down instead — pass back a `SynthDie.place` and that die is drawn
+    exactly where it was, which is how a held die stays held.
     """
     import cv2
     import numpy as np
@@ -178,22 +184,28 @@ def render_scene(
     image = np.clip(image * fall[:, :, None], 0, 255).astype(np.uint8)
 
     truth: list[SynthDie] = []
-    for kind, value in spec:
-        size = int(die_px * rng.uniform(0.9, 1.1))
-        # Rotating inside a same-sized canvas shears the corners off, so the die is drawn
-        # into a padded canvas and rotated there. `pad` covers a square's diagonal.
-        pad = int(size * 1.5) | 1
-        for _ in range(200):
-            x = rng.randint(10, max(11, width - pad - 10))
-            y = rng.randint(10, max(11, height - pad - 10))
-            candidate = Box(x, y, pad, pad)
-            if all(not _touches(candidate, Box(d.box.x, d.box.y, pad, pad), margin=6)
-                   for d in truth):
-                break
+    for index, (kind, value) in enumerate(spec):
+        fixed = places[index] if places and index < len(places) else None
+        if fixed is not None:
+            # A die that was kept back is not thrown again: it is still lying exactly where
+            # it was, which is the only thing that tells a reader it was held.
+            x, y, size, angle = int(fixed[0]), int(fixed[1]), int(fixed[2]), float(fixed[3])
+            pad = int(size * 1.5) | 1
         else:
-            continue
-
-        angle = rng.uniform(0, 360) if kind != "d6" else rng.uniform(-25, 25)
+            size = int(die_px * rng.uniform(0.9, 1.1))
+            # Rotating inside a same-sized canvas shears the corners off, so the die is drawn
+            # into a padded canvas and rotated there. `pad` covers a square's diagonal.
+            pad = int(size * 1.5) | 1
+            for _ in range(200):
+                x = rng.randint(10, max(11, width - pad - 10))
+                y = rng.randint(10, max(11, height - pad - 10))
+                candidate = Box(x, y, pad, pad)
+                if all(not _touches(candidate, Box(d.box.x, d.box.y, pad, pad), margin=6)
+                       for d in truth):
+                    break
+            else:
+                continue
+            angle = rng.uniform(0, 360) if kind != "d6" else rng.uniform(-25, 25)
         patch, mask = _die_patch(kind, value, size, body_bgr, ink_bgr, rng)
         canvas = np.zeros((pad, pad, 3), dtype=np.uint8)
         cmask = np.zeros((pad, pad), dtype=np.uint8)
@@ -221,7 +233,7 @@ def render_scene(
         ys, xs = np.nonzero(solid)
         box = Box(x + int(xs.min()), y + int(ys.min()),
                   int(xs.max() - xs.min() + 1), int(ys.max() - ys.min() + 1))
-        truth.append(SynthDie(kind, value, box, angle))
+        truth.append(SynthDie(kind, value, box, angle, (x, y, size, angle)))
 
     return image, truth
 

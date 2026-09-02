@@ -446,8 +446,11 @@ def create_app(settings: Settings | None = None) -> Any:
         somebody threw, and no amount of asking changes them.
         """
         try:
-            # A guest has no game of its own to ask, so the pool comes down from the host.
-            return reader.throw(guest.dice_wanted if guest.connected else None).to_json()
+            # A guest has no game of its own to ask, so the pool and what is being kept
+            # back both come down from the host.
+            if guest.connected:
+                return reader.throw(guest.dice_wanted, guest.held_now).to_json()
+            return reader.throw().to_json()
         except (CaptureError, EngineError) as exc:
             return fail(exc, 400)
 

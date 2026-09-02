@@ -10,7 +10,7 @@ event stream a bot or a game can subscribe to.
 > **Status: it plays, but nothing has run on a real tower yet.** Everything from the camera
 > to the scorecard works end to end on simulated frames: capture, settling, pip counting,
 > fifteen game modes, three boards, turns and chips, the fair-play watch, the label loop,
-> the panel, the API and both web front ends — 395 tests, none of which need hardware.
+> the panel, the API and both web front ends — 401 tests, none of which need hardware.
 >
 > What is missing is the half only a real tower can supply: **a trained model** (which needs
 > real dice in front of a real camera, and is what makes a d20 readable at all) and **every

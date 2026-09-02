@@ -85,6 +85,16 @@ Signal, das eine Kamera hat. Rät sie falsch, tipp den Würfel an. Nichts hängt
 die Vermutung stimmt: gewertet wird schlicht, was auf der Fläche liegt, ein falsch erkanntes
 Halten kostet dich also nichts als für einen Moment ein falsches Etikett.
 
+**Behaltene Würfel werden auf dem Bildschirm abseits abgelegt**, in einem eigenen
+eingezäunten Bereich neben dem Wurf — so, wie man die, die man behält, an den Tischrand
+schiebt. Einen antippen legt ihn zurück auf den Haufen. Vorher waren sie an Ort und Stelle
+markiert, was dieselbe Information ist und schwerer zu lesen: ein Wurf mischt den Haufen
+durch, „welche behalte ich" hieß also jedes Mal, fünf Würfel neu anzusehen.
+
+**Ein neuer Zug nimmt alles wieder auf.** Holds gehören zu dem Zug, in dem sie gemacht
+wurden — der erste Wurf einer Runde ist also immer alle Würfel, so wie wenn man sie vom Tisch
+zusammenkratzt.
+
 Ein Wurf zählt nur, wenn die Würfel sich wirklich geändert haben. Dieselben ruhenden Würfel
 noch einmal anzuschauen — was die Kamera mehrmals pro Sekunde tut — ist kein Wurf und
 verbraucht keinen.
@@ -225,8 +235,9 @@ Kiste funktioniert, an der nichts steckt — ein erstes Spiel sollte keinen Turm
 Kamera und keinen Umweg durch die Einstellungen.
 
 Simulierte Würfel werden von DiceCore gezeichnet und durch die echte Erkennung zurückgelesen,
-alles Dahinterliegende verhält sich also genau wie mit Kamera. Ein `Throw`-Knopf erscheint
-dort, wo sonst die Fläche wäre. Auf *Real* zu schalten geht zurück zu der Kamera, die diese
+alles Dahinterliegende verhält sich also genau wie mit Kamera — auch das Behalten: ein
+gehaltener Würfel wird nicht neu geworfen und bewegt sich nicht, genau wie er es auf einer
+echten Fläche nicht täte. Ein `Throw`-Knopf erscheint dort, wo sonst die Fläche wäre. Auf *Real* zu schalten geht zurück zu der Kamera, die diese
 Kiste vorher hatte; hatte sie nie eine, nimmt sie die, die sie wahrscheinlich hat (der
 Flachbandanschluss auf einem Pi, USB sonst) und sagt klar Bescheid, wenn die nicht aufgeht.
 

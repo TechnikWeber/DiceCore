@@ -555,14 +555,38 @@ const DIE_COLOURS = {
   pink: ["#f472b6", "#14181f"],
 };
 
+function oneDie(die, index) {
+  const paint = DIE_COLOURS[die.colour];
+  const style = paint ? `background:${paint[0]};color:${paint[1]}` : "";
+  return `<div class="die ${die.held ? "held" : ""}" data-index="${index}"
+    style="${style}" title="${escapeHtml(die.kind)}${
+      die.colour ? `, ${escapeHtml(die.colour)}` : ""}">${dieFace(die, paint)}</div>`;
+}
+
 function renderDice(game) {
-  $("dice").innerHTML = game.turn.dice.map((die, index) => {
-    const paint = DIE_COLOURS[die.colour];
-    const style = paint ? `background:${paint[0]};color:${paint[1]}` : "";
-    return `<div class="die ${die.held ? "held" : ""}" data-index="${index}"
-      style="${style}" title="${escapeHtml(die.kind)}${
-        die.colour ? `, ${escapeHtml(die.colour)}` : ""}">${dieFace(die, paint)}</div>`;
-  }).join("");
+  // Held dice are moved out of the pile and set down beside it, the way a person playing
+  // Kniffel pushes the ones they are keeping to the edge of the table. Leaving them in the
+  // pile with a border was technically enough information and still confusing: a throw
+  // reshuffles the pile, so "which ones am I keeping" meant re-reading five dice every time.
+  const kept = [];
+  const loose = [];
+  game.turn.dice.forEach((die, index) => (die.held ? kept : loose).push([die, index]));
+  const aside = game.rules.holds && kept.length > 0;
+  // Only once something is in it. An empty fenced-off area is a box asking to be filled,
+  // and on a five-dice row it costs a whole line of the screen to say nothing.
+  const hint = game.rules.holds && !kept.length && game.turn.rolls_used > 0
+    && game.turn.rolls_left > 0 && myTurn();
+
+  $("dice").className = `dice ${aside ? "with-aside" : ""}`;
+  $("dice").innerHTML = (aside
+    ? `<div class="aside">
+         <span class="aside-label">Keeping</span>
+         <div class="pile">${kept.map(([die, i]) => oneDie(die, i)).join("")}</div>
+       </div>
+       <div class="pile rolling">${loose.map(([die, i]) => oneDie(die, i)).join("")}</div>`
+    : game.turn.dice.map((die, index) => oneDie(die, index)).join(""))
+    + (hint ? `<span class="aside-hint">Tap a die to keep it for the next throw</span>` : "");
+
   if (game.rules.holds && myTurn()) {
     $("dice").querySelectorAll(".die").forEach((node) => {
       node.onclick = () => act("hold", { index: Number(node.dataset.index) });

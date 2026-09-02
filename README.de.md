@@ -10,7 +10,7 @@ als JSON-API und als Live-Stream, den ein Bot oder ein Spiel abonnieren kann.
 > **Status: es spielt, aber nichts davon lief bisher an einem echten Turm.** Von der Kamera
 > bis zum Spielblock funktioniert alles Ende zu Ende auf simulierten Bildern: Aufnahme,
 > Ruhe-Erkennung, Augenzählen, fünfzehn Spielmodi, drei Spielbretter, Züge und Chips, die
-> Fair-Play-Wache, die Label-Schleife, das Panel, die API und beide Weboberflächen — 395
+> Fair-Play-Wache, die Label-Schleife, das Panel, die API und beide Weboberflächen — 401
 > Tests, von denen keiner Hardware braucht.
 >
 > Es fehlt die Hälfte, die nur ein echter Turm liefern kann: **ein trainiertes Modell** (das

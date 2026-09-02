@@ -130,3 +130,82 @@ def test_a_camera_cannot_be_asked_to_roll(tmp_path, monkeypatch):
     assert reader.can_throw() is False
     with pytest.raises(CaptureError):
         reader.throw()
+
+
+# --- keeping dice back -----------------------------------------------------------------
+
+
+def test_a_held_die_is_not_thrown_again():
+    source = SimSource(seed=7)
+    source.set_plan(["d6"], 5)
+    source.throw()
+    source.grab()                                     # renders, which is what fixes places
+    before = list(source._values)
+
+    source.throw([True, True, False, False, False])
+    # The first two are the same dice: not re-rolled, and not re-ordered past each other.
+    assert source._values[:2] == before[:2]
+    assert len(source._values) == 5
+
+
+def test_a_held_die_stays_exactly_where_it_was():
+    """The only signal that a die was held is that it did not move. If the simulator moves
+    it, the reader sees a fresh throw and the hold silently disappears."""
+    source = SimSource(seed=3)
+    source.set_plan(["d6"], 5)
+    source.throw()
+    source.grab()
+    kept = source._places[0]
+
+    source.throw([True] + [False] * 4)
+    source.grab()
+    assert source._places[0] == kept
+
+
+def test_nothing_held_means_everything_is_thrown():
+    source = SimSource(seed=11)
+    source.set_plan(["d6"], 5)
+    source.throw()
+    source.grab()
+    before = list(source._values)
+    for _ in range(6):
+        source.throw()
+        source.grab()
+        if list(source._values) != before:
+            return
+    raise AssertionError("six throws in a row came out identical — nothing is being rolled")
+
+
+def test_the_engine_reads_a_held_die_back_as_held(reader):
+    """The whole round trip: hold, throw, and the game still says it is being kept."""
+    reader.game.start("yahtzee", TurnRules(rolls=3, holds=True), ["Player 1"])
+    reader.throw()
+    assert len(reader.game.turn.dice) == 5
+    reader.game.hold(0)
+    reader.game.hold(1)
+    kept = sorted(slot.value for slot in reader.game.turn.dice if slot.held)
+
+    reader.throw()
+    still = sorted(slot.value for slot in reader.game.turn.dice if slot.held)
+    assert still == kept
+    assert reader.game.turn.rolls_used == 2
+
+
+def test_a_new_turn_throws_everything(reader):
+    # Holds belong to a turn. Picking the dice up is what starting one means.
+    reader.game.start("yahtzee", TurnRules(rolls=3, holds=True), ["Player 1"])
+    reader.throw()
+    reader.game.hold(0)
+    reader.game.book("chance")
+    assert reader.held_now() == []
+    reader.throw()
+    assert not any(slot.held for slot in reader.game.turn.dice)
+
+
+def test_farkle_sets_dice_aside_rather_than_keeping_them_on_the_tray(reader):
+    # Opposite rule, same word: a die set aside in Farkle leaves the tray, so the next throw
+    # is fewer dice — never the same pool with some of it standing still.
+    reader.game.start("farkle", TurnRules(rolls=1, holds=True, unlimited=True), ["Player 1"])
+    reader.throw()
+    reader.game.hold(0)
+    assert reader.held_now() == []

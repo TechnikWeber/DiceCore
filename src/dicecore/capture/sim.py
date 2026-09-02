@@ -40,6 +40,8 @@ class SimSource(FrameSource):
         self.plan: list[str] = ["d6", "d6"]
         self._frame: Frame | None = None
         self._values: list[tuple[str, int]] = []
+        #: Where each die was put last time, so a held one can be put back exactly there.
+        self._places: list[tuple[int, int, int, float] | None] = []
         self.throws = 0
 
     # --- what to throw ------------------------------------------------------
@@ -61,9 +63,27 @@ class SimSource(FrameSource):
         else:
             self.plan = (kinds + [kinds[0]] * count)[:count]
 
-    def throw(self) -> list[tuple[str, int]]:
-        """Roll the planned dice and draw them. This is the button on the play screen."""
-        self._values = [(kind, self.rng.choice(values_for(kind))) for kind in self.plan]
+    def throw(self, hold: list[bool] | None = None) -> list[tuple[str, int]]:
+        """
+        Roll the planned dice and draw them. This is the button on the play screen.
+
+        `hold` says which of the dice already on the tray are being kept. Those are not
+        thrown again and **not moved**: they keep their value and their exact place, because
+        lying still in the same spot is the only thing that tells a reader a die was held.
+        Re-rolling them instead made holding do nothing at all, which is worse than not
+        offering it.
+        """
+        kept: list[tuple[str, int]] = []
+        kept_places: list[tuple[int, int, int, float] | None] = []
+        for index, die in enumerate(self._values):
+            if index < len(hold or []) and (hold or [])[index]:
+                kept.append(die)
+                kept_places.append(self._places[index] if index < len(self._places) else None)
+        # The plan is the whole pool, so what is thrown is the pool minus what was kept.
+        fresh = [(kind, self.rng.choice(values_for(kind)))
+                 for kind in self.plan[len(kept):]]
+        self._values = kept + fresh
+        self._places = kept_places + [None] * len(fresh)
         self._frame = None
         self.throws += 1
         return list(self._values)
@@ -81,13 +101,27 @@ class SimSource(FrameSource):
     def _render(self) -> Frame:
         from ..synth import render_scene
 
-        image, _ = render_scene(self._values, width=self.width, height=self.height,
-                                seed=self.rng.randrange(1 << 30), die_px=self.die_px)
+        image, drawn = render_scene(self._values, width=self.width, height=self.height,
+                                    seed=self.rng.randrange(1 << 30), die_px=self.die_px,
+                                    places=self._places)
+        # Remember where everything landed, so the next throw can put back whatever is held.
+        #
+        # In reading order, and that is not tidiness. The game numbers its dice the way the
+        # engine reads them off the tray — top row left to right — so `hold[2]` means the
+        # third die *as read*. Keeping this list in the order the dice happened to be drawn
+        # in made holding keep an unrelated die, which looks exactly like the hold being
+        # ignored at random.
+        from ..engine.geometry import sort_reading_order
+
+        order = sort_reading_order([die.box for die in drawn])
+        self._values = [(drawn[i].kind, drawn[i].value) for i in order]
+        self._places = [drawn[i].place for i in order]
         h, w = image.shape[:2]
         return Frame(image=image, source=f"sim:{self.throws}", size=(w, h))
 
     def describe(self) -> dict[str, Any]:
         return {"name": self.name, "plan": list(self.plan), "throws": self.throws,
+                "placed": sum(1 for place in self._places if place is not None),
                 "showing": [{"kind": k, "value": v} for k, v in self._values],
                 "width": self.width, "height": self.height}
 

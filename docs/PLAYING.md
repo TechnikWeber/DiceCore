@@ -83,6 +83,15 @@ throws and shows those as kept — that is the only signal a camera has. If it g
 tap the die. Nothing depends on the guess being right: what gets scored is simply what is on
 the tray, so a mis-detected hold costs you nothing but a wrong label for a moment.
 
+**Kept dice are set aside on the screen**, in their own fenced-off area beside the throw,
+the way a person pushes the ones they are keeping to the edge of the table. Tapping one puts
+it back in the pile. They were marked in place before, which is the same information and
+harder to read: a throw reshuffles the pile, so "which ones am I keeping" meant looking at
+five dice again every time.
+
+**A new turn picks everything up.** Holds belong to the turn they were made in, so the first
+throw of a turn is always all the dice — as it is when you scoop them off the table.
+
 A throw only counts when the dice actually changed. Looking at the same settled dice again —
 which the camera does several times a second — is not a throw, and does not burn one.
 
@@ -216,8 +225,9 @@ nothing plugged in — a first game should not need a tower, a camera, or a trip
 settings.
 
 Simulated dice are drawn by DiceCore and read back through the real engine, so everything
-downstream behaves exactly as it does with a camera. A `Throw` button appears where the tray
-would be. Switching to *Real* goes back to the camera this box had before; if it has never
+downstream behaves exactly as it does with a camera — including keeping dice back: a held
+die is not thrown again and does not move, exactly as it would not on a real tray. A `Throw`
+button appears where the tray would be. Switching to *Real* goes back to the camera this box had before; if it has never
 had one, it takes the one it probably has (the ribbon connector on a Pi, USB elsewhere) and
 says so plainly if that does not open.
 
