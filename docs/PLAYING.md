@@ -84,8 +84,11 @@ which the camera does several times a second — is not a throw, and does not bu
 ### Chips
 
 A chip buys one more throw when the ordinary ones are gone. Set how many each player gets
-under **Detection → Game mode** (up to three; zero by default, since it is a house rule
-rather than part of Kniffel).
+in the setup wizard or under **Detection → Game mode** — up to four, and zero by default.
+
+Chips are a **house rule**: the Kniffel in the box is three throws a turn and nothing else.
+Plenty of tables play with a handful of tokens for a fourth throw, which is what this is
+for, and four is the cap because that is the most anyone seems to hand out.
 
 **Chips are per game, not per turn.** Three chips means three for the whole evening, so
 spending one is a decision — refilling them every turn would take the decision away and

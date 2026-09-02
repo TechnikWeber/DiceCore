@@ -96,7 +96,19 @@ Die Zahl kommt rund eine fünftel Sekunde nachdem die Würfel liegen — die Fai
 läuft dahinter weiter, das Urteil landet ein paar Sekunden später auf `/api/v1/state` und im
 WebSocket. `?verify=1` wartet stattdessen darauf.
 
-## Auf dem Raspberry Pi
+## Eine Zeile, auf dem Pi wie auf dem Rechner
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/TechnikWeber/DiceCore/main/provisioning/bootstrap.sh | bash
+```
+
+Das Skript erkennt selbst, auf welcher Maschine es läuft, und installiert, was die
+tatsächlich brauchen kann: Kamera-Stack und systemd-Dienst auf einem Pi, PyTorch und keinen
+Dienst auf einem Arbeitsrechner, und auf einem ARMv6-Zero nur das nackte Paket plus den
+Hinweis, es auf eine andere Maschine zeigen zu lassen. Erzwingen mit
+`| bash -s -- --role desk` oder `--role pi`.
+
+Von Hand stattdessen:
 
 ```bash
 sudo apt install rpicam-apps python3-picamera2

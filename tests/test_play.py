@@ -129,8 +129,9 @@ def test_a_finished_turn_takes_no_more_throws():
 
 def test_the_number_of_chips_is_a_house_rule_not_a_game_rule():
     mode = mode_by_id("yahtzee")
-    assert rules_for(mode, {"chips": 3}).chips == 3
-    assert rules_for(mode, {"chips": 9}).chips == 3      # three is the ceiling
+    assert rules_for(mode, {"chips": 4}).chips == 4
+    # The cap is a guard against a typo, not a rule — four is what tables play with.
+    assert rules_for(mode, {"chips": 99}).chips == 4
     assert rules_for(mode, None).chips == 0
 
 

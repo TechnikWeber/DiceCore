@@ -172,7 +172,9 @@ def rules_for(mode: GameMode, overrides: dict[str, Any] | None = None) -> TurnRu
     return TurnRules(
         rolls=max(1, int(values.get("rolls", mode.turns.rolls))),
         holds=mode.turns.holds,
-        chips=max(0, min(3, int(values.get("chips", mode.turns.chips)))),
+        # Capped at four rather than three: a cap is a guard against a typo, not a rule,
+        # and the number a table plays with is the table's business.
+        chips=max(0, min(4, int(values.get("chips", mode.turns.chips)))),
         auto_end=mode.turns.auto_end,
         unlimited=mode.turns.unlimited,
     )

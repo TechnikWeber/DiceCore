@@ -2,6 +2,24 @@
 
 Notable changes, newest first. Dates are the day the work landed.
 
+## 0.9.0 (2026-09-02)
+
+### Added
+- **One-line install**, the same shape as YonderRC's:
+  `curl -fsSL …/provisioning/bootstrap.sh | bash`. It works out whether it is on a Pi or a
+  desktop and installs what that machine can use — camera stack and a service on a Pi,
+  PyTorch and no service on a desktop, the bare package on an ARMv6 Zero with a note to
+  point it at another machine.
+- **A button that installs PyTorch** (and the other optional halves) from the Training
+  page, with pip's output streaming into it. The extra is picked from a fixed list rather
+  than taken from the request — an endpoint that hands a user-supplied string to pip is
+  remote code execution with a friendly label on it.
+- **d3 and d2** join the vocabulary. A d3 is a real die even though most tables read one
+  off a d6; that closes the roleplaying set. The exotic ones (d5, d7, d14, d16, d24, d30)
+  are one line each and documented as such.
+- Chips go up to **four** rather than three. The cap is a guard against a typo, not a rule,
+  and the number a table plays with is the table's business.
+
 ## 0.8.1 (2026-09-02)
 
 ### Fixed

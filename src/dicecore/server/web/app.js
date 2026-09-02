@@ -614,6 +614,48 @@ async function captureIntoSet() {
 
 // --- training ---------------------------------------------------------------
 
+// --- installing the optional halves from here -------------------------------
+
+function renderInstall(extras) {
+  const missing = Object.entries(extras).filter(([, e]) => !e.installed);
+  const job = state.install;
+  const busy = job && job.state === "running";
+
+  $("install-panel").innerHTML = `
+    ${missing.length ? `<p class="hint">Not installed on this machine yet. The button
+      does what a terminal would — <code>pip install</code> into this virtualenv — and
+      DiceCore has to be restarted afterwards to pick it up.</p>
+      <div class="row">${missing.map(([key, e]) =>
+        `<button data-install="${key}" ${busy ? "disabled" : ""}>${escapeHtml(e.why)}</button>`)
+        .join("")}</div>`
+      : `<p class="muted">Everything optional is installed on this machine.</p>`}
+    ${job ? `<div class="msg ${job.state === "failed" ? "bad"
+        : job.state === "done" ? "good" : "warn"}" style="margin-top:10px">
+        ${escapeHtml(job.extra)}: ${escapeHtml(job.state)} · ${job.elapsed_s}s
+        ${job.error ? `— ${escapeHtml(job.error)}` : ""}</div>
+      <pre style="max-height:200px">${escapeHtml((job.lines || []).join("\n"))}</pre>` : ""}`;
+
+  $("install-panel").querySelectorAll("[data-install]").forEach((button) => {
+    button.onclick = async () => {
+      try {
+        state.install = await api("/api/setup/install",
+                                  json("POST", { extra: button.dataset.install }));
+        pollInstall();
+      } catch (err) { alertBox(err.message); }
+    };
+  });
+}
+
+async function pollInstall() {
+  let info;
+  try { info = await api("/api/setup/install"); } catch { return; }
+  state.install = info.job;
+  renderInstall(info.extras);
+  clearTimeout(state.timers.install);
+  // PyTorch is two gigabytes: check often enough to look alive, rarely enough to be quiet.
+  if (info.running) state.timers.install = setTimeout(pollInstall, 1500);
+}
+
 async function pollTraining() {
   let info;
   try { info = await api("/api/setup/training"); } catch { return; }
@@ -621,6 +663,7 @@ async function pollTraining() {
     ? ""
     : `<div class="msg warn">${escapeHtml(info.why)}</div>`;
   $("btn-train").disabled = !info.available;
+  renderInstall(info.extras || {});
 
   const job = info.job;
   if (job) {
@@ -698,6 +741,12 @@ function renderModeEditor() {
     if (typeof fallback === "boolean") {
       return `<div><label>${label}</label><input class="mp" data-key="${key}" type="checkbox"
         ${value ? "checked" : ""}></div>`;
+    }
+    if (key === "chips") {
+      return `<div><label>${label}</label><select class="mp" data-key="chips">${
+        [0, 1, 2, 3, 4].map((n) =>
+          `<option ${n === Number(value) ? "selected" : ""}>${n}</option>`).join("")
+      }</select></div>`;
     }
     if (choices[key]) {
       return `<div><label>${label}</label><select class="mp" data-key="${key}">${

@@ -34,7 +34,7 @@ class TurnRules:
     #: Whether keeping dice between throws is part of the game.
     holds: bool = False
     #: Extra throws a player may buy, one throw each. **Per game, not per turn** — a chip
-    #: is something you have three of for the evening and have to decide when to spend, and
+    #: is something you have a few of for the evening and have to decide when to spend, and
     #: refilling them every turn would take that decision away.
     chips: int = 0
     #: Whether the turn ends by itself once the throws are used up, or waits for the player.

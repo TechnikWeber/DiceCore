@@ -94,6 +94,19 @@ Any game that is not in the list: choose the rule (`sum`, `pool`, `best`, `under
 numbers. If you find yourself using it constantly, that game deserves a proper entry in the
 catalogue — send the numbers along and it becomes one.
 
+## Which dice are known
+
+`d2 d3 d4 d6 d8 d10 d100 d12 d20` — the seven of a roleplaying set plus the two small ones
+that turn up with them. A d3 is a real die even though most tables read one off a d6, and a
+d2 turns up for coin-flip effects.
+
+Anything can be *learned*: the label list offers whichever faces a kind has, so a d20 is
+twenty classes and a d4 is four. What differs is the rolling — about ten confirmed examples
+a face, so sixty for a d6 and two hundred for a d20.
+
+Kinds beyond these exist — d5, d7, d14, d16, d24, d30 from the Dice Lab and Zocchi sets —
+and each is one line in `DIE_FACES` plus one in `READING`. Add yours if you own them.
+
 ## Ten-sided dice
 
 A d10 is the one die whose printing is not standard. Modern ones show **0–9** and let the

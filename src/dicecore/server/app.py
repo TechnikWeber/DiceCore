@@ -30,6 +30,7 @@ from ..config import Settings, config_path
 from ..dataset.store import DatasetStore
 from ..dice import DIE_FACES, DIE_KINDS, values_for
 from ..engine import MODES, EngineError
+from ..install import EXTRAS, Installer, available
 from ..integrity import POLICIES
 from ..modes import DEFAULT as DEFAULT_MODE
 from ..modes import MODES as GAME_MODES
@@ -86,12 +87,14 @@ def create_app(settings: Settings | None = None) -> Any:
     buttons = ButtonPanel(loaded.panel.signals, on_chip, on_next)
     state["buttons"] = buttons
 
-    app = FastAPI(title="DiceCore", version="0.8.1",
+    app = FastAPI(title="DiceCore", version="0.9.0",
                   description="Reads real dice with a camera.")
     app.state.reader = reader
     app.state.training = training
     app.state.hub = hub
     app.state.buttons = buttons
+    installer = Installer()
+    state["installer"] = installer
 
     def store() -> DatasetStore:
         # The printing style travels with the store: it decides which labels are legal.
@@ -695,7 +698,32 @@ def create_app(settings: Settings | None = None) -> Any:
         ok, why = _torch_state()
         job = training.job
         return {"available": ok, "why": why, "job": job.to_json() if job else None,
-                "models": _list_models(state["settings"])}
+                "models": _list_models(state["settings"]),
+                "extras": available(), "can_install": bool(EXTRAS)}
+
+    @app.get("/api/setup/install")
+    def install_state() -> Any:
+        """What is installed here, and what an install in progress is doing."""
+        job = state["installer"].job
+        return {"extras": available(), "job": job.to_json() if job else None,
+                "running": state["installer"].running()}
+
+    @app.post("/api/setup/install")
+    async def install_extra(request: Request) -> Any:
+        """
+        Install one of DiceCore's optional halves — PyTorch above all.
+
+        The body names a key, and the key picks a constant: handing a user-supplied string
+        to pip would be remote code execution wearing a helpful label.
+        """
+        body = await request.json()
+        try:
+            job = state["installer"].start(str(body.get("extra", "")))
+        except ValueError as exc:
+            raise HTTPException(400, str(exc)) from exc
+        except RuntimeError as exc:
+            return fail(exc, 409)
+        return job.to_json()
 
     @app.post("/api/setup/training/start")
     async def training_start(request: Request) -> Any:

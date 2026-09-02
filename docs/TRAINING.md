@@ -46,7 +46,8 @@ exactly as they will be in use.
 
 **Train** on the Training tab. Progress, loss and accuracy stream into the page; you can
 close the browser and come back. It needs PyTorch, so it runs on a PC — the tab says so if
-this machine cannot. Options:
+this machine cannot, and offers a **button that installs it** (about 2 GB; DiceCore has to
+be restarted afterwards to pick it up). Options:
 
 - Copy `~/.local/share/dicecore/datasets/<set>` to a PC, run DiceCore there, train, copy the
   model directory back.

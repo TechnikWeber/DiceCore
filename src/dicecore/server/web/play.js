@@ -92,8 +92,8 @@ function renderLobby() {
 //: Only the settings a table actually decides, offered as buttons. Everything else keeps
 //: its default, and everything here is optional — Start works on the first tap.
 const OPTIONS = {
-  yahtzee: [["chips", "Chips per player, for the whole game", [0, 1, 2, 3]]],
-  yahtzee_extreme: [["chips", "Chips per player, for the whole game", [0, 1, 2, 3]]],
+  yahtzee: [["chips", "Chips per player, for the whole game", [0, 1, 2, 3, 4]]],
+  yahtzee_extreme: [["chips", "Chips per player, for the whole game", [0, 1, 2, 3, 4]]],
   farkle: [["target", "Play to", [3000, 5000, 10000, 20000]],
            ["entry", "Needed to get on the board", [0, 350, 500, 1000]]],
   pool: [["threshold", "A die counts from", [3, 4, 5, 6]]],

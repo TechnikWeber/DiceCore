@@ -42,3 +42,16 @@ def test_a_d10_showing_zero_is_a_face_not_a_failure():
 def test_empty_result_says_so():
     assert RollResult().notation == "no dice"
     assert RollResult().total == 0
+
+
+def test_the_small_dice_a_roleplaying_table_owns_are_in_the_vocabulary():
+    # A d3 is a real die, even though most tables read one off a d6; a d2 turns up with it.
+    assert values_for("d3") == [1, 2, 3]
+    assert values_for("d2") == [1, 2]
+    assert is_valid("d3", 3) and not is_valid("d3", 4)
+
+
+def test_the_whole_roleplaying_set_is_known():
+    from dicecore.dice import DIE_KINDS
+
+    assert {"d4", "d6", "d8", "d10", "d100", "d12", "d20"} <= set(DIE_KINDS)

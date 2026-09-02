@@ -1,59 +1,136 @@
 #!/usr/bin/env bash
-# Install DiceCore as a service on a Raspberry Pi.
 #
-# Deliberately boring and re-runnable: it may be the second thing you try after the first
-# attempt half-worked, and it must not make that worse.
+# Install DiceCore. Run it from a checkout:
+#
+#   sudo bash provisioning/install.sh              # works out what this machine is
+#   sudo bash provisioning/install.sh --role desk  # a training machine (PyTorch, no service)
+#   sudo bash provisioning/install.sh --role pi    # a tower (camera stack, systemd service)
+#   sudo bash provisioning/install.sh --no-service
+#
+# Deliberately boring and re-runnable: it may well be the second thing you try after the
+# first attempt half-worked, and it must not make that worse.
 set -euo pipefail
 
-PREFIX=${PREFIX:-/opt/dicecore}
+ROLE=""
+WANT_SERVICE=1
+for arg in "$@"; do
+  case "$arg" in
+    --role) shift ;;
+    pi|desk) ROLE="$arg" ;;
+    --role=*) ROLE="${arg#*=}" ;;
+    --no-service) WANT_SERVICE=0 ;;
+    *) ;;
+  esac
+done
+
+REPO_DIR=$(cd "$(dirname "$0")/.." && pwd)
 STATE=${STATE:-/var/lib/dicecore}
 USER_NAME=${USER_NAME:-dicecore}
-REPO_DIR=$(cd "$(dirname "$0")/.." && pwd)
+VENV="$REPO_DIR/.venv"
 
 [ "$(id -u)" -eq 0 ] || { echo "Run this with sudo."; exit 1; }
 
-echo "==> Packages"
+# --- which machine is this? -------------------------------------------------
+IS_PI=0
+if grep -qi "raspberry pi" /proc/device-tree/model 2>/dev/null; then IS_PI=1; fi
+[ -z "$ROLE" ] && { [ "$IS_PI" -eq 1 ] && ROLE=pi || ROLE=desk; }
+ARCH=$(uname -m)
+
+echo "== DiceCore install =="
+echo "   role       : $ROLE"
+echo "   machine    : $ARCH $( [ "$IS_PI" -eq 1 ] && cat /proc/device-tree/model | tr -d '\0' )"
+echo "   checkout   : $REPO_DIR"
+
+# --- packages ---------------------------------------------------------------
+echo "-- packages"
 apt-get update -qq
-# rpicam-apps: the capture fallback that works on every Bookworm Pi.
-# python3-picamera2: faster capture, and a system package that cannot be pip-installed.
-apt-get install -y --no-install-recommends \
-  python3-venv python3-pip rpicam-apps python3-picamera2 libatlas-base-dev
-
-echo "==> User and directories"
-id -u "$USER_NAME" >/dev/null 2>&1 || useradd --system --home "$STATE" --shell /usr/sbin/nologin "$USER_NAME"
-usermod -aG video "$USER_NAME"
-install -d -o "$USER_NAME" -g "$USER_NAME" "$STATE" "$STATE/datasets" "$STATE/models" "$STATE/frames" "$STATE/tuning"
-
-echo "==> Code in $PREFIX"
-install -d "$PREFIX"
-# Copy rather than symlink so a `git pull` in your working copy cannot half-update a
-# running service.
-cp -r "$REPO_DIR/src" "$REPO_DIR/pyproject.toml" "$REPO_DIR/README.md" "$REPO_DIR/LICENSE" "$PREFIX/"
-
-echo "==> Virtualenv (with system site packages, for picamera2)"
-python3 -m venv --system-site-packages "$PREFIX/.venv"
-"$PREFIX/.venv/bin/pip" install --quiet --upgrade pip
-# onnxruntime is left out on purpose: it has no ARMv6 wheel and is slow to build. Add it on
-# a Pi 4/5 with: .venv/bin/pip install 'dicecore[model]'
-"$PREFIX/.venv/bin/pip" install --quiet -e "$PREFIX[vision,server]"
-chown -R "$USER_NAME:$USER_NAME" "$PREFIX"
-
-echo "==> Tuning files"
-if [ -d "$REPO_DIR/provisioning/tuning" ]; then
-  cp "$REPO_DIR"/provisioning/tuning/*.json "$STATE/tuning/" 2>/dev/null || true
+BASE="python3-venv python3-pip git"
+if [ "$ROLE" = pi ]; then
+  # rpicam-apps: the capture fallback that works on every Bookworm Pi.
+  # python3-picamera2: faster capture, and a system package that cannot be pip-installed.
+  # libatlas-base-dev: numpy's BLAS on a Pi.
+  apt-get install -y --no-install-recommends $BASE rpicam-apps python3-picamera2 libatlas-base-dev
+else
+  apt-get install -y --no-install-recommends $BASE
 fi
 
-echo "==> Service"
-install -m 644 "$REPO_DIR/provisioning/dicecore.service" /etc/systemd/system/dicecore.service
-systemctl daemon-reload
-systemctl enable --now dicecore.service
+# --- extras: only what this machine can use ---------------------------------
+# ARMv6 (Pi Zero v1) has no wheels for OpenCV or onnxruntime, so it gets the bare package
+# and reads through another machine (engine.mode=remote). Saying that here is kinder than
+# a wall of build errors.
+EXTRAS="vision,server"
+if [ "$ARCH" = "armv6l" ]; then
+  EXTRAS=""
+  echo "   note       : ARMv6 — capture only; set engine.mode=remote and point it at a PC"
+elif [ "$ROLE" = desk ]; then
+  EXTRAS="vision,server,train,display,gpio"
+else
+  EXTRAS="vision,server,model,display,gpio"
+fi
+echo "   extras     : ${EXTRAS:-none}"
 
-PORT=$("$PREFIX/.venv/bin/python" - <<'PY'
+# --- user and directories ---------------------------------------------------
+if [ "$ROLE" = pi ]; then
+  echo "-- user and directories"
+  id -u "$USER_NAME" >/dev/null 2>&1 || useradd --system --home "$STATE" --shell /usr/sbin/nologin "$USER_NAME"
+  usermod -aG video,gpio,spi,i2c "$USER_NAME" 2>/dev/null || usermod -aG video "$USER_NAME"
+  install -d -o "$USER_NAME" -g "$USER_NAME" "$STATE" "$STATE/datasets" "$STATE/models" \
+          "$STATE/frames" "$STATE/tuning"
+fi
+
+# --- virtualenv -------------------------------------------------------------
+echo "-- virtualenv at $VENV"
+if [ "$ROLE" = pi ]; then
+  # --system-site-packages so the venv can see python3-picamera2, which is apt-only.
+  python3 -m venv --system-site-packages "$VENV"
+else
+  python3 -m venv "$VENV"
+fi
+"$VENV/bin/pip" install --quiet --upgrade pip
+if [ -n "$EXTRAS" ]; then
+  "$VENV/bin/pip" install --quiet -e "$REPO_DIR[$EXTRAS]"
+else
+  "$VENV/bin/pip" install --quiet -e "$REPO_DIR"
+fi
+
+if [ "$ROLE" = pi ]; then
+  [ -d "$REPO_DIR/provisioning/tuning" ] && \
+    cp "$REPO_DIR"/provisioning/tuning/*.json "$STATE/tuning/" 2>/dev/null || true
+  chown -R "$USER_NAME:$USER_NAME" "$VENV" 2>/dev/null || true
+fi
+
+# --- something to look at before any hardware arrives -----------------------
+echo "-- a few rendered rolls, so the simulator has something to read"
+if [ "$ROLE" = pi ]; then
+  sudo -u "$USER_NAME" DICECORE_STATE="$STATE" "$VENV/bin/dicecore" synth --count 12 >/dev/null || true
+else
+  "$VENV/bin/dicecore" synth --count 12 >/dev/null || true
+fi
+
+# --- service ----------------------------------------------------------------
+if [ "$ROLE" = pi ] && [ "$WANT_SERVICE" -eq 1 ]; then
+  echo "-- service"
+  sed "s|/opt/dicecore|$REPO_DIR|g" "$REPO_DIR/provisioning/dicecore.service" \
+    > /etc/systemd/system/dicecore.service
+  systemctl daemon-reload
+  systemctl enable --now dicecore.service
+fi
+
+PORT=$("$VENV/bin/python" - <<'PY'
 from dicecore.config import Settings
 print(Settings.load()[0].server.port)
 PY
 )
+
 echo
-echo "DiceCore is running: http://$(hostname).local:${PORT}/"
-echo "Check what this Pi can do:  sudo -u $USER_NAME $PREFIX/.venv/bin/dicecore doctor"
-echo "Pick a camera module:       sudo $PREFIX/.venv/bin/dicecore camera-module list"
+echo "== done =="
+if [ "$ROLE" = pi ] && [ "$WANT_SERVICE" -eq 1 ]; then
+  echo "   game screen : http://$(hostname).local:${PORT}/"
+  echo "   setup       : http://$(hostname).local:${PORT}/setup"
+  echo "   what this Pi can do:  sudo -u $USER_NAME $VENV/bin/dicecore doctor"
+  echo "   pick a camera module: sudo $VENV/bin/dicecore camera-module list"
+else
+  echo "   start it with:  $VENV/bin/dicecore serve"
+  echo "   then open    :  http://localhost:${PORT}/"
+  [ "$ROLE" = desk ] && echo "   PyTorch is installed, so this machine can train models."
+fi

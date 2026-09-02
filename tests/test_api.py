@@ -452,3 +452,17 @@ def test_the_new_mode_takes_effect_once_the_game_is_left(client):
     client.post("/api/v1/game/stop")
     client.post("/api/setup/mode", json={"mode": "farkle"})
     assert client.get("/api/v1/game").json()["game"]["mode"] == "farkle"
+
+
+def test_the_page_can_see_what_is_installed_here(client):
+    body = client.get("/api/setup/install").json()
+    assert "train" in body["extras"] and "installed" in body["extras"]["train"]
+    assert body["running"] is False
+
+
+def test_only_a_known_extra_can_be_installed(client):
+    # An endpoint that hands a user-supplied string to pip is remote code execution with a
+    # friendly label on it. The request names a key; the key picks a constant.
+    assert client.post("/api/setup/install", json={"extra": "train; rm -rf /"}).status_code == 400
+    assert client.post("/api/setup/install", json={"extra": "requests"}).status_code == 400
+    assert client.post("/api/setup/install", json={"extra": ""}).status_code == 400

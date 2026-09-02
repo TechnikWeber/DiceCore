@@ -15,7 +15,14 @@ from typing import Any
 # --- Dice kinds -------------------------------------------------------------------
 
 #: Faces per kind. `d10` is the 0–9 die, `d100` the tens die (00, 10, … 90).
+#:
+#: The seven of a roleplaying set, plus the two small ones that turn up with them: a d3
+#: (a real die, though most tables read one off a d6) and a d2. Kinds beyond these exist —
+#: d5, d7, d14, d16, d24, d30 from the Dice Lab and Zocchi sets — and each is one line
+#: here plus one in `READING`, so add yours if you own them.
 DIE_FACES: dict[str, int] = {
+    "d2": 2,
+    "d3": 3,
     "d4": 4,
     "d6": 6,
     "d8": 8,
@@ -28,6 +35,8 @@ DIE_FACES: dict[str, int] = {
 #: How a kind is read. Pipped dice are counted, numeral dice are recognised. A d6 can be
 #: either — pips are the common case, but numeral d6 exist and are read like a d8.
 READING = {
+    "d2": "numeral",
+    "d3": "numeral",
     "d4": "numeral",
     "d6": "pips",
     "d8": "numeral",

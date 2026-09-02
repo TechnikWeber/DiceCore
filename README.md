@@ -92,7 +92,18 @@ The number arrives about a fifth of a second after the dice stop — the fair-pl
 behind it and the verdict lands on `/api/v1/state` and the websocket a couple of seconds
 later. `?verify=1` waits for it instead.
 
-## On a Raspberry Pi
+## One line, on a Pi or on a desktop
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/TechnikWeber/DiceCore/main/provisioning/bootstrap.sh | bash
+```
+
+It works out which machine it is on and installs what that machine can actually use: the
+camera stack and a systemd service on a Pi, PyTorch and no service on a desktop, and on an
+ARMv6 Pi Zero the bare package plus a note to point it at another machine. Force it with
+`| bash -s -- --role desk` or `--role pi`.
+
+By hand instead:
 
 ```bash
 sudo apt install rpicam-apps python3-picamera2
