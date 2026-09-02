@@ -9,11 +9,11 @@ import time
 
 import pytest
 
-from dicecore.config import OutputSettings, SignalSettings
+from dicecore.config import PanelSettings, SignalSettings
 from dicecore.dice import Box, Die, RollResult
-from dicecore.output import OutputHub
-from dicecore.output.signals import SignalOutput
-from dicecore.output.state import (
+from dicecore.panel import OutputHub
+from dicecore.panel.signals import SignalOutput
+from dicecore.panel.state import (
     ERROR,
     IDLE,
     READING,
@@ -166,7 +166,7 @@ def test_the_lamps_are_simulated_when_there_is_no_gpio(monkeypatch):
 
 def test_a_display_renders_a_preview_without_any_hardware():
     pytest.importorskip("PIL")
-    settings = OutputSettings()
+    settings = PanelSettings()
     settings.display.enabled = True
     hub = OutputHub(settings)
     try:
@@ -182,8 +182,8 @@ def test_a_display_renders_a_preview_without_any_hardware():
 
 
 def test_every_panel_renders_at_its_own_size():
-    from dicecore.output.displays import COMMON_SIZES
-    from dicecore.output.render import render
+    from dicecore.panel.displays import COMMON_SIZES
+    from dicecore.panel.render import render
 
     pytest.importorskip("PIL")
     for kind, sizes in COMMON_SIZES.items():
@@ -195,7 +195,7 @@ def test_every_panel_renders_at_its_own_size():
 
 
 def test_a_hub_with_nothing_enabled_costs_nothing():
-    hub = OutputHub(OutputSettings())
+    hub = OutputHub(PanelSettings())
     assert not hub.enabled and hub.devices == []
     hub.update(Presentation(phase=RESULT, total=4))     # must not raise, must not start a thread
     hub.close()
@@ -203,7 +203,7 @@ def test_a_hub_with_nothing_enabled_costs_nothing():
 
 def test_the_hub_shows_the_newest_state_even_when_it_falls_behind():
     pytest.importorskip("PIL")
-    settings = OutputSettings()
+    settings = PanelSettings()
     settings.display.enabled = True
     hub = OutputHub(settings)
     try:

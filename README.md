@@ -33,6 +33,12 @@ event stream a bot or a game can subscribe to.
 - **Training from the browser**, with live loss and accuracy, exporting an ONNX model the
   engine picks up. Training needs PyTorch and so runs on a PC; the UI says so plainly rather
   than failing halfway through.
+- **A game screen and a setup page.** `/` is the board you put on the television — the
+  number in large letters, the dice drawn, the turn counter, the scorecard. `/setup` is
+  everything else. One service, one repo, two front doors.
+- **Turns, holds and chips.** Kniffel is three throws with dice kept in between, so
+  DiceCore counts them down, notices which dice you left on the tray, and lets a chip buy a
+  fourth. Two optional GPIO buttons do the same without a browser.
 - **Game modes.** The same dice, read the way the game at your table reads them: a sum, a
   count of successes, a Kniffel combination, a percentile, a roll under a target. Fourteen
   of them, from plain six-siders to a chi-square test for whether a die is loaded — and a
@@ -53,6 +59,8 @@ event stream a bot or a game can subscribe to.
 *The same renderer drives every panel and the browser preview, so the layout can be worked
 out before anything is soldered.*
 
+![The game screen during a Kniffel turn: the combination in large letters, the five dice drawn as pips, the throw counter with chips, and the scorecard down the side](docs/screenshots/play.jpg)
+
 ![The Training tab: a set of stored rolls, each with the engine's guess pre-filled per die, ready to be corrected and confirmed](docs/screenshots/training.jpg)
 
 ## Five minutes, no hardware
@@ -64,6 +72,8 @@ python3 -m venv .venv && .venv/bin/pip install -e '.[vision,server,dev]'
 .venv/bin/dicecore synth --count 20 --kinds d6,d20   # fake rolls to read
 .venv/bin/dicecore serve                             # → http://localhost:8099/
 ```
+
+`/` is the game screen, `/setup` is the workshop.
 
 Then `curl localhost:8099/api/v1/roll`:
 
@@ -133,6 +143,7 @@ A die that could not be read has `"value": 0` and prints as `?`. Never add it up
 | [docs/API.md](docs/API.md) | The contract other projects depend on |
 | [docs/TRAINING.md](docs/TRAINING.md) | Teaching it your own dice |
 | [docs/ANTI-CHEAT.md](docs/ANTI-CHEAT.md) | What the fair-play watch catches, and what it cannot |
+| [docs/PLAYING.md](docs/PLAYING.md) | The game screen, turns, chips and the two buttons |
 | [docs/GAME-MODES.md](docs/GAME-MODES.md) | The modes, what each one scores, and how to add another |
 | [docs/DISPLAYS.md](docs/DISPLAYS.md) | The screen, the lamps and the buzzer — panels, pins, wiring |
 

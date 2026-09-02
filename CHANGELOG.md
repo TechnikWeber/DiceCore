@@ -2,6 +2,51 @@
 
 Notable changes, newest first. Dates are the day the work landed.
 
+## 0.5.0 (2026-09-02)
+
+DiceCore stops only reading and starts playing. Two front doors, one service: `/` is the
+game screen for the television at the table, `/setup` is everything else.
+
+### Added
+- **A game screen** at `/`: the headline in large letters, the dice drawn (a six-sider as
+  pips), the throw counter, the scorecard, the last turns. Opening it is what starts
+  DiceCore watching the tray.
+- **Turns**, for the games where one throw is not the whole story. Kniffel is three throws
+  with dice kept in between; the counter runs down, and a throw only counts when the dice
+  actually changed.
+- **Holds, observed rather than enforced.** DiceCore notices which dice did not move and
+  shows those as kept; tap one in the browser to correct it. Nothing depends on the guess:
+  what is scored is what is on the tray.
+- **Chips** — up to three a turn, a house rule rather than part of the game — buy one more
+  throw once the ordinary ones are gone, and cannot be spent while any remain.
+- **Two GPIO buttons**, chip and end-turn, calling exactly the endpoints the browser
+  buttons do. Wire each between the pin and ground; `-1` leaves one out.
+- **A Kniffel scorecard** in the browser: every open category shows what it would score
+  right now, tapping books it and hands the tower on. Several players, upper bonus, and a
+  crossed-out box that has to be given up deliberately.
+- **The panel carries the turn too**: `2/3` and a dot per chip, and a caption that says
+  what you may do next — *throw again*, *chip or book*, *turn over*.
+- `GET /api/v1/game` and five POSTs, all versioned, so a play screen can be written by
+  somebody else. The websocket carries the game state alongside every roll.
+- **A zero on a 0–9 ten-sider can be worth nothing instead of ten**, for the tables whose
+  house rules say so. Ten remains the default.
+- `docs/PLAYING.md`.
+- 214 tests.
+
+### Changed
+- The `output` package is now `panel`, because it listens as well as speaks. The config
+  section moved with it, and an existing config's `output` block is carried over rather
+  than silently replaced by defaults.
+- The setup page moved from `/` to `/setup`.
+
+### Fixed
+- The play screen showed the headline of whatever the camera had looked at last, which in a
+  turn with no throws left is a different set of dice than the ones on the board. A turn
+  keeps its own reading now.
+- Settings loaded from JSON only descended one level, so `panel.display.kind` came back as
+  a plain dict. (Fixed in 0.4.0's cycle; the nesting got deeper here and would have hidden
+  it again.)
+
 ## 0.4.0 (2026-09-02)
 
 Game modes. DiceCore reads dice; a mode reads the *result* — which is the difference between

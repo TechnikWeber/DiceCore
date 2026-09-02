@@ -61,6 +61,9 @@ class Presentation:
     lament: bool = False
     #: A line for the screen when there is no number: an error, or a hint.
     message: str = ""
+    #: Where this throw sits in a turn, for the games that have turns: used, allowed, left,
+    #: chips, player. None for a game where one throw is the whole story.
+    turn: dict[str, Any] | None = None
     #: Frame counter while an animation plays; 0 is the still picture.
     anim: int = 0
     at: float = field(default_factory=time.time)
@@ -86,6 +89,7 @@ class Presentation:
             "phase": self.phase, "headline": self.headline, "big": self.big,
             "total": self.total, "notation": self.notation,
             "dice": [{"kind": k, "value": v} for k, v in self.dice],
+            "turn": self.turn,
             "verdict": self.verdict, "celebrate": self.celebrate, "lament": self.lament,
             "message": self.message, "go": self.go, "at": self.at,
         }

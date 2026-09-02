@@ -48,7 +48,7 @@ function showTab() {
   document.querySelectorAll("nav a").forEach((a) => a.classList.toggle("on", a.hash === `#${name}`));
   if (name === "camera") { refreshHardware(); refreshPreview(); }
   if (name === "signals") pollOutputs();
-  if (name === "detection") pollModeSession();
+  if (name === "detection") { pollModeSession(); renderPlayState(); }
   if (name === "training") { loadSets(); pollTraining(); }
   if (name === "system") refreshStatus();
 }
@@ -167,6 +167,9 @@ function loadForm() {
   fillSelect($("mode-select"), state.options.modes, s.mode.active);
   fillSelect($("mode-pick"), state.options.modes, s.mode.active);
   $("mode-d10").value = s.mode.d10_style;
+  $("mode-zero").value = s.mode.d10_zero_counts_as_ten ? "ten" : "zero";
+  $("play-players").value = (s.play.players || []).join("\n");
+  $("play-enabled").checked = s.play.enabled;
   renderModeEditor();
   renderModeBlurb();
   $("cap-folder").value = s.capture.folder;
@@ -287,6 +290,11 @@ function collectForm() {
   s.output.celebrate_total = Number($("cl-total").value);
   s.output.lament_on_min = $("cl-lament").checked;
   s.output.animation_frames = Number($("cl-frames").value);
+  s.panel.signals.chip_pin = Number($("sg-chipbtn").value);
+  s.panel.signals.next_pin = Number($("sg-nextbtn").value);
+  s.panel.signals.button_pull_up = $("sg-pullup").checked;
+  s.panel.signals.debounce_s = Number($("sg-debounce").value);
+  s.play.enabled = $("play-enabled").checked;
   s.settle.enabled = $("st-enabled").checked;
   s.settle.motion_threshold = Number($("st-motion").value);
   s.settle.stable_frames = Number($("st-frames").value);
@@ -566,10 +574,25 @@ async function saveMode(id, params) {
   try {
     await api("/api/setup/mode", json("POST", {
       mode: id, params, d10_style: $("mode-d10").value,
+      d10_zero_counts_as_ten: $("mode-zero").value === "ten",
     }));
     await boot();
     alertBox("Mode saved.", "good");
   } catch (err) { alertBox(err.message); }
+}
+
+async function renderPlayState() {
+  try {
+    const info = await api("/api/v1/game");
+    const game = info.game;
+    const turn = game.turn;
+    $("play-state").innerHTML = game.rules.multi
+      ? `<p class="muted">${escapeHtml(game.current_player)} — throw ${turn.rolls_used}
+         of ${turn.rolls_allowed}, turn ${turn.number}
+         ${turn.chips_left ? `· ${turn.chips_left} chip(s) left` : ""}</p>`
+      : `<p class="muted">${escapeHtml(game.mode)} plays one throw a turn — nothing to
+         count down.</p>`;
+  } catch { $("play-state").innerHTML = ""; }
 }
 
 async function pollModeSession() {
@@ -728,6 +751,15 @@ $("btn-train").onclick = async () => {
 $("btn-train-stop").onclick = () => api("/api/setup/training/stop", { method: "POST" }).catch(() => {});
 $("btn-ws").onclick = toggleWebsocket;
 $("mode-select").addEventListener("change", renderModeEditor);
+$("btn-players").onclick = async () => {
+  const players = $("play-players").value.split("\n").map((n) => n.trim()).filter(Boolean);
+  try {
+    await api("/api/v1/game/reset", json("POST", { players: players.length ? players : ["Player 1"] }));
+    await boot();
+    renderPlayState();
+    alertBox("New game started.", "good");
+  } catch (err) { alertBox(err.message); }
+};
 $("btn-mode-save").onclick = () => saveMode($("mode-select").value, collectModeParams());
 $("btn-mode-reset").onclick = async () => {
   try {

@@ -30,7 +30,9 @@ from .integrity import (
     frame_hash,
 )
 from .modes import ModeSession, interpret
-from .output import state as phases
+from .modes.catalogue import mode_by_id, rules_for
+from .panel import state as phases
+from .play import GameSession
 
 
 class Reader:
@@ -52,6 +54,11 @@ class Reader:
         self._last_frame_hash: str | None = None
         #: Events established while reading, waiting for a hold window to judge them.
         self._pending_events: list[Event] = []
+        #: The live game: whose turn it is, how many throws are left, what has been scored.
+        #: Owned here because a roll has to reach it before anything is shown — the screen
+        #: over the tower says "throw 2 of 3" from the same state the browser does.
+        self.game = GameSession()
+        self.configure_game()
         #: What each game mode remembers between throws — an exploding roll still open, a
         #: fairness tally being built up. One per mode, because two consumers may read the
         #: same tray differently: a screen in "normal" and a bot in "pool" are both right,
@@ -83,6 +90,7 @@ class Reader:
             if settings is not None:
                 previous = self.settings.mode.active
                 self.settings = settings
+                self.configure_game()
                 if settings.mode.active != previous:
                     # An exploding roll or a fairness tally belongs to the mode that started
                     # it, and to the settings it was collected under. Changing either starts
@@ -160,6 +168,9 @@ class Reader:
                 # true — while knowing the verdict has not landed.
                 result.verdict = PENDING
 
+            # The game hears about the roll before any screen does, so "throw 2 of 3" and
+            # the number arrive together rather than a frame apart.
+            self.game.observe(result)
             self._show(result, phases.RESULT)
             if not guard.enabled:
                 # Nothing is being watched, so it is already your turn again.
@@ -260,6 +271,14 @@ class Reader:
         # The moment the lamps exist for: the watch is over, throw again.
         self._show(result, phases.VOID if result.verdict == VOID else phases.READY)
 
+    def configure_game(self) -> None:
+        """Point the live game at the configured mode, its turn rules and the players."""
+        mode = mode_by_id(self.settings.mode.active)
+        if mode is None:
+            return
+        rules = rules_for(mode, self.settings.mode.params.get(mode.id))
+        self.game.configure(mode.id, rules, list(self.settings.play.players))
+
     def session_for(self, mode_id: str) -> ModeSession:
         session = self.mode_sessions.get(mode_id)
         if session is None:
@@ -278,7 +297,8 @@ class Reader:
         mode = self.settings.mode
         active = mode_id or mode.active
         score = interpret(result.dice, active, mode.params.get(active),
-                          self.session_for(active), mode.d10_style)
+                          self.session_for(active), mode.d10_style,
+                          mode.d10_zero_counts_as_ten)
         result.reading = {
             "mode": active, "headline": score.headline, "detail": score.detail,
             "value": score.value, "celebrate": score.celebrate, "lament": score.lament,
@@ -298,9 +318,18 @@ class Reader:
                 pass  # a screen must never be able to break a reading
 
     def _show(self, result: RollResult, phase: str) -> None:
-        output = self.settings.output
-        self._emit(phases.presentation_for(result, phase, output.celebrate,
-                                           output.celebrate_total, output.lament_on_min))
+        panel = self.settings.panel
+        presentation = phases.presentation_for(result, phase, panel.celebrate,
+                                               panel.celebrate_total, panel.lament_on_min)
+        turn = self.game.turn
+        if self.game.rules.multi:
+            presentation.turn = {
+                "used": turn.rolls_used, "allowed": turn.rolls_allowed,
+                "left": turn.rolls_left, "chips": turn.chips_left,
+                "player": self.game.players[turn.player % len(self.game.players)],
+                "players": len(self.game.players),
+            }
+        self._emit(presentation)
 
     def _pre_roll_events(self, result: RollResult, frame: Frame,
                          threw: bool | None) -> list[Event]:

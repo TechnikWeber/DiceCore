@@ -34,9 +34,9 @@ from ..integrity import POLICIES
 from ..modes import DEFAULT as DEFAULT_MODE
 from ..modes import MODES as GAME_MODES
 from ..modes import mode_by_id
-from ..output import OutputHub
-from ..output import state as phases
-from ..output.displays import COMMON_SIZES, PANELS
+from ..panel import ButtonPanel, OutputHub
+from ..panel import state as phases
+from ..panel.displays import COMMON_SIZES, PANELS
 from ..reader import Reader
 from ..system import boot_config, diagnostics
 from ..training import TrainingManager
@@ -56,16 +56,26 @@ def create_app(settings: Settings | None = None) -> Any:
 
     loaded, complaints = Settings.load() if settings is None else (settings, [])
     state: dict[str, Any] = {"settings": loaded, "complaints": complaints, "hub": None}
-    hub = OutputHub(loaded.output)
+    hub = OutputHub(loaded.panel)
     state["hub"] = hub
     reader = Reader(loaded, on_phase=lambda p: state["hub"].update(p))
     training = TrainingManager(loaded)
 
-    app = FastAPI(title="DiceCore", version="0.4.0",
+    def on_chip() -> None:
+        reader.game.chip()
+
+    def on_next() -> None:
+        reader.game.finish_turn()
+
+    buttons = ButtonPanel(loaded.panel.signals, on_chip, on_next)
+    state["buttons"] = buttons
+
+    app = FastAPI(title="DiceCore", version="0.5.0",
                   description="Reads real dice with a camera.")
     app.state.reader = reader
     app.state.training = training
     app.state.hub = hub
+    app.state.buttons = buttons
 
     def store() -> DatasetStore:
         return DatasetStore(state["settings"].dataset_dir)
@@ -107,6 +117,64 @@ def create_app(settings: Settings | None = None) -> Any:
                 for m in GAME_MODES
             ],
         }
+
+    @app.get("/api/v1/game")
+    def game_state() -> Any:
+        """
+        Whose turn it is, how many throws are left, and what has been scored.
+
+        Part of the versioned API because a play screen is exactly the sort of thing someone
+        will want to write their own version of — on a tablet, on a TV, in a language this
+        project does not use.
+        """
+        return {"game": reader.game.to_json(),
+                "last": reader.last.to_json() if reader.last else None,
+                "buttons": state["buttons"].describe()}
+
+    @app.post("/api/v1/game/hold")
+    async def game_hold(request: Request) -> Any:
+        """Correct which dice are being kept — the one thing the camera has to guess."""
+        body = await request.json()
+        reader.game.hold(int(body.get("index", -1)))
+        return reader.game.to_json()
+
+    @app.post("/api/v1/game/chip")
+    def game_chip() -> Any:
+        """Spend a chip for one more throw. The same call the GPIO button makes."""
+        problem = reader.game.chip()
+        return {"ok": problem is None, "detail": problem, "game": reader.game.to_json()}
+
+    @app.post("/api/v1/game/book")
+    async def game_book(request: Request) -> Any:
+        """Score the dice into a category and hand the tower on."""
+        body = await request.json()
+        try:
+            outcome = reader.game.book(str(body.get("category", "")),
+                                       bool(body.get("cross_out", False)))
+        except ValueError as exc:
+            return fail(exc, 400)
+        return {"ok": True, **outcome, "game": reader.game.to_json()}
+
+    @app.post("/api/v1/game/next")
+    def game_next() -> Any:
+        """End the turn without booking anything. The same call the GPIO button makes."""
+        last = reader.last
+        reader.game.finish_turn((last.reading or {}).get("headline", "") if last else "")
+        return reader.game.to_json()
+
+    @app.post("/api/v1/game/reset")
+    async def game_reset(request: Request) -> Any:
+        """Start over — new cards, first player, turn one."""
+        body = await request.json() if await request.body() else {}
+        players = body.get("players")
+        if isinstance(players, list) and players:
+            current = state["settings"]
+            current.play.players = [str(p)[:24] for p in players][:8]
+            current.save()
+            reader.settings = current
+            reader.configure_game()
+        reader.game.reset()
+        return reader.game.to_json()
 
     @app.get("/api/v1/roll")
     def roll(wait: int = 1, store_to: str = "", verify: int | None = None,
@@ -206,13 +274,19 @@ def create_app(settings: Settings | None = None) -> Any:
                     # has been watched. A scoreboard uses the first; anything that must not
                     # honour a tampered roll waits for the second.
                     result = await asyncio.to_thread(reader.read, True, False)
-                    payload = json.dumps(result.to_json(), sort_keys=True)
+                    body = result.to_json()
+                    # Additive: consumers reading `total` and `dice` are untouched, and a
+                    # play screen gets the turn state in the same message as the number.
+                    body["game"] = reader.game.to_json()
+                    payload = json.dumps(body, sort_keys=True)
                     if payload != previous:
                         previous = payload
                         await socket.send_text(payload)
                         if state["settings"].guard.enabled:
                             verified = await asyncio.to_thread(reader.verify_last)
-                            previous = json.dumps(verified.to_json(), sort_keys=True)
+                            after = verified.to_json()
+                            after["game"] = reader.game.to_json()
+                            previous = json.dumps(after, sort_keys=True)
                             await socket.send_text(previous)
                 except (CaptureError, EngineError) as exc:
                     await socket.send_text(json.dumps({"error": str(exc)}))
@@ -283,11 +357,15 @@ def create_app(settings: Settings | None = None) -> Any:
             current.mode.params[wanted] = body["params"]
         if body.get("d10_style") in ("0-9", "1-10"):
             current.mode.d10_style = body["d10_style"]
+        if "d10_zero_counts_as_ten" in body:
+            current.mode.d10_zero_counts_as_ten = bool(body["d10_zero_counts_as_ten"])
         current.save()
         reader.reload(current)
         reader.settings = current
+        reader.configure_game()
         return {"ok": True, "mode": wanted, "params": current.mode.params.get(wanted, {}),
-                "d10_style": current.mode.d10_style}
+                "d10_style": current.mode.d10_style,
+                "d10_zero_counts_as_ten": current.mode.d10_zero_counts_as_ten}
 
     @app.post("/api/setup/mode/reset")
     def reset_mode_session() -> Any:
@@ -311,9 +389,13 @@ def create_app(settings: Settings | None = None) -> Any:
         # Rebuild the outputs: a changed pin or panel means new hardware to open, and the
         # old hub is holding the pins the new one wants.
         old = state["hub"]
-        state["hub"] = OutputHub(updated.output)
+        state["hub"] = OutputHub(updated.panel)
         old.close()
         app.state.hub = state["hub"]
+        # The buttons hold pins too, and a changed pin needs the old one released first.
+        state["buttons"].close()
+        state["buttons"] = ButtonPanel(updated.panel.signals, on_chip, on_next)
+        app.state.buttons = state["buttons"]
         return {"ok": True, "settings": updated.to_dict()}
 
     @app.get("/api/setup/hardware")
@@ -554,10 +636,25 @@ def create_app(settings: Settings | None = None) -> Any:
     # --- the page ---------------------------------------------------------------------
 
     @app.get("/", response_class=HTMLResponse)
-    def index() -> Any:
+    def play_screen() -> Any:
+        """
+        The game, full screen and without a scrap of admin chrome around it.
+
+        This is the page you put on the television at the table, which is why it is at `/`
+        and the setup page is not: the thing you look at all evening should not be one tab
+        away behind six you never touch.
+        """
+        return HTMLResponse((WEB_DIR / "play.html").read_text())
+
+    @app.get("/setup", response_class=HTMLResponse)
+    def setup_page() -> Any:
         # Read per request rather than cached: editing the page and hitting reload is how
         # the UI gets developed, and on a Pi the read costs nothing.
-        return HTMLResponse((WEB_DIR / "index.html").read_text())
+        return HTMLResponse((WEB_DIR / "setup.html").read_text())
+
+    @app.get("/play.js")
+    def play_script() -> Any:
+        return Response((WEB_DIR / "play.js").read_text(), media_type="text/javascript")
 
     @app.get("/app.js")
     def script() -> Any:
@@ -566,6 +663,10 @@ def create_app(settings: Settings | None = None) -> Any:
     @app.get("/style.css")
     def style() -> Any:
         return Response((WEB_DIR / "style.css").read_text(), media_type="text/css")
+
+    @app.get("/play.css")
+    def play_style() -> Any:
+        return Response((WEB_DIR / "play.css").read_text(), media_type="text/css")
 
     return app
 

@@ -48,7 +48,7 @@ measured, not assumed, so a 135×240 stick and a 320×240 tile both come out loo
 deliberate rather than cropped.
 
 Driven through [luma](https://luma-lcd.readthedocs.io), which takes a PIL image — so adding
-a panel luma supports is a table entry in `output/displays.py`, not a new code path.
+a panel luma supports is a table entry in `panel/displays.py`, not a new code path.
 
 ### Wiring a SPI panel (ST7789 / ILI9341)
 
@@ -121,8 +121,8 @@ The state that drives both outputs is public, so a project embedding DiceCore ca
 same thing its own way:
 
 ```python
-from dicecore.output import OutputHub
-from dicecore.output.state import Presentation, RESULT
+from dicecore.panel import OutputHub
+from dicecore.panel.state import Presentation, RESULT
 from dicecore.reader import Reader
 
 hub = OutputHub(settings.output)

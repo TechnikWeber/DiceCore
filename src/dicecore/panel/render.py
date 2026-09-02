@@ -134,6 +134,16 @@ def _rings(draw: Any, width: int, height: int, step: int, accent: Any) -> None:
 def _compose(draw: Any, presentation: Presentation, width: int, height: int,
              ink: Any, accent: Any, mono: bool) -> None:
     caption = CAPTION.get(presentation.phase, "")
+    turn = presentation.turn
+    if turn and presentation.phase == READY:
+        # "Throw again" is wrong when the throws are gone — in a game with turns that is the
+        # moment you have to do something else, and the panel should say which.
+        if turn.get("left"):
+            caption = "THROW AGAIN"
+        elif turn.get("chips"):
+            caption = "CHIP OR BOOK"
+        else:
+            caption = "TURN OVER"
     if presentation.celebrate and presentation.phase in (RESULT, READY):
         caption = "NICE ROLL"
     elif presentation.lament and presentation.phase in (RESULT, READY):
@@ -146,6 +156,12 @@ def _compose(draw: Any, presentation: Presentation, width: int, height: int,
     # A 128x32 OLED has no room for three stacked rows, so it gets one: the word on the
     # left, the number on the right. Anything taller keeps the readable stacked layout.
     if height < 48:
+        # One row, so the turn counter replaces the word entirely — it is the more useful
+        # of the two when there is only room for one.
+        if presentation.turn:
+            turn = presentation.turn
+            caption = f"{turn['used']}/{turn['allowed']}" + (
+                " " + "•" * min(3, int(turn["chips"])) if turn.get("chips") else "")
         caption_font = _fit(draw, caption, int(width * 0.62), height - 4, height)
         draw.text((margin, (height - _measure(draw, caption, caption_font)[3]) / 2),
                   caption, font=caption_font, fill=ink)
@@ -156,7 +172,25 @@ def _compose(draw: Any, presentation: Presentation, width: int, height: int,
                        (height - (bottom - top)) / 2 - top), number, font=number_font, fill=ink)
         return
 
-    caption_font = _fit(draw, caption, width - 2 * margin, int(height * 0.14),
+    # The turn counter shares the caption row, on the right. On a small panel "2/3" is the
+    # single most useful thing after the number itself: it says whether you may throw again.
+    turn_text = ""
+    if presentation.turn:
+        turn = presentation.turn
+        turn_text = f"{turn['used']}/{turn['allowed']}"
+        if turn.get("chips"):
+            turn_text += " " + "•" * min(3, int(turn["chips"]))
+
+    caption_width = width - 2 * margin
+    turn_font = _fit(draw, turn_text or "0/0", int(width * 0.30), int(height * 0.14),
+                     max(9, int(height * 0.12)))
+    if turn_text:
+        left, top, right, bottom = _measure(draw, turn_text, turn_font)
+        draw.text((width - margin - (right - left) - left, max(1, int(height * 0.04))),
+                  turn_text, font=turn_font, fill=ink)
+        caption_width = int(width * 0.62)
+
+    caption_font = _fit(draw, caption, caption_width, int(height * 0.14),
                         max(9, int(height * 0.12)))
     draw.text((margin, max(1, int(height * 0.04))), caption,
               font=caption_font, fill=ink if mono else accent)

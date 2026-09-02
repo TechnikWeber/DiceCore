@@ -164,6 +164,23 @@ game uses narrows what the engine has to consider.
 A mode is not a rules engine: DiceCore does not know your modifier, whose turn it is, or
 what you rolled for. See [docs/GAME-MODES.md](GAME-MODES.md).
 
+### Playing, not only reading
+
+Some games are not one throw. Kniffel is three, with dice kept in between, so there is a
+turn machine (`play/turns.py`), a scorecard (`play/kniffel.py`) and a live game the browser
+and the panel both render (`play/session.py`).
+
+**Holds are observed, not enforced.** A camera cannot stop a hand, and nothing here depends
+on the guess being right: what is scored is what is on the tray. The holds only tell the
+player what is being kept, and the browser can correct them.
+
+The game lives on the *server*, not in the browser — so the screen over the tower can say
+"throw 2 of 3" too, a closed tab loses nothing, and a phone at the other end of the table
+sees the same game rather than its own copy.
+
+`/` is the game screen and `/setup` is the workshop. Two front doors, one service; see
+[docs/PLAYING.md](PLAYING.md).
+
 ## Outputs and modes
 
 The same `RollResult` is served through every output; a mode only chooses what is

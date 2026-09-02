@@ -236,7 +236,80 @@ def test_an_unknown_camera_module_is_refused_before_config_txt_is_touched(client
     assert bad.status_code == 400
 
 
+def test_both_front_doors_are_served(client):
+    # The game screen is at the root because it is the one that stays on all evening.
+    assert "play.js" in client.get("/").text
+    assert "Setup" in client.get("/setup").text
+    for asset in ("/app.js", "/play.js", "/style.css", "/play.css"):
+        assert client.get(asset).status_code == 200, asset
+
+
+def test_a_game_can_be_played_through_the_api(client):
+    client.post("/api/setup/mode", json={"mode": "yahtzee", "params": {"chips": 1}})
+    client.post("/api/v1/game/reset", json={"players": ["A", "B"]})
+
+    state = client.get("/api/v1/game").json()["game"]
+    assert state["rules"]["rolls"] == 3 and state["rules"]["chips"] == 1
+    assert state["current_player"] == "A"
+
+    for expected in (1, 2, 3):
+        client.get("/api/v1/roll?verify=0")
+        assert client.get("/api/v1/game").json()["game"]["turn"]["rolls_used"] == expected
+
+    turn = client.get("/api/v1/game").json()["game"]["turn"]
+    assert turn["rolls_left"] == 0 and turn["can_spend_chip"]
+
+    assert client.post("/api/v1/game/chip").json()["ok"]
+    assert client.get("/api/v1/game").json()["game"]["turn"]["rolls_allowed"] == 4
+
+
+def test_a_chip_is_refused_while_throws_remain(client):
+    client.post("/api/setup/mode", json={"mode": "yahtzee", "params": {"chips": 1}})
+    client.post("/api/v1/game/reset", json={"players": ["A"]})
+    client.get("/api/v1/roll?verify=0")
+    answer = client.post("/api/v1/game/chip").json()
+    assert not answer["ok"] and "no need" in answer["detail"].lower()
+
+
+def test_booking_a_category_hands_the_tower_on(client):
+    client.post("/api/setup/mode", json={"mode": "yahtzee"})
+    client.post("/api/v1/game/reset", json={"players": ["A", "B"]})
+    client.get("/api/v1/roll?verify=0")
+    booked = client.post("/api/v1/game/book", json={"category": "chance"}).json()
+    assert booked["ok"] and booked["points"] > 0
+    assert booked["game"]["current_player"] == "B"
+
+
+def test_giving_a_category_up_has_to_be_meant(client):
+    client.post("/api/setup/mode", json={"mode": "yahtzee"})
+    client.post("/api/v1/game/reset", json={"players": ["A"]})
+    client.get("/api/v1/roll?verify=0")
+    refused = client.post("/api/v1/game/book", json={"category": "kniffel"})
+    assert refused.status_code == 400
+    assert client.post("/api/v1/game/book",
+                       json={"category": "kniffel", "cross_out": True}).json()["points"] == 0
+
+
+def test_a_hold_can_be_corrected_from_the_browser(client):
+    client.post("/api/setup/mode", json={"mode": "yahtzee"})
+    client.post("/api/v1/game/reset", json={"players": ["A"]})
+    client.get("/api/v1/roll?verify=0")
+    state = client.post("/api/v1/game/hold", json={"index": 0}).json()
+    assert state["turn"]["dice"][0]["held"] is True
+
+
+def test_the_buttons_are_reported_even_without_a_pi(client):
+    buttons = client.get("/api/v1/game").json()["buttons"]
+    assert "chip" in buttons and "next" in buttons
+
+
+def test_a_zero_on_a_ten_sided_die_can_be_worth_nothing_instead_of_ten(client):
+    # Standard is ten; some house rules count it as a plain zero.
+    assert client.post("/api/setup/mode",
+                       json={"mode": "normal", "d10_zero_counts_as_ten": False}).json()[
+        "d10_zero_counts_as_ten"] is False
+    assert client.get("/api/setup/settings").json()["mode"]["d10_zero_counts_as_ten"] is False
+
+
 def test_the_page_itself_is_served(client):
-    assert "DiceCore" in client.get("/").text
-    assert client.get("/app.js").status_code == 200
-    assert client.get("/style.css").status_code == 200
+    assert "DiceCore" in client.get("/setup").text

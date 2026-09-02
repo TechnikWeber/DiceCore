@@ -1,5 +1,8 @@
 """
-Everything that tells a person what is going on: the screen, the lamps, the buzzer.
+The physical panel at the table: what a person sees, and the buttons they press.
+
+Outputs — a small screen, two lamps, a buzzer — and inputs, because a game needs a way to
+say "spend a chip" or "my turn is over" without walking round to a browser.
 
 The hub owns a thread. Not for speed — an SPI panel takes tens of milliseconds per frame,
 and a buzzer pattern is a tenth of a second of deliberate sleeping. Doing either on the
@@ -13,8 +16,9 @@ import queue
 import threading
 from typing import Any
 
-from ..config import OutputSettings
+from ..config import PanelSettings
 from .base import OutputDevice, OutputError
+from .buttons import ButtonPanel
 from .displays import PANELS, DisplayOutput
 from .signals import SignalOutput
 from .state import (
@@ -31,14 +35,15 @@ from .state import (
 
 __all__ = [
     "OutputHub", "OutputDevice", "OutputError", "Presentation", "presentation_for",
-    "PANELS", "IDLE", "ROLLING", "READING", "RESULT", "READY", "VOID", "ERROR",
+    "ButtonPanel", "PANELS", "IDLE", "ROLLING", "READING", "RESULT", "READY", "VOID",
+    "ERROR",
 ]
 
 
 class OutputHub:
     """Fans one `Presentation` out to every enabled output, on its own thread."""
 
-    def __init__(self, settings: OutputSettings) -> None:
+    def __init__(self, settings: PanelSettings) -> None:
         self.settings = settings
         self.display: DisplayOutput | None = None
         self.signals: SignalOutput | None = None

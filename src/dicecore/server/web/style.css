@@ -159,3 +159,8 @@ pre {
 }
 .lamp.on.green i { background: var(--good); box-shadow: 0 0 10px var(--good); }
 .lamp.on.red i { background: var(--bad); box-shadow: 0 0 10px var(--bad); }
+
+/* The way back to the game screen, marked as leaving the setup page rather than as a tab. */
+nav a.away { border: 1px solid var(--accent); color: var(--accent); }
+nav a.away:hover { background: var(--accent); color: var(--accent-ink); }
+textarea { min-height: 70px; resize: vertical; font-family: inherit; }

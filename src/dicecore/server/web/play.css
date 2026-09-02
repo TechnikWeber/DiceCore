@@ -1,0 +1,117 @@
+/*
+ * The play screen. Different job from the setup page, so different rules: this one is read
+ * from across a room, on a television, by people who are not sitting at it. Everything is
+ * bigger, the contrast is higher, and nothing is a link unless you can hit it with a thumb.
+ */
+:root {
+  color-scheme: dark;
+  --bg: #0e1014;
+  --panel: #171a20;
+  --panel-2: #1e222a;
+  --line: #2b303a;
+  --ink: #f2f5f9;
+  --ink-soft: #98a2b3;
+  --accent: #5b8dff;
+  --good: #3ecf8e;
+  --warn: #e0a94a;
+  --bad: #f0806f;
+  --pip: #14181f;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; min-height: 100vh; background: var(--bg); color: var(--ink);
+  font: 16px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  display: flex; flex-direction: column;
+}
+a { color: var(--ink-soft); }
+
+header {
+  display: flex; align-items: center; gap: 18px; flex-wrap: wrap;
+  padding: 14px 24px; border-bottom: 1px solid var(--line); background: var(--panel);
+}
+header .who { font-size: 22px; font-weight: 650; }
+header .game { color: var(--ink-soft); font-size: 15px; }
+header .spacer { flex: 1; }
+header a.setup { text-decoration: none; font-size: 14px; padding: 6px 12px;
+                 border: 1px solid var(--line); border-radius: 8px; }
+
+main { flex: 1; display: grid; grid-template-columns: 1fr; gap: 20px; padding: 22px 24px 30px; }
+@media (min-width: 1000px) { main.with-card { grid-template-columns: minmax(0,1fr) 460px; } }
+
+.board { display: flex; flex-direction: column; gap: 18px; min-width: 0; }
+.headline {
+  font-size: clamp(56px, 13vw, 168px); font-weight: 700; line-height: .95;
+  letter-spacing: -.03em; word-break: break-word;
+}
+.headline.small { font-size: clamp(40px, 7vw, 92px); }
+.detail { color: var(--ink-soft); font-size: clamp(16px, 2vw, 24px);
+          font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+
+/* Turn state: the two facts a player needs — throws left, and chips in hand. */
+.turnbar { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; font-size: 16px; }
+.pips-left { display: flex; gap: 6px; }
+.pips-left i {
+  width: 14px; height: 14px; border-radius: 50%; display: block;
+  border: 2px solid var(--accent);
+}
+.pips-left i.used { background: var(--accent); }
+.pips-left i.chip { border-color: var(--warn); }
+.pips-left i.chip.used { background: var(--warn); }
+
+.dice { display: flex; gap: 16px; flex-wrap: wrap; }
+.die {
+  width: clamp(64px, 9vw, 112px); aspect-ratio: 1; border-radius: 16px; background: #eef1f5;
+  color: var(--pip); display: grid; place-items: center; cursor: pointer; position: relative;
+  border: 4px solid transparent; transition: transform .08s, border-color .12s;
+  font-size: clamp(28px, 4vw, 46px); font-weight: 700;
+}
+.die:hover { transform: translateY(-2px); }
+.die.held { border-color: var(--good); box-shadow: 0 0 0 4px rgba(62, 207, 142, .18); }
+.die.held::after {
+  content: "held"; position: absolute; bottom: -22px; left: 0; right: 0; text-align: center;
+  font-size: 12px; color: var(--good); letter-spacing: .04em;
+}
+.die.unread { background: #3a2020; color: var(--bad); }
+/* Pips, drawn rather than written — a six-sider reads faster as dots from a distance. */
+.die .face { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8%;
+             width: 74%; height: 74%; }
+.die .face span { border-radius: 50%; background: var(--pip); }
+.die .face span.off { background: transparent; }
+
+.actions { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 4px; }
+button {
+  font: inherit; font-weight: 600; padding: 14px 22px; border-radius: 12px;
+  border: 1px solid var(--line); background: var(--panel-2); color: var(--ink);
+  cursor: pointer; font-size: 17px;
+}
+button:hover:not(:disabled) { border-color: var(--accent); }
+button.primary { background: var(--accent); border-color: var(--accent); color: #0d1117; }
+button.chip { border-color: var(--warn); color: var(--warn); }
+button:disabled { opacity: .4; cursor: not-allowed; }
+
+.note { padding: 10px 14px; border-radius: 10px; font-size: 15px; }
+.note.warn { background: rgba(224, 169, 74, .14); color: var(--warn); }
+.note.bad { background: rgba(240, 128, 111, .14); color: var(--bad); }
+.note.good { background: rgba(62, 207, 142, .14); color: var(--good); }
+
+/* The scorecard. Dense on purpose: thirteen rows have to fit beside the dice. */
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px;
+        padding: 14px 16px; }
+.card h2 { margin: 0 0 10px; font-size: 15px; color: var(--ink-soft); font-weight: 600; }
+table { width: 100%; border-collapse: collapse; font-size: 15px; }
+th, td { padding: 6px 8px; border-bottom: 1px solid var(--line); text-align: right; }
+th:first-child, td:first-child { text-align: left; color: var(--ink-soft); font-weight: 500; }
+tr.section td { padding-top: 12px; color: var(--ink-soft); font-size: 13px; border: none; }
+tr.total td { font-weight: 700; font-size: 17px; border-top: 2px solid var(--line); }
+td.you { background: rgba(91, 141, 255, .08); }
+td.open button {
+  width: 100%; padding: 5px 8px; font-size: 14px; border-radius: 7px;
+  background: transparent; border-color: transparent; color: var(--ink-soft);
+}
+td.open button.worth { color: var(--good); border-color: rgba(62, 207, 142, .35); }
+td.open button:hover:not(:disabled) { background: var(--panel-2); }
+.card .leader { color: var(--good); }
+
+.log { font-size: 14px; color: var(--ink-soft); }
+.log div { padding: 4px 0; border-bottom: 1px solid var(--line); }
+.idle { color: var(--ink-soft); font-size: clamp(22px, 4vw, 40px); font-weight: 600; }

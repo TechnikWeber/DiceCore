@@ -108,7 +108,8 @@ def check_dice(mode: GameMode, dice: list[Die]) -> list[str]:
 
 
 def interpret(dice: list[Die], mode_id: str = DEFAULT, overrides: dict[str, Any] | None = None,
-              session: ModeSession | None = None, d10_style: str = "0-9") -> Score:
+              session: ModeSession | None = None, d10_style: str = "0-9",
+              zero_is_ten: bool = True) -> Score:
     """
     Read a set of faces the way this mode reads them.
 
@@ -132,7 +133,7 @@ def interpret(dice: list[Die], mode_id: str = DEFAULT, overrides: dict[str, Any]
         )
 
     rule = values.get("rule", mode.rule) if mode.id == "custom" else mode.rule
-    score = _apply(rule, scorable, values, session, d10_style)
+    score = _apply(rule, scorable, values, session, d10_style, zero_is_ten)
     score.warnings = warnings + score.warnings
     score.extras["mode"] = mode.id
     score.extras["rule"] = rule
@@ -140,8 +141,10 @@ def interpret(dice: list[Die], mode_id: str = DEFAULT, overrides: dict[str, Any]
 
 
 def _apply(rule: str, dice: list[Die], values: dict[str, Any], session: ModeSession,
-           d10_style: str) -> Score:
-    zero_is_ten = bool(values.get("zero_is_ten", d10_style == "0-9"))
+           d10_style: str, default_zero_is_ten: bool = True) -> Score:
+    # A zero is worth ten in nearly every game that uses a 0–9 die, so that is the answer
+    # unless the table says otherwise — and a mode may still override the table.
+    zero_is_ten = bool(values.get("zero_is_ten", default_zero_is_ten))
 
     if rule == "sum":
         return scoring.score_sum(dice, zero_is_ten)

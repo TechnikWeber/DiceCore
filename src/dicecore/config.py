@@ -167,6 +167,10 @@ class ModeSettings:
     #: How this set's ten-sided dice are printed: "0-9" or "1-10". A property of the dice
     #: themselves — it decides the labels a model is trained on.
     d10_style: str = "0-9"
+    #: What a zero on a 0–9 die is worth. Ten in nearly every game, which is why that is the
+    #: default — but some house rules count it as nothing, and then a 0 really is a 0. A mode
+    #: may still override it; this is the answer for everything that does not.
+    d10_zero_counts_as_ten: bool = True
     #: Per-mode parameter overrides, keyed by mode id: {"pool": {"threshold": 5}}.
     params: dict[str, Any] = field(default_factory=dict)
     #: Let a mode narrow engine.expected_kinds by itself. Off only for a mixed table where
@@ -224,10 +228,20 @@ class SignalSettings:
     #: table that has decided the beeping is enough.
     celebrate_sound: bool = True
 
+    # --- buttons: the panel listens as well as speaks ---------------------
+    #: Spend a chip — one extra throw in a game that allows them. -1 for no button.
+    chip_pin: int = -1
+    #: End the turn / book nothing / hand the tower on.
+    next_pin: int = -1
+    #: True for a button wired to ground (the usual case, using the Pi's own pull-up).
+    button_pull_up: bool = True
+    #: Ignore repeats within this long, so one press is one press.
+    debounce_s: float = 0.08
+
 
 @dataclass
-class OutputSettings:
-    """The screen, the lamps, and what counts as a roll worth celebrating."""
+class PanelSettings:
+    """The screen, the lamps, the buttons, and what counts as a roll worth celebrating."""
 
     display: DisplaySettings = field(default_factory=DisplaySettings)
     signals: SignalSettings = field(default_factory=SignalSettings)
@@ -239,6 +253,16 @@ class OutputSettings:
     #: Frames in the celebration animation, and how fast they run.
     animation_frames: int = 12
     animation_interval_s: float = 0.06
+
+
+@dataclass
+class PlaySettings:
+    """The game screen at the table."""
+
+    #: Who is playing. One name is a solo game; the play screen passes the tower round.
+    players: list[str] = field(default_factory=lambda: ["Player 1"])
+    #: Show the scorecard and turn counter, rather than just the number.
+    enabled: bool = True
 
 
 @dataclass
@@ -258,7 +282,8 @@ class Settings:
     settle: SettleSettings = field(default_factory=SettleSettings)
     guard: GuardSettings = field(default_factory=GuardSettings)
     mode: ModeSettings = field(default_factory=ModeSettings)
-    output: OutputSettings = field(default_factory=OutputSettings)
+    play: PlaySettings = field(default_factory=PlaySettings)
+    panel: PanelSettings = field(default_factory=PanelSettings)
     server: ServerSettings = field(default_factory=ServerSettings)
     #: Keys we did not recognise, kept verbatim so a downgrade is not a data loss.
     extra: dict[str, Any] = field(default_factory=dict)
@@ -287,7 +312,13 @@ class Settings:
         known = {f.name: f for f in fields(cls) if f.name != "extra"}
         kwargs: dict[str, Any] = {}
         extra: dict[str, Any] = {}
-        for key, value in (data or {}).items():
+        data = dict(data or {})
+        # The screen and lamps section was called "output" before the buttons arrived and
+        # made it a panel rather than an output. Carry an old config over instead of
+        # silently handing someone back the defaults.
+        if "output" in data and "panel" not in data:
+            data["panel"] = data.pop("output")
+        for key, value in data.items():
             spec = known.get(key)
             if spec is None or not isinstance(value, dict):
                 extra[key] = value

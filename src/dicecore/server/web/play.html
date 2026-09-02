@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>DiceCore</title>
+  <link rel="stylesheet" href="/play.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%232f6df6'/><circle cx='10' cy='10' r='3' fill='white'/><circle cx='22' cy='22' r='3' fill='white'/><circle cx='16' cy='16' r='3' fill='white'/></svg>">
+</head>
+<body>
+<header>
+  <span class="who" id="who">—</span>
+  <span class="game" id="game-name"></span>
+  <span class="spacer"></span>
+  <span class="game" id="link-state">connecting…</span>
+  <a class="setup" href="/setup">Setup</a>
+</header>
+
+<main id="main">
+  <section class="board">
+    <div class="turnbar" id="turnbar"></div>
+    <div class="headline" id="headline">Throw the dice</div>
+    <div class="detail" id="detail"></div>
+    <div class="dice" id="dice"></div>
+    <div id="notes"></div>
+    <div class="actions">
+      <button class="chip" id="btn-chip">Spend a chip</button>
+      <button id="btn-next">End turn</button>
+      <button id="btn-reset">New game</button>
+    </div>
+  </section>
+
+  <aside id="side" hidden>
+    <div class="card" id="card"></div>
+    <div class="card" style="margin-top:16px">
+      <h2>Last turns</h2>
+      <div class="log" id="log"></div>
+    </div>
+  </aside>
+</main>
+
+<script src="/play.js"></script>
+</body>
+</html>

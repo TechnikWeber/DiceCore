@@ -15,6 +15,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
+from ..play.turns import TurnRules
+
 ALL_KINDS = ("d4", "d6", "d8", "d10", "d100", "d12", "d20")
 
 
@@ -34,6 +36,9 @@ class GameMode:
     defaults: dict[str, Any] = field(default_factory=dict)
     #: True when the mode needs to remember something between throws.
     stateful: bool = False
+    #: What a turn looks like. Most games are one throw and done; Kniffel is three with
+    #: dice kept in between, which is what the turn machine exists for.
+    turns: TurnRules = field(default_factory=TurnRules)
 
 
 MODES: tuple[GameMode, ...] = (
@@ -46,7 +51,6 @@ MODES: tuple[GameMode, ...] = (
         "normal_extended", "Normal, extended",
         "Six-sided dice and ten-sided ones together, added up.",
         ("d6", "d10"), "sum", "1–6",
-        {"zero_is_ten": True},
     ),
     GameMode(
         "rpg", "Tabletop roleplaying",
@@ -84,13 +88,19 @@ MODES: tuple[GameMode, ...] = (
     ),
     GameMode(
         "yahtzee", "Kniffel / Yahtzee",
-        "Five dice, read as a combination rather than a sum: full house, straights, Kniffel.",
+        "Five dice, read as a combination rather than a sum: full house, straights, Kniffel. "
+        "Three throws a turn, keeping what you like in between, and a scorecard in the "
+        "browser.",
         ("d6",), "yahtzee", "5",
+        {"rolls": 3, "chips": 0},
+        turns=TurnRules(rolls=3, holds=True, chips=0, auto_end=False),
     ),
     GameMode(
         "farkle", "Farkle / Zehntausend",
         "Six dice scored on the common house rules — ones and fives, triples and straights.",
         ("d6",), "farkle", "1–6",
+        {"rolls": 3, "chips": 0},
+        turns=TurnRules(rolls=3, holds=True, chips=0, auto_end=False),
     ),
     GameMode(
         "backgammon", "Backgammon",
@@ -130,3 +140,19 @@ DEFAULT = "normal"
 
 def mode_by_id(mode_id: str) -> GameMode | None:
     return BY_ID.get(mode_id)
+
+
+def rules_for(mode: GameMode, overrides: dict[str, Any] | None = None) -> TurnRules:
+    """
+    A mode's turn rules with the table's own numbers on top.
+
+    Chips are a house rule — some tables give three, some none — so they are a setting
+    rather than part of the game's definition.
+    """
+    values = overrides or {}
+    return TurnRules(
+        rolls=max(1, int(values.get("rolls", mode.turns.rolls))),
+        holds=mode.turns.holds,
+        chips=max(0, min(3, int(values.get("chips", mode.turns.chips)))),
+        auto_end=mode.turns.auto_end,
+    )

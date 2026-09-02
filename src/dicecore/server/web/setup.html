@@ -3,17 +3,18 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>DiceCore</title>
+  <title>DiceCore — Setup</title>
   <link rel="stylesheet" href="/style.css">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%232f6df6'/><circle cx='10' cy='10' r='3' fill='white'/><circle cx='22' cy='22' r='3' fill='white'/><circle cx='16' cy='16' r='3' fill='white'/></svg>">
 </head>
 <body>
 <header>
-  <h1>DiceCore</h1>
+  <h1>DiceCore <span class="sub">Setup</span></h1>
   <span class="sub" id="subtitle">reads real dice with a camera</span>
 </header>
 
 <nav>
+  <a href="/" class="away">▶ Game screen</a>
   <a href="#roll">Roll</a>
   <a href="#camera">Camera</a>
   <a href="#detection">Detection</a>
@@ -120,6 +121,10 @@
           <option value="0-9">0 – 9 (the usual modern print)</option>
           <option value="1-10">1 – 10 (older sets)</option>
         </select></div>
+        <div><label>A zero on a 0–9 die is worth</label><select id="mode-zero">
+          <option value="ten">ten (nearly every game)</option>
+          <option value="zero">nothing — a 0 really is a 0</option>
+        </select></div>
       </div>
       <p class="hint" id="mode-detail"></p>
       <div class="grid" id="mode-params"></div>
@@ -128,6 +133,22 @@
         <button id="btn-mode-reset">Start this mode's tally again</button>
       </div>
       <div id="mode-session" style="margin-top:12px"></div>
+    </div>
+
+    <div class="card">
+      <h2>Players and turns</h2>
+      <p class="hint">Games with more than one throw a turn — Kniffel, Farkle — keep the
+        dice you leave on the tray and count the throws down. Chips buy an extra throw when
+        the ordinary ones are gone; set the number under the mode above. The game itself is
+        on the <a href="/">game screen</a>.</p>
+      <div class="grid">
+        <div><label>Players (one per line)</label><textarea id="play-players" rows="3"></textarea></div>
+        <div><label>Show the scorecard and turn counter</label><input id="play-enabled" type="checkbox"></div>
+      </div>
+      <div class="row" style="margin-top:12px">
+        <button class="primary" id="btn-players">Save players and start a new game</button>
+      </div>
+      <div id="play-state" style="margin-top:12px"></div>
     </div>
 
     <div class="card">
@@ -261,6 +282,15 @@
         <div><label>Beep length (ms)</label><input id="sg-beep" type="number"></div>
         <div><label>Pin is active high</label><input id="sg-high" type="checkbox"></div>
         <div><label>Sound for a great or awful roll</label><input id="sg-celebsound" type="checkbox"></div>
+      </div>
+      <p class="hint" style="margin-top:14px">Two buttons on the header, so a chip can be
+        spent and a turn ended without walking round to a browser. Wire each between the pin
+        and ground; <code>-1</code> leaves one out.</p>
+      <div class="grid">
+        <div><label>Chip button (BCM)</label><input id="sg-chipbtn" type="number"></div>
+        <div><label>End-turn button (BCM)</label><input id="sg-nextbtn" type="number"></div>
+        <div><label>Buttons use the internal pull-up</label><input id="sg-pullup" type="checkbox"></div>
+        <div><label>Debounce (s)</label><input id="sg-debounce" type="number" step="0.01"></div>
       </div>
       <div class="row" style="margin-top:12px"><button class="primary" data-save>Save</button></div>
     </div>

@@ -22,6 +22,9 @@ Owner: Philipp Weber · GitHub: TechnikWeber/DiceCore
 - `src/dicecore/training/` — `data` (crops, readiness, no torch), `trainer` (torch),
   `job` (a watchable background run).
 - `src/dicecore/system/` — `boot_config` (CSI modules in config.txt), `diagnostics`.
+- `src/dicecore/play/` — playing rather than reading: `turns` (the state machine for games
+  with more than one throw), `kniffel` (the scorecard), `session` (the live game the browser
+  and the panel both render).
 - `src/dicecore/modes/` — game modes: `catalogue` (the table), `scoring` (pure rules, one
   function per game), `fairness` (the chi-square tally), and `interpret()` in `__init__`.
 - `src/dicecore/integrity.py` — fair play decided on numbers: comparing two readings,
@@ -29,7 +32,8 @@ Owner: Philipp Weber · GitHub: TechnikWeber/DiceCore
 - `src/dicecore/guard.py` — the hold window after a reading: turns frames into events.
 - `src/dicecore/reader.py` — capture → settle → engine → guard. The single owner of the
   camera, and the only place that knows about the *previous* roll (staleness, replay).
-- `src/dicecore/output/` — what a person sees: `state` (one `Presentation` for every output,
+- `src/dicecore/panel/` — the physical panel, in and out: `buttons` (chip and end-turn on
+  GPIO) alongside what a person sees: `state` (one `Presentation` for every output,
   pure), `render` (PIL, one renderer for every panel), `displays` (ST7789 / ILI9341 /
   SSD1306 via luma, plus an always-on PNG preview), `signals` (LEDs and buzzer via gpiozero),
   and the hub that fans out on its own thread.
@@ -84,6 +88,16 @@ python3 -m venv .venv && .venv/bin/pip install -e '.[vision,server,dev]'
   again immediately is normal play and must never void anything.
 - **`Die.unread` is not `value == 0`.** A d10 printed 0–9 has a zero face; filtering on
   `value == 0` dropped it out of every sum. Unread means no value *and* no confidence.
+- **Holds are observed, never enforced.** DiceCore cannot stop a hand and does not try. What
+  is scored is what is on the tray, so a hold guessed wrongly costs nobody a game — it is a
+  label, and the browser can correct it. Do not build anything that depends on it.
+- **A throw only counts when the dice changed.** The camera looks at the tray several times
+  a second; `stale` is what stops that burning a Kniffel throw for standing still.
+- **The game lives on the server.** The panel has to be able to say "throw 2 of 3" as well,
+  a closed tab must lose nothing, and a second screen must see the same game. Browser-side
+  game state would fail all three.
+- **`/` is the game screen, `/setup` is the workshop.** The page that stays on all evening
+  is not buried behind admin tabs. Opening `/` is also what starts continuous reading.
 - **A mode is data.** New game → an entry in `catalogue.py` and a function in `scoring.py`.
   The web UI builds its settings form from the mode's own `defaults`, so a new mode needs no
   UI work at all. If a mode needs a change to the reader, the design is wrong.

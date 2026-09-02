@@ -37,6 +37,12 @@ als JSON-API und als Live-Stream, den ein Bot oder ein Spiel abonnieren kann.
 - **Training aus dem Browser**, mit laufender Loss- und Genauigkeitsanzeige, am Ende ein
   ONNX-Modell, das die Engine übernimmt. Training braucht PyTorch und läuft deshalb auf dem
   PC; die Oberfläche sagt das offen, statt auf halbem Weg abzubrechen.
+- **Ein Spielbildschirm und eine Einrichtungsseite.** `/` ist das Brett für den Fernseher —
+  die Zahl groß, die Würfel gezeichnet, der Wurfzähler, der Spielblock. `/setup` ist alles
+  andere. Ein Dienst, ein Repo, zwei Eingänge.
+- **Züge, Halten und Chips.** Kniffel sind drei Würfe mit Behalten dazwischen: DiceCore
+  zählt sie herunter, erkennt welche Würfel liegen geblieben sind, und ein Chip kauft einen
+  vierten. Zwei optionale GPIO-Taster tun dasselbe ohne Browser.
 - **Spielmodi.** Dieselben Würfel, gelesen wie das Spiel an deinem Tisch sie liest: als
   Summe, als Anzahl Erfolge, als Kniffel-Kombination, als Prozentwurf, als Unterwürfeln
   gegen einen Zielwert. Vierzehn Stück, von normalen Sechsseitern bis zum Chi-Quadrat-Test,
@@ -51,6 +57,8 @@ als JSON-API und als Live-Stream, den ein Bot oder ein Spiel abonnieren kann.
   `dtoverlay` in die `config.txt` und sagt, dass neu gestartet werden muss.
 - **Alles davon ohne Hardware.** `dicecore synth` zeichnet Würfel, die Quelle `folder` spielt
   sie ab, und alles oben Genannte läuft damit auf dem Laptop.
+
+![Der Spielbildschirm während eines Kniffel-Zugs: die Kombination groß, die fünf Würfel als Augen gezeichnet, der Wurfzähler mit Chips und rechts der Spielblock](docs/screenshots/play.jpg)
 
 ![Fünf Panels nebeneinander, von DiceCore selbst gerendert: ein ST7789 240x240 mit NICE ROLL über einer 20, ein ILI9341 320x240 mit HANDS OFF über 18, ein schmales ST7789 135x240 mit rotem VOID und zwei SSD1306-OLEDs](docs/screenshots/displays.png)
 
@@ -68,6 +76,8 @@ python3 -m venv .venv && .venv/bin/pip install -e '.[vision,server,dev]'
 .venv/bin/dicecore synth --count 20 --kinds d6,d20   # erfundene Würfe zum Lesen
 .venv/bin/dicecore serve                             # → http://localhost:8099/
 ```
+
+`/` ist der Spielbildschirm, `/setup` die Werkstatt.
 
 Danach `curl localhost:8099/api/v1/roll`:
 
@@ -139,6 +149,7 @@ mitrechnen.
 | [docs/API.md](docs/API.md) | Der Vertrag, auf den andere Projekte sich verlassen |
 | [docs/TRAINING.md](docs/TRAINING.md) | Ihm die eigenen Würfel beibringen |
 | [docs/ANTI-CHEAT.md](docs/ANTI-CHEAT.md) | Was die Fair-Play-Überwachung erkennt — und was nicht |
+| [docs/PLAYING.md](docs/PLAYING.md) | Spielbildschirm, Züge, Chips und die beiden Taster |
 | [docs/GAME-MODES.md](docs/GAME-MODES.md) | Die Modi, was jeder wertet, und wie ein weiterer dazukommt |
 | [docs/DISPLAYS.md](docs/DISPLAYS.md) | Display, Lampen und Summer — Panels, Pins, Verdrahtung |
 
