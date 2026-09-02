@@ -16,6 +16,7 @@
 <nav>
   <a href="/" class="away">▶ Game screen</a>
   <a href="#roll">Roll</a>
+  <a href="#network">Network</a>
   <a href="#camera">Camera</a>
   <a href="#detection">Detection</a>
   <a href="#signals">Screen &amp; lamps</a>
@@ -57,6 +58,72 @@
       <p class="hint">The boxes are what the engine found. A red box is a die it located but
         could not read — those are exactly the ones worth labelling under Training.</p>
       <div class="frame" id="roll-frame"><img id="roll-image" alt="last frame"></div>
+    </div>
+  </section>
+
+  <!-- ------------------------------------------------------------- Network -->
+  <section id="network">
+    <div class="card">
+      <h2>How this box is reached</h2>
+      <p class="hint"><b>A dice tower has no keyboard and no screen.</b> If it cannot reach
+        the WiFi — a new house, a changed password, somebody else's table — it opens
+        <em>its own</em> network after a minute, and a phone that joins it gets the setup
+        page popped open by itself. That is the way in when there is no other one.</p>
+      <div id="net-status"></div>
+      <div class="row" style="margin-top:12px">
+        <button id="btn-net-refresh">Refresh</button>
+        <button id="btn-net-scan">Scan for networks</button>
+        <button id="btn-net-ap">Open my own network now</button>
+        <button id="btn-net-ap-stop">Close it</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Join a network</h2>
+      <p class="hint">The box has one radio, so joining a network closes the one it is
+        serving — <b>including the connection you are reading this over</b>, if you came in
+        through it. That is expected: rejoin your own WiFi and the box will be on it too. If
+        the password is wrong, it reopens its own network so you are never locked out.</p>
+      <div id="net-list"><p class="muted">Press <b>Scan for networks</b>.</p></div>
+      <div class="grid" style="margin-top:12px">
+        <div><label>Network name</label><input id="net-ssid" placeholder="pick one above, or type it"></div>
+        <div><label>Password</label><input id="net-pass" type="password" placeholder="leave blank for an open network"></div>
+      </div>
+      <div class="row" style="margin-top:12px"><button class="primary" id="btn-net-join">Join</button></div>
+    </div>
+
+    <div class="card">
+      <h2>WiFi country</h2>
+      <p class="hint"><b>A Raspberry Pi refuses to transmit until it knows which country's
+        rules apply</b>, and says so as “device is not available” — which is the single most
+        common reason a fresh Pi's hotspot never appears, and a sentence nobody guesses.
+        Set it once.</p>
+      <div class="row">
+        <div style="max-width:120px"><label>Country</label><input id="net-country" maxlength="2" placeholder="DE"></div>
+        <button id="btn-net-country" style="align-self:end">Set country and unblock the radio</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>The box's own network</h2>
+      <p class="hint">Defaulting to <em>a Pi only</em> is not caution for its own sake: on a
+        desktop this would seize the WiFi adapter and start serving an access point the first
+        time a router rebooted for longer than the grace period. A dice reader must not be
+        able to do that to somebody's computer.</p>
+      <div class="grid">
+        <div><label>Open it automatically when there is no network</label>
+          <select id="net-auto">
+            <option value="pi">on a Raspberry Pi only (recommended)</option>
+            <option value="always">always, on this machine too</option>
+            <option value="off">never</option>
+          </select></div>
+        <div><label>After how long (seconds)</label><input id="net-grace" type="number"></div>
+        <div><label>Name of the network it serves</label><input id="net-apssid"></div>
+        <div><label>Password (blank = open)</label><input id="net-appass" placeholder="blank, unless you have a reason"></div>
+        <div><label>Pop the page open on phones (captive portal)</label><input id="net-captive" type="checkbox"></div>
+        <div><label>WiFi interface</label><input id="net-iface"></div>
+      </div>
+      <div class="row" style="margin-top:12px"><button class="primary" data-save>Save</button></div>
     </div>
   </section>
 
@@ -416,7 +483,13 @@
     <div class="card">
       <h2>Confirm what landed</h2>
       <p class="hint">Unconfirmed rolls come first. Change what is wrong, then confirm — a
-        die the engine could not read shows as <code>?</code>.</p>
+        die the engine could not read shows as <code>?</code>. Most of this is agreement:
+        the engine usually has the pips right and you are only here to say so, which is what
+        the button below is for.</p>
+      <div class="row" style="margin-bottom:12px">
+        <button class="primary" id="btn-confirm-read">All correct — confirm every fully read roll</button>
+        <span class="muted" id="confirm-read-note"></span>
+      </div>
       <div class="samples" id="samples"></div>
     </div>
 

@@ -49,7 +49,10 @@ if [ "$ROLE" = pi ]; then
   # rpicam-apps: the capture fallback that works on every Bookworm Pi.
   # python3-picamera2: faster capture, and a system package that cannot be pip-installed.
   # libatlas-base-dev: numpy's BLAS on a Pi.
-  apt-get install -y --no-install-recommends $BASE rpicam-apps python3-picamera2 libatlas-base-dev
+  # network-manager, rfkill, iw: the setup page manages WiFi through nmcli and reads the
+  # radio through the other two. Without them a box that loses its network has no way back.
+  apt-get install -y --no-install-recommends $BASE rpicam-apps python3-picamera2 \
+    libatlas-base-dev network-manager rfkill iw
 else
   apt-get install -y --no-install-recommends $BASE
 fi
@@ -105,6 +108,25 @@ if [ "$ROLE" = pi ]; then
   sudo -u "$USER_NAME" DICECORE_STATE="$STATE" "$VENV/bin/dicecore" synth --count 12 >/dev/null || true
 else
   "$VENV/bin/dicecore" synth --count 12 >/dev/null || true
+fi
+
+# --- the way back in --------------------------------------------------------
+if [ "$ROLE" = pi ]; then
+  echo "-- network"
+  # A Pi refuses to transmit until it knows which country's rules apply, and says so as
+  # "device is not available" — the most common reason a fresh Pi's hotspot never appears.
+  if command -v raspi-config >/dev/null; then
+    CC=$(raspi-config nonint get_wifi_country 2>/dev/null || true)
+    if [ -z "$CC" ] || [ "$CC" = "0" ]; then
+      echo "   !! no WiFi country set — the radio will stay blocked until one is."
+      echo "      Set it on the Network page, or: sudo raspi-config nonint do_wifi_country DE"
+    else
+      echo "   WiFi country: $CC"
+    fi
+  fi
+  # The service runs as root so it can manage the network and bind port 80 for the captive
+  # portal. That is the trade: a box nobody can reach is worse than a service with rights.
+  install -d /etc/NetworkManager/dnsmasq-shared.d
 fi
 
 # --- service ----------------------------------------------------------------

@@ -63,6 +63,10 @@ kurzen Assistenten durchtippen, werfen.*
   sobald die Würfel liegen, mit kleiner Animation bei einer natürlichen 20; eine grüne und
   eine rote LED plus Summer sagen, wer dran ist, ganz ohne Hinsehen. Beides optional, beides
   gleichzeitig nutzbar, und beides im Browser vorschaubar, bevor ein einziger Draht gelötet ist.
+- **Ein Weg hinein, wenn kein Netz da ist.** Eine Minute ohne WLAN, und das Gerät öffnet
+  sein eigenes — mit Captive Portal, das die Einrichtungsseite auf dem Handy von selbst
+  aufgehen lässt. Ein Turm im Regal hat weder Tastatur noch Bildschirm, und jeder andere
+  Rettungsweg bräuchte beides.
 - **Schickt Würfe hinaus.** Ein fertiger Wurf kann direkt in einen Discord-Kanal gehen, in
   eine Avrae-Variable, die ein `!phys`-Alias zurückliest, oder als JSON an eine beliebige
   URL — die Zahl vom Tisch landet dort, wo das Spiel ohnehin stattfindet.
@@ -187,6 +191,7 @@ erreicht.*
 | | |
 |---|---|
 | [docs/CONCEPT.md](docs/CONCEPT.md) | Was daraus werden soll und warum es so gebaut ist |
+| [docs/NETWORK.md](docs/NETWORK.md) | Das Gerät ins WLAN bringen — und das Netz, das es öffnet, wenn keines da ist |
 | [docs/HARDWARE.md](docs/HARDWARE.md) | Welcher Pi, welche Kamera, wohin montieren, wie beleuchten |
 | [docs/API.md](docs/API.md) | Der Vertrag, auf den andere Projekte sich verlassen |
 | [docs/TRAINING.md](docs/TRAINING.md) | Ihm die eigenen Würfel beibringen |

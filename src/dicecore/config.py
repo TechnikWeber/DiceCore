@@ -309,6 +309,38 @@ class PublishSettings:
 
 
 @dataclass
+class NetworkSettings:
+    """
+    Getting the box onto a network, and opening its own when there is none.
+
+    A dice tower on a shelf has no keyboard and no screen. If it cannot reach the WiFi there
+    has to be a way in that is not an SSH session, and the answer is that it serves its own
+    network with a captive portal — see `system/network.py`.
+    """
+
+    #: When to open the box's own network after `grace_s` without one:
+    #:
+    #: * ``"pi"`` — only on a Raspberry Pi. **The default, and it matters:** on a laptop or a
+    #:   desktop this would reconfigure somebody's WiFi the moment their router hiccupped,
+    #:   which is nobody's idea of a dice reader.
+    #: * ``"always"`` — anywhere. For a box that is not a Pi but is still on a shelf.
+    #: * ``"off"`` — never.
+    auto_hotspot: str = "pi"
+    #: How long without a network before opening one. Long enough not to react to a router
+    #: rebooting, short enough that somebody standing there does not give up.
+    grace_s: float = 45.0
+    #: The network the box serves. Open by default — somebody who cannot reach the box also
+    #: cannot be told a password.
+    hotspot_ssid: str = "DiceCore-setup"
+    hotspot_password: str = ""
+    #: Answer the "am I online?" probes so a phone opens the setup page by itself. Needs
+    #: port 80, so it needs root; without it the page still works, it just has to be typed.
+    captive_portal: bool = True
+    #: Which interface carries the WiFi. Only worth changing on odd hardware.
+    interface: str = "wlan0"
+
+
+@dataclass
 class ServerSettings:
     host: str = "0.0.0.0"
     port: int = 8099
@@ -339,6 +371,7 @@ class Settings:
     play: PlaySettings = field(default_factory=PlaySettings)
     panel: PanelSettings = field(default_factory=PanelSettings)
     publish: PublishSettings = field(default_factory=PublishSettings)
+    network: NetworkSettings = field(default_factory=NetworkSettings)
     server: ServerSettings = field(default_factory=ServerSettings)
     #: Keys we did not recognise, kept verbatim so a downgrade is not a data loss.
     extra: dict[str, Any] = field(default_factory=dict)

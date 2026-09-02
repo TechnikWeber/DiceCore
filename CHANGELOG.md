@@ -2,6 +2,50 @@
 
 Notable changes, newest first. Dates are the day the work landed.
 
+## 0.13.0 (2026-09-02)
+
+### Added
+- **A way in when there is no network.** Ported from YonderRC: after 45 seconds without a
+  network the box opens its own, and a captive portal on port 80 pops the setup page open on
+  a phone. Forty-five seconds rather than immediately, because a router rebooting takes a
+  network away for twenty and a box that runs off with its own radio every time is worse
+  than one that waits. A **Network** page scans, joins, sets the WiFi country and opens or
+  closes the box's own network by hand.
+- The hotspot is built with explicit `nmcli` calls rather than `nmcli device wifi hotspot`,
+  which cannot produce an **open** network — and open is the point, since somebody who
+  cannot reach the box cannot be told a password either. A failed join **reopens** it, so a
+  wrong password never leaves a box unreachable.
+- The page names the actual failure: "device is not available" means the radio is blocked
+  because no WiFi country has ever been set, which is the most common reason a fresh Pi's
+  hotspot never appears and a sentence nobody guesses.
+- **Undo**, one step, for a booking, a bank or an ended turn. A misclick on a scorecard cost
+  that box for the rest of the game, which is the most expensive mistake the interface
+  allows and the easiest one to make.
+- **"All correct"**: one button confirms every stored roll the engine read completely. Two
+  hundred d20 faces was two hundred clicks, and that is the evening that decides how good
+  the model gets. Rolls with a die the engine could not read are left for a person — those
+  are the ones that need looking at.
+- `docs/NETWORK.md`.
+
+### Fixed
+- **The auto-hotspot would have taken over a desktop's WiFi.** As first written it ran
+  everywhere, so a development machine would have seized the adapter and started serving an
+  access point the first time a router rebooted for longer than the grace period. It is now
+  "on a Raspberry Pi only" by default, with "always" and "never" available.
+- **The model pipeline had never been run once, and did not work.** `torch.onnx.export`
+  needs `onnxscript`, which was missing from the `train` extra — so training completed and
+  then failed at the one step that produces a model. Fixed, and the whole chain (train →
+  export → load → read) now runs as a test: 98% validation accuracy on a synthetic set and
+  9 of 10 dice read correctly from fresh frames.
+- The ONNX export used the deprecated `dynamic_axes` form, and the modern `dynamic_shapes`
+  is positional rather than keyed by input name — keying it by name falls through to the old
+  path silently, which is why it was easy to get wrong.
+- The training loop read its loss off a tensor that still carried a gradient.
+- **"No dice found" now says why.** It counts what was rejected and by how much: *"1 object
+  was rejected as too big — the largest filled 15% of the tray and the limit is 8%"*. A tray
+  cropped tightly around the landing area, which the tray editor encourages, makes every die
+  too big and used to say nothing at all.
+
 ## 0.12.1 (2026-09-02)
 
 ### Changed

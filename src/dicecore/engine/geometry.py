@@ -26,6 +26,57 @@ def plausible_die(box: Box, frame_area: int, min_area_frac: float, max_area_frac
     return min_aspect <= aspect <= max_aspect
 
 
+def why_not_a_die(box: Box, frame_area: int, min_area_frac: float, max_area_frac: float,
+                 min_aspect: float, max_aspect: float) -> tuple[str, float]:
+    """Which test a blob failed, and by how much. Pure, so the message can be tested."""
+    if box.w <= 0 or box.h <= 0 or frame_area <= 0:
+        return "empty", 0.0
+    frac = box.area / frame_area
+    if frac < min_area_frac:
+        return "too small", frac
+    if frac > max_area_frac:
+        return "too big", frac
+    aspect = box.w / box.h
+    if aspect < min_aspect or aspect > max_aspect:
+        return "wrong shape", aspect
+    return "other", frac
+
+
+def explain_no_dice(rejected: list[tuple[str, float]], min_area_frac: float,
+                    max_area_frac: float) -> str:
+    """
+    Say why nothing was found, using what was actually thrown away.
+
+    "No dice found" is true and useless. The common cause is a tray cropped tightly around
+    the landing area — which the tray editor positively encourages — after which every die
+    is more than the allowed fraction of it and vanishes without a word.
+    """
+    if not rejected:
+        return ("No dice found, and nothing on the tray even looked like an object. Check "
+                "the contrast setting (dice lighter than the tray?), the light, and that "
+                "the tray region actually contains the landing area.")
+    reasons: dict[str, list[float]] = {}
+    for reason, value in rejected:
+        reasons.setdefault(reason, []).append(value)
+    biggest = max(reasons.items(), key=lambda item: len(item[1]))
+    count, name = len(biggest[1]), biggest[0]
+    worst = max(biggest[1]) if name == "too big" else min(biggest[1])
+    if name == "too big":
+        return (f"No dice found: {count} object(s) were rejected as too big — the largest "
+                f"filled {worst:.0%} of the tray and the limit is {max_area_frac:.0%}. "
+                f"Either the tray region is cropped tighter than the dice, or raise "
+                f"\"largest die\" under the classic engine.")
+    if name == "too small":
+        return (f"No dice found: {count} object(s) were rejected as too small — the largest "
+                f"filled {worst:.2%} of the tray and the limit is {min_area_frac:.2%}. "
+                f"Either the camera is too far away, or lower \"smallest die\".")
+    if name == "wrong shape":
+        return (f"No dice found: {count} object(s) were the right size but the wrong shape "
+                f"(the most square was {worst:.2f} wide for its height). Usually two dice "
+                f"touching, or a shadow joined to a die.")
+    return ("No dice found. Check the contrast setting, the light, and the tray region.")
+
+
 def roi_box(frame_w: int, frame_h: int, x: float, y: float, w: float, h: float) -> Box:
     """
     Turn the tray rectangle (fractions of the frame) into pixels, clamped to the frame.

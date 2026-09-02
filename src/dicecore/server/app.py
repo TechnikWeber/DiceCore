@@ -42,6 +42,8 @@ from ..panel import state as phases
 from ..panel.displays import COMMON_SIZES, PANELS
 from ..reader import Reader
 from ..system import boot_config, diagnostics
+from ..system.network import HotspotProfile, Network, is_country_code
+from ..system.portal import CaptivePortal, Watcher, auto_hotspot_wanted
 from ..training import TrainingManager
 from ..training.data import readiness
 
@@ -93,7 +95,7 @@ def create_app(settings: Settings | None = None) -> Any:
     buttons = ButtonPanel(loaded.panel.signals, on_chip, on_next)
     state["buttons"] = buttons
 
-    app = FastAPI(title="DiceCore", version="0.12.1",
+    app = FastAPI(title="DiceCore", version="0.13.0",
                   description="Reads real dice with a camera.")
     app.state.reader = reader
     app.state.training = training
@@ -101,6 +103,22 @@ def create_app(settings: Settings | None = None) -> Any:
     app.state.buttons = buttons
     installer = Installer()
     state["installer"] = installer
+
+    # The network, and the watcher that opens the box's own when there is none. Started
+    # here because a box that cannot be reached is exactly the one that has to fix itself.
+    network = Network(loaded.network.interface)
+    portal = CaptivePortal(loaded.server.port)
+    watcher = Watcher(network, portal,
+                      HotspotProfile(loaded.network.hotspot_ssid,
+                                     loaded.network.hotspot_password),
+                      loaded.network.grace_s)
+    state["network"] = network
+    state["watcher"] = watcher
+    # Only where it belongs: see `auto_hotspot_wanted`. A development machine must not have
+    # its WiFi taken over because a router hiccupped.
+    if auto_hotspot_wanted(loaded.network.auto_hotspot, diagnostics.pi_model() is not None):
+        watcher.start()
+    app.state.network = network
 
     def store() -> DatasetStore:
         # The printing style travels with the store: it decides which labels are legal.
@@ -244,6 +262,19 @@ def create_app(settings: Settings | None = None) -> Any:
         except ValueError as exc:
             return fail(exc, 400)
         return {**outcome, "game": reader.game.to_json()}
+
+    @app.post("/api/v1/game/undo")
+    def game_undo() -> Any:
+        """
+        Take back the last booking, bank or ended turn — one step.
+
+        A misclick on a scorecard costs that box for the rest of the game, which is the most
+        expensive mistake the interface allows and the easiest one to make.
+        """
+        ok, problem = reader.game.undo()
+        if not ok:
+            return fail(RuntimeError(problem or "Nothing to take back."), 409)
+        return reader.game.to_json()
 
     @app.post("/api/v1/game/next")
     def game_next() -> Any:
@@ -545,7 +576,75 @@ def create_app(settings: Settings | None = None) -> Any:
         state["buttons"].close()
         state["buttons"] = ButtonPanel(updated.panel.signals, on_chip, on_next)
         app.state.buttons = state["buttons"]
+        watcher.profile = HotspotProfile(updated.network.hotspot_ssid,
+                                         updated.network.hotspot_password)
+        watcher.grace_s = updated.network.grace_s
+        if auto_hotspot_wanted(updated.network.auto_hotspot,
+                               diagnostics.pi_model() is not None):
+            watcher.start()
         return {"ok": True, "settings": updated.to_dict()}
+
+    @app.get("/api/setup/network")
+    def network_status() -> Any:
+        """What the box is connected to, what it can see, and what it is doing about it."""
+        return {**state["network"].status(), "watcher": state["watcher"].describe(),
+                "settings": {
+                    "auto_hotspot": state["settings"].network.auto_hotspot,
+                    "is_pi": diagnostics.pi_model() is not None,
+                    "grace_s": state["settings"].network.grace_s,
+                    "hotspot_ssid": state["settings"].network.hotspot_ssid,
+                    "hotspot_open": not state["settings"].network.hotspot_password,
+                    "captive_portal": state["settings"].network.captive_portal}}
+
+    @app.post("/api/setup/network/scan")
+    def network_scan() -> Any:
+        """What is in range. Takes a couple of seconds — the radio has to go and look."""
+        return {"networks": state["network"].scan()}
+
+    @app.post("/api/setup/network/join")
+    async def network_join(request: Request) -> Any:
+        """
+        Join a network.
+
+        The answer arrives *before* the switch completes, because completing it takes the
+        connection you are reading this over away with it — that is what having one radio
+        means, and the page says so rather than appearing to hang.
+        """
+        body = await request.json()
+        ok, message = state["network"].join(str(body.get("ssid", "")),
+                                            str(body.get("password", "")))
+        return {"ok": ok, "detail": message, "status": state["network"].status()}
+
+    @app.post("/api/setup/network/hotspot")
+    async def network_hotspot(request: Request) -> Any:
+        """Open or close the box's own network by hand."""
+        body = await request.json() if await request.body() else {}
+        current = state["settings"]
+        if body.get("stop"):
+            ok, message = state["network"].stop_hotspot()
+            state["watcher"].portal.stop()
+            return {"ok": ok, "detail": message}
+        profile = HotspotProfile(str(body.get("ssid") or current.network.hotspot_ssid),
+                                 str(body.get("password") or current.network.hotspot_password))
+        ok, message = state["network"].start_hotspot(profile)
+        if ok and current.network.captive_portal:
+            state["watcher"].portal.start()
+        return {"ok": ok, "detail": message}
+
+    @app.post("/api/setup/network/country")
+    async def network_country(request: Request) -> Any:
+        """
+        Set the WiFi country, which a Pi refuses to transmit without.
+
+        The single most common reason a fresh Pi's hotspot never appears, and a sentence
+        nobody guesses from nmcli's "device is not available".
+        """
+        body = await request.json()
+        code = str(body.get("country", ""))
+        if not is_country_code(code):
+            raise HTTPException(400, f"{code!r} is not a two-letter country code.")
+        ok, message = state["network"].set_country(code)
+        return {"ok": ok, "detail": message}
 
     @app.get("/api/setup/hardware")
     def hardware() -> Any:
@@ -731,6 +830,36 @@ def create_app(settings: Settings | None = None) -> Any:
         except FileNotFoundError as exc:
             raise HTTPException(404, str(exc)) from exc
         return {"sample": sample.to_json(), "result": result.to_json()}
+
+    @app.post("/api/setup/sets/{set_id}/confirm-read")
+    async def confirm_all_read(set_id: str, request: Request) -> Any:
+        """
+        Confirm every stored roll the engine read completely, as it read it.
+
+        The label loop is mostly agreement: the engine has the pips right and the person is
+        only there to say so. Two hundred d20 faces is two hundred clicks otherwise, and
+        that is the evening that decides how good the model gets. Rolls with a die the
+        engine could not read are left alone — those are the ones that need a person.
+        """
+        body = await request.json() if await request.body() else {}
+        limit = int(body.get("limit", 200))
+        try:
+            samples = list(store().iter_samples(set_id))
+        except FileNotFoundError as exc:
+            raise HTTPException(404, str(exc)) from exc
+
+        confirmed = skipped = 0
+        for sample in samples[:limit]:
+            if sample.confirmed:
+                continue
+            if any(die.predicted is None or die.value == 0 for die in sample.dice) \
+                    or not sample.dice:
+                skipped += 1
+                continue
+            store().update_sample(set_id, sample.id,
+                                  [{"kind": d.kind, "value": d.value} for d in sample.dice])
+            confirmed += 1
+        return {"confirmed": confirmed, "needs_you": skipped}
 
     @app.patch("/api/setup/sets/{set_id}/samples/{sample_id}")
     async def update_sample(set_id: str, sample_id: str, request: Request) -> Any:

@@ -63,11 +63,27 @@ def from_dict(data: dict[str, Any]) -> GameSession:
     """Rebuild a session. Raises on anything it cannot make sense of; the caller drops it."""
     if int(data.get("version", 0)) != VERSION:
         raise ValueError(f"game file is version {data.get('version')}, not {VERSION}")
-
     rules = TurnRules(**{k: data["rules"][k] for k in
                          ("rolls", "holds", "chips", "auto_end", "unlimited")})
     session = GameSession(str(data["mode"]), rules, list(data["players"]),
                           dict(data.get("params") or {}))
+    return apply_dict(session, data)
+
+
+def apply_dict(session: GameSession, data: dict[str, Any]) -> GameSession:
+    """
+    Pour a saved state back into a session that already exists.
+
+    Needed twice: reading a game off disk at startup, and undoing a move — both are "make
+    this session be that state again", and the reader holds one session object for the life
+    of the process, so replacing it is not an option.
+    """
+    rules = TurnRules(**{k: data["rules"][k] for k in
+                         ("rolls", "holds", "chips", "auto_end", "unlimited")})
+    session.mode = str(data["mode"])
+    session.rules = rules
+    session.players = list(data["players"])
+    session.params = dict(data.get("params") or {})
     session.colours = list(data.get("colours") or session.colours)
     session.chips = list(data.get("chips") or session.chips)
     session.started = float(data.get("started", session.started))

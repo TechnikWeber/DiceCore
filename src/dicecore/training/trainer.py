@@ -160,7 +160,9 @@ def train_model(
             loss = loss_fn(model(augment(xb)), yb)
             loss.backward()
             optimiser.step()
-            running += float(loss) * len(xb)
+            # .detach() first: converting a tensor that still carries a gradient to a
+            # scalar keeps the whole graph alive for as long as the number is held.
+            running += loss.detach().item() * len(xb)
         schedule.step()
 
         model.eval()
@@ -181,13 +183,25 @@ def train_model(
     out_dir.mkdir(parents=True, exist_ok=True)
     emit(stage="exporting", message="Writing model.onnx…")
     dummy = torch.zeros(1, 1, INPUT_SIZE, INPUT_SIZE)
-    torch.onnx.export(
-        model, dummy, str(out_dir / MODEL_FILE),
-        input_names=["crop"], output_names=["logits"],
-        # A whole roll is classified in one call, so the batch axis must stay dynamic.
-        dynamic_axes={"crop": {0: "batch"}, "logits": {0: "batch"}},
-        opset_version=17,
-    )
+    # A whole roll is classified in one call, so the batch axis must stay dynamic — get
+    # that wrong and a second die on the tray throws at inference time.
+    #
+    # Two ways of saying it. `dynamic_shapes` is what the current exporter wants and
+    # `dynamic_axes` is what older PyTorch understands, so ask for the new one and fall
+    # back. Pinning either would break on half the versions somebody might have.
+    #
+    # `dynamic_shapes` is positional — a tuple matching the model's arguments, not a dict
+    # keyed by ONNX input name. Keying it by name silently falls through to the deprecated
+    # path, which still works and is why this was easy to get wrong quietly.
+    common = dict(input_names=["crop"], output_names=["logits"], opset_version=18)
+    try:
+        torch.onnx.export(model, (dummy,), str(out_dir / MODEL_FILE),
+                          dynamic_shapes=({0: torch.export.Dim("batch")},), **common)
+    except Exception:
+        # Older PyTorch: the same statement in the language it understands.
+        torch.onnx.export(model, dummy, str(out_dir / MODEL_FILE),
+                          dynamic_axes={"crop": {0: "batch"}, "logits": {0: "batch"}},
+                          **{**common, "opset_version": 17})
     meta = ModelMeta(
         classes=classes, input_size=INPUT_SIZE, mean=MEAN, std=STD,
         trained_at=time.time(), samples=int(len(labels)), accuracy=round(best_accuracy, 4),

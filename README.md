@@ -59,6 +59,9 @@ through a short wizard, throw.*
   instant the dice stop, with a small animation for a natural 20; a green and a red LED plus
   a buzzer say whose turn it is without anyone reading anything. Both are optional, both run
   at once, and both are previewed in the browser before a single wire is soldered.
+- **A way in when there is no network.** No WiFi for a minute and the box opens its own,
+  with a captive portal that pops the setup page open on a phone — because a tower on a
+  shelf has no keyboard and no screen, and every other recovery needs one.
 - **Sends rolls out.** A finished roll can go straight into a Discord channel, into an
   Avrae variable a `!phys` alias reads back, or as JSON to any URL of yours — so the number
   off your table lands where the game already is.
@@ -179,6 +182,7 @@ does instead is put your number where an alias can reach it.*
 | | |
 |---|---|
 | [docs/CONCEPT.md](docs/CONCEPT.md) | What this is meant to become, and why it is built this way |
+| [docs/NETWORK.md](docs/NETWORK.md) | Getting the box on the WiFi, and the network it opens when there is none |
 | [docs/HARDWARE.md](docs/HARDWARE.md) | Which Pi, which camera, where to mount it, how to light it |
 | [docs/API.md](docs/API.md) | The contract other projects depend on |
 | [docs/TRAINING.md](docs/TRAINING.md) | Teaching it your own dice |

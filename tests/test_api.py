@@ -509,3 +509,36 @@ def test_a_test_send_reports_what_actually_happened(client):
     # It waits for the answer rather than firing and forgetting: finding out whether the
     # token is right is the entire point, and "sent" is not that answer.
     assert len(attempts) == 1 and attempts[0]["ok"] is False
+
+
+def test_a_booking_can_be_undone_over_the_api(client):
+    client.post("/api/v1/game/start", json={"mode": "yahtzee", "players": ["A", "B"]})
+    client.get("/api/v1/roll?verify=0")
+    client.post("/api/v1/game/book", json={"category": "chance"})
+    assert client.get("/api/v1/game").json()["game"]["can_undo"] is True
+
+    after = client.post("/api/v1/game/undo").json()
+    assert after["current_player"] == "A" and after["turn"]["number"] == 1
+    assert after["cards"][0]["scores"]["chance"] is None
+    # And only one step back.
+    assert client.post("/api/v1/game/undo").status_code == 409
+
+
+def test_every_fully_read_roll_can_be_confirmed_at_once(client):
+    # Two hundred d20 faces is two hundred clicks otherwise, and that is the evening that
+    # decides how good the model gets.
+    set_id = client.post("/api/setup/sets", json={"name": "bulk"}).json()["id"]
+    for _ in range(4):
+        client.post(f"/api/setup/sets/{set_id}/capture")
+    answer = client.post(f"/api/setup/sets/{set_id}/confirm-read").json()
+    assert answer["confirmed"] >= 1
+    stats = client.get("/api/setup/sets").json()[0]["stats"]
+    assert stats["confirmed_dice"] >= 1
+
+
+def test_a_roll_with_a_die_the_engine_could_not_read_is_left_for_a_person(client):
+    # Those are exactly the ones that need somebody to look.
+    set_id = client.post("/api/setup/sets", json={"name": "mixed"}).json()["id"]
+    client.post(f"/api/setup/sets/{set_id}/capture")
+    answer = client.post(f"/api/setup/sets/{set_id}/confirm-read").json()
+    assert answer["confirmed"] + answer["needs_you"] >= 1

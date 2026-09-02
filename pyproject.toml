@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "dicecore"
-version = "0.12.1"
+version = "0.13.0"
 description = "Reads real dice with a camera: pips, polyhedral numerals, totals — as an API."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -25,7 +25,9 @@ server = ["fastapi>=0.110", "uvicorn[standard]>=0.27", "python-multipart>=0.0.9"
 # Running a trained model on this machine (Pi 4/5, or a PC — not ARMv6).
 model = ["onnxruntime>=1.17"]
 # Training a model. PyTorch, so: a PC, not a Pi.
-train = ["torch>=2.2", "torchvision>=0.17", "onnx>=1.15"]
+# onnxscript is not optional despite the name: torch.onnx.export imports it, so without it
+# training runs to the end and then fails at the one step that produces the model.
+train = ["torch>=2.2", "torchvision>=0.17", "onnx>=1.15", "onnxscript>=0.1"]
 # A small screen over the tower: ST7789 / ILI9341 (SPI) and SSD1306 (I2C or SPI).
 display = ["pillow>=10", "luma.lcd>=2.11", "luma.oled>=3.13"]
 # Two lamps and a buzzer on the GPIO header.

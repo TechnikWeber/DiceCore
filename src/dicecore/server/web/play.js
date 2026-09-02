@@ -244,6 +244,7 @@ function renderGame() {
         <button class="primary" id="btn-aside" hidden>Set aside</button>
         <button id="btn-bank" hidden>Bank</button>
         <button class="chip" id="btn-chip" hidden>Spend a chip</button>
+        <button id="btn-undo" hidden>Undo that</button>
         <button id="btn-next" hidden>End turn</button>
       </div>
     </section>
@@ -349,6 +350,8 @@ function renderActions(game, roll) {
   }
   show("btn-next", !game.farkle && !game.cards.length);
   $("btn-next").disabled = game.turn.rolls_used === 0;
+  show("btn-undo", Boolean(game.can_undo));
+  $("btn-undo").onclick = () => post("/api/v1/game/undo");
 
   $("btn-chip").onclick = () => post("/api/v1/game/chip");
   $("btn-aside").onclick = () => post("/api/v1/game/aside");

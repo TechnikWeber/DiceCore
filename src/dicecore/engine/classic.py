@@ -77,11 +77,19 @@ class ClassicEngine(Engine):
         area = roi.w * roi.h
 
         candidates: list[tuple[Box, Any]] = []
+        # Why each rejected blob was rejected. Without this, a tray cropped a little too
+        # tightly makes every die "too big" and the only thing said is "no dice found" —
+        # which sends people looking at the light, the focus and the threshold instead of
+        # at the one number that is actually wrong.
+        rejected: list[tuple[str, float]] = []
         for contour in contours:
             x, y, cw, ch = cv2.boundingRect(contour)
             box = Box(int(x), int(y), int(cw), int(ch))
             if not geo.plausible_die(box, area, cfg.min_area_frac, cfg.max_area_frac,
                                      cfg.min_aspect, cfg.max_aspect):
+                rejected.append(geo.why_not_a_die(box, area, cfg.min_area_frac,
+                                                  cfg.max_area_frac, cfg.min_aspect,
+                                                  cfg.max_aspect))
                 continue
             if any(geo.overlaps(box, other) for other, _ in candidates):
                 continue
@@ -119,10 +127,8 @@ class ClassicEngine(Engine):
                 "numerals."
             )
         if not dice:
-            warnings.append(
-                "No dice found. Check the tray region and the contrast setting "
-                "(classic.dice_are_light), and that the tray is actually in frame."
-            )
+            warnings.append(geo.explain_no_dice(rejected, cfg.min_area_frac,
+                                                cfg.max_area_frac))
 
         return RollResult(
             dice=dice,

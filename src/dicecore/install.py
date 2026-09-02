@@ -24,7 +24,8 @@ from typing import Any
 
 #: key → (what it is for, the extra as written in pyproject.toml)
 EXTRAS: dict[str, tuple[str, str]] = {
-    "train": ("Training models on this machine (PyTorch, ~2 GB)", "train"),
+    "train": ("Training models on this machine (PyTorch and its ONNX exporter, ~2 GB)",
+              "train"),
     "model": ("Running a trained model here (onnxruntime)", "model"),
     "vision": ("Reading dice here at all (numpy, OpenCV)", "vision"),
     "display": ("A small screen over the tower (luma, Pillow)", "display"),

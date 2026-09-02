@@ -104,6 +104,10 @@ class GameSession:
         #: showing it would put a headline over a different set of dice.
         self.reading: dict[str, Any] | None = None
         self.message: str = ""
+        #: The state before the last move that cannot be un-made by playing on — a booking,
+        #: a bank, a finished turn. One step only: "I hit the wrong box" is the mistake this
+        #: exists for, and a deeper history would invite using it to re-decide a game.
+        self._undo: dict[str, Any] | None = None
         self._reset_cards()
 
     # --- lifecycle ----------------------------------------------------------
@@ -159,6 +163,7 @@ class GameSession:
             self.params = dict(params or {})
             self.reset()
             self.running = True
+            self._undo = None
             self.touch()
 
     def stop(self) -> None:
@@ -247,6 +252,7 @@ class GameSession:
         with self._lock:
             if self.farkle is None:
                 raise ValueError("This game has nothing to bank.")
+            self.snapshot()
             player = self.turn.player
             gained, problem = self.farkle.bank(player)
             self.log.append(TurnRecord(player, self.turn.number, self.turn.values(),
@@ -262,6 +268,7 @@ class GameSession:
         with self._lock:
             if not self.cards:
                 raise ValueError("This game has no scorecard.")
+            self.snapshot()
             card = self.cards[self.turn.player]
             # Booking a category that scores nothing is a real move — crossing a box out —
             # but it costs you that box for the rest of the game, so it has to be meant.
@@ -306,10 +313,43 @@ class GameSession:
             if problem:
                 self.message = problem
                 return False, problem
+            self.snapshot()
             if self.turn.dice:
                 self.log.append(TurnRecord(self.turn.player, self.turn.number,
                                            self.turn.values(), headline=headline))
             self._advance()
+            return True, None
+
+    def snapshot(self) -> None:
+        """Remember where we are, so the next move can be taken back."""
+        from . import store
+
+        try:
+            self._undo = store.to_dict(self)
+        except Exception:
+            self._undo = None
+
+    @property
+    def can_undo(self) -> bool:
+        return self._undo is not None
+
+    def undo(self) -> tuple[bool, str | None]:
+        """
+        Put the last booking back.
+
+        A misclick on a scorecard costs that box for the rest of the game, which is the most
+        expensive mistake the interface allows and the easiest one to make. Exactly one step:
+        anything more would turn a slip into a way of re-deciding a turn that went badly.
+        """
+        with self._lock:
+            if self._undo is None:
+                return False, "Nothing to take back."
+            from . import store
+
+            store.apply_dict(self, self._undo)
+            self._undo = None
+            self.message = "Taken back."
+            self.touch()
             return True, None
 
     def touch(self) -> None:
@@ -359,6 +399,7 @@ class GameSession:
                           "chips": self.rules.chips, "multi": self.rules.multi},
                 "turn": self.turn.to_json(),
                 "reading": self.reading,
+                "can_undo": self.can_undo,
                 "current_player": self.players[self.turn.player % len(self.players)],
                 "cards": [c.to_json() for c in self.cards],
                 "sheet": kniffel.sheet_json(self.sheet) if self.sheet else None,

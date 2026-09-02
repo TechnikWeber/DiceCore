@@ -50,6 +50,7 @@ function showTab() {
   if (name === "signals") pollOutputs();
   if (name === "detection") { pollModeSession(); renderPlayState(); refreshTrayImage(); }
   if (name === "training") { loadSets(); pollTraining(); }
+  if (name === "network") refreshNetwork();
   if (name === "api") pollPublish();
   if (name === "system") refreshStatus();
 }
@@ -292,6 +293,15 @@ function loadForm() {
       $("avrae-alias").textContent = avraeAlias(pb.avrae_uvar || "dicecore");
       $("avrae-alias-roll").textContent = avraeRollAlias(pb.avrae_uvar || "dicecore");
     },
+    network: () => {
+      const n = s.network;
+      $("net-auto").value = n.auto_hotspot;
+      $("net-grace").value = n.grace_s;
+      $("net-apssid").value = n.hotspot_ssid;
+      $("net-appass").value = n.hotspot_password;
+      $("net-captive").checked = n.captive_portal;
+      $("net-iface").value = n.interface;
+    },
     server: () => {
       $("sv-stream").checked = s.server.stream_enabled;
       $("sv-fps").value = s.server.stream_fps;
@@ -363,6 +373,12 @@ function collectForm() {
   s.panel.signals.next_pin = Number($("sg-nextbtn").value);
   s.panel.signals.button_pull_up = $("sg-pullup").checked;
   s.panel.signals.debounce_s = Number($("sg-debounce").value);
+  s.network.auto_hotspot = $("net-auto").value;
+  s.network.grace_s = Number($("net-grace").value);
+  s.network.hotspot_ssid = $("net-apssid").value.trim() || "DiceCore-setup";
+  s.network.hotspot_password = $("net-appass").value;
+  s.network.captive_portal = $("net-captive").checked;
+  s.network.interface = $("net-iface").value.trim() || "wlan0";
   s.publish.enabled = $("pb-enabled").checked;
   s.publish.only_usable = $("pb-usable").checked;
   s.publish.avrae_enabled = $("pb-avrae").checked;
@@ -641,7 +657,8 @@ async function loadSamples() {
       <img loading="lazy" src="/api/setup/sets/${state.setId}/samples/${sample.id}.jpg">
       <div class="dice">${dice || '<span class="muted">no dice found</span>'}</div>
       <div class="row" style="margin-top:8px">
-        <button class="primary confirm">${sample.dice.every((d) => d.confirmed) ? "Confirmed ✓" : "Confirm"}</button>
+        <button class="primary confirm">${sample.dice.every((d) => d.confirmed)
+          ? "Confirmed ✓" : "All correct"}</button>
         <button class="danger drop">Delete</button>
       </div>
     </div>`;
@@ -949,6 +966,54 @@ async function testOutputs(phase) {
   } catch (err) { alertBox(err.message); }
 }
 
+// --- the network ------------------------------------------------------------
+
+async function refreshNetwork() {
+  let info;
+  try { info = await api("/api/setup/network"); } catch (err) {
+    $("net-status").innerHTML = `<div class="msg bad">${escapeHtml(err.message)}</div>`;
+    return;
+  }
+  if (!info.managed) {
+    $("net-status").innerHTML = `<div class="msg warn">${escapeHtml(info.reason)}</div>`;
+    return;
+  }
+  const radio = info.radio;
+  const rows = [
+    ["Reached at", info.address || "—"],
+    ["Ethernet", info.ethernet ? "connected" : "—"],
+    ["WiFi", info.hotspot ? "serving its own network" : (info.wifi ? "joined" : "—")],
+    ["Internet", info.online ? "yes" : "no"],
+    ["WiFi country", radio.country || "not set"],
+    ["Radio", radio.usable ? "usable"
+      : (radio.hard_blocked ? "blocked by a hardware switch" : "blocked")],
+  ];
+  $("net-status").innerHTML =
+    `<table>${rows.map(([k, v]) => `<tr><th>${k}</th><td>${escapeHtml(v)}</td></tr>`).join("")}</table>`
+    + (info.error ? `<div class="msg warn" style="margin-top:10px"><b>${escapeHtml(info.error.cause)}</b><br>${escapeHtml(info.error.fix)}</div>` : "")
+    + (info.watcher.portal_problem
+        ? `<div class="msg warn" style="margin-top:10px">Captive portal: ${escapeHtml(info.watcher.portal_problem)}. The setup page still works, it just has to be typed in.</div>` : "")
+    + (info.watcher.last_action
+        ? `<p class="muted">Last thing it did by itself: ${escapeHtml(info.watcher.last_action)}</p>` : "");
+}
+
+async function scanNetworks() {
+  $("net-list").innerHTML = `<p class="muted">Looking…</p>`;
+  try {
+    const { networks } = await api("/api/setup/network/scan", json("POST", {}));
+    $("net-list").innerHTML = networks.length
+      ? `<table><tr><th>Network</th><th>Signal</th><th>Security</th><th></th></tr>${
+          networks.map((n) => `<tr><td>${escapeHtml(n.ssid)}</td><td>${n.signal}%</td>
+            <td>${escapeHtml(n.security)}</td>
+            <td><button data-ssid="${escapeHtml(n.ssid)}">Use</button></td></tr>`).join("")
+        }</table>`
+      : `<p class="muted">Nothing in range — or the radio is blocked; see above.</p>`;
+    $("net-list").querySelectorAll("[data-ssid]").forEach((b) => {
+      b.onclick = () => { $("net-ssid").value = b.dataset.ssid; $("net-pass").focus(); };
+    });
+  } catch (err) { $("net-list").innerHTML = `<div class="msg bad">${escapeHtml(err.message)}</div>`; }
+}
+
 // --- sending rolls out ------------------------------------------------------
 
 //: The alias a player pastes into Discord once. Written in Draconic without f-strings or
@@ -1054,6 +1119,44 @@ document.querySelectorAll("[data-save]").forEach((b) => (b.onclick = saveSetting
 $("btn-roll").onclick = roll;
 $("btn-preview").onclick = refreshPreview;
 $("btn-hardware").onclick = refreshHardware;
+$("btn-net-refresh").onclick = refreshNetwork;
+$("btn-net-scan").onclick = scanNetworks;
+$("btn-net-ap").onclick = async () => {
+  try {
+    const a = await api("/api/setup/network/hotspot", json("POST", {}));
+    alertBox(a.detail, a.ok ? "good" : "bad");
+    refreshNetwork();
+  } catch (err) { alertBox(err.message); }
+};
+$("btn-net-ap-stop").onclick = async () => {
+  try {
+    const a = await api("/api/setup/network/hotspot", json("POST", { stop: true }));
+    alertBox(a.detail, a.ok ? "good" : "bad");
+    refreshNetwork();
+  } catch (err) { alertBox(err.message); }
+};
+$("btn-net-join").onclick = async () => {
+  const ssid = $("net-ssid").value.trim();
+  if (!ssid) { alertBox("Pick a network first."); return; }
+  // Said before the call, not after: joining takes this connection away if you came in
+  // through the box's own network, and the answer may never arrive.
+  alertBox(`Joining “${ssid}” — if you are on the box's own network this page will stop `
+    + `responding. Rejoin your own WiFi and the box will be there too.`, "warn");
+  try {
+    const a = await api("/api/setup/network/join",
+                        json("POST", { ssid, password: $("net-pass").value }));
+    alertBox(a.detail, a.ok ? "good" : "bad");
+    refreshNetwork();
+  } catch (err) { alertBox(`No answer — which is expected if the switch worked. ${err.message}`, "warn"); }
+};
+$("btn-net-country").onclick = async () => {
+  try {
+    const a = await api("/api/setup/network/country",
+                        json("POST", { country: $("net-country").value }));
+    alertBox(a.detail, a.ok ? "good" : "bad");
+    refreshNetwork();
+  } catch (err) { alertBox(err.message); }
+};
 $("btn-tray-refresh").onclick = refreshTrayImage;
 $("btn-tray-all").onclick = () => drawTray({ x: 0, y: 0, w: 1, h: 1 });
 setupTrayEditor();
@@ -1078,6 +1181,19 @@ $("btn-train").onclick = async () => {
   } catch (err) { alertBox(err.message); }
 };
 $("btn-train-stop").onclick = () => api("/api/setup/training/stop", { method: "POST" }).catch(() => {});
+$("btn-confirm-read").onclick = async () => {
+  if (!state.setId) { alertBox("Pick a set first."); return; }
+  try {
+    const answer = await api(`/api/setup/sets/${state.setId}/confirm-read`, json("POST", {}));
+    $("confirm-read-note").textContent = answer.needs_you
+      ? `${answer.needs_you} roll(s) still need you — the engine could not read every die.`
+      : "";
+    alertBox(answer.confirmed
+      ? `${answer.confirmed} roll(s) confirmed as read.`
+      : "Nothing to confirm — every fully read roll is already done.", "good");
+    await loadSets();
+  } catch (err) { alertBox(err.message); }
+};
 $("btn-export-set").onclick = () => {
   if (!state.setId) { alertBox("Pick a set first."); return; }
   // A plain download: the browser is better at saving a file than any code here would be.

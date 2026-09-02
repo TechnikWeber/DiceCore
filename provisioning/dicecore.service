@@ -5,8 +5,11 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-User=dicecore
-Group=video
+# Root, deliberately. Two things need it and both are the difference between a box you can
+# recover and one you cannot: managing WiFi through NetworkManager when the network is gone,
+# and binding port 80 for the captive portal that opens the setup page on a phone. The
+# alternative is a box on a shelf with no keyboard, no screen and no way in.
+User=root
 # The camera lives behind /dev/video* and /dev/dma_heap, hence the video group.
 WorkingDirectory=/opt/dicecore
 Environment=DICECORE_STATE=/var/lib/dicecore
@@ -20,11 +23,9 @@ RestartSec=3
 StandardOutput=journal
 StandardError=journal
 
-# Writing /boot/firmware/config.txt (the CSI module panel) needs root. It is not granted
-# here on purpose — apply a module change with `sudo dicecore camera-module <id>` instead,
-# so the one file that decides whether the Pi boots is never written by a web request.
+# config.txt stays writable because the CSI module panel writes it — the one file that
+# decides whether the Pi boots. Backed up beside itself on every change; see boot_config.py.
 NoNewPrivileges=yes
-ProtectSystem=full
 ProtectHome=yes
 PrivateTmp=yes
 

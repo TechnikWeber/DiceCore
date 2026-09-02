@@ -528,3 +528,53 @@ def test_the_dice_colours_survive_the_round_trip(tmp_path):
     rolled.dice[0].colour = "red"
     session.observe(rolled)
     assert store.load(path).turn.dice[0].colour == "red"
+
+
+# --- taking a move back -----------------------------------------------------------
+
+
+def test_a_misbooked_category_can_be_taken_back():
+    # The most expensive mistake the interface allows, and the easiest one to make.
+    session = game()
+    session.start("yahtzee", KNIFFEL, ["A", "B"])
+    session.observe(result(3, 3, 3, 5, 5))
+    session.book("full_house")
+    assert session.cards[0].total == 25 and session.turn.player == 1
+
+    assert session.undo() == (True, None)
+    assert session.cards[0].total == 0
+    assert session.cards[0].scores["full_house"] is None
+    assert session.turn.player == 0 and session.turn.number == 1
+    assert session.turn.values() == [3, 3, 3, 5, 5]      # the dice are still on the tray
+
+
+def test_only_one_step_goes_back():
+    # Deeper would turn a slip into a way of re-deciding a turn that went badly.
+    session = game()
+    session.start("yahtzee", KNIFFEL, ["A"])
+    session.observe(result(3, 3, 3, 5, 5))
+    session.book("full_house")
+    assert session.undo()[0]
+    assert session.undo() == (False, "Nothing to take back.")
+
+
+def test_a_new_game_has_nothing_to_take_back():
+    session = game()
+    session.start("yahtzee", KNIFFEL, ["A"])
+    assert not session.can_undo
+
+
+def test_banking_in_farkle_can_be_taken_back():
+    from dicecore.modes.catalogue import mode_by_id
+
+    mode = mode_by_id("farkle")
+    session = GameSession("farkle", rules_for(mode, mode.defaults), ["A", "B"], mode.defaults)
+    session.start("farkle", session.rules, ["A", "B"], params=mode.defaults)
+    session.observe(result(1, 1, 1, 3, 4, 2))
+    for slot in session.turn.dice:
+        slot.held = slot.value == 1
+    session.set_aside()
+    session.bank()
+    assert session.farkle.banked[0] == 1000
+    assert session.undo()[0]
+    assert session.farkle.banked[0] == 0 and session.farkle.turn_points == 1000
