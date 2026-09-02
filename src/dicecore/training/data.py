@@ -38,13 +38,26 @@ class Readiness:
                 "ready": self.ready, "reasons": self.reasons}
 
 
-def readiness(store: DatasetStore, set_id: str) -> Readiness:
+def as_ids(sets: str | list[str]) -> list[str]:
+    """One set or several. Everything downstream takes a list."""
+    return [sets] if isinstance(sets, str) else list(sets)
+
+
+def readiness(store: DatasetStore, sets: str | list[str]) -> Readiness:
+    """
+    Whether these sets, together, can train a model.
+
+    Together, because a model is not tied to one set: you collect your six-siders and your
+    friend collects his d20s, and one model can learn both. What decides the model's
+    vocabulary is which sets went into it, not which set is "current".
+    """
     counts: dict[str, int] = {}
-    for sample in store.iter_samples(set_id):
-        for die in sample.dice:
-            if die.confirmed:
-                key = f"{die.kind}:{die.value}"
-                counts[key] = counts.get(key, 0) + 1
+    for set_id in as_ids(sets):
+        for sample in store.iter_samples(set_id):
+            for die in sample.dice:
+                if die.confirmed:
+                    key = f"{die.kind}:{die.value}"
+                    counts[key] = counts.get(key, 0) + 1
     total = sum(counts.values())
     thin = sorted(k for k, v in counts.items() if v < MIN_PER_CLASS)
     reasons = []
@@ -64,8 +77,8 @@ def readiness(store: DatasetStore, set_id: str) -> Readiness:
     return Readiness(total, dict(sorted(counts.items())), thin, ready, reasons)
 
 
-def iter_crops(store: DatasetStore, set_id: str, input_size: int, mean: float, std: float
-               ) -> Iterator[tuple[Any, str]]:
+def iter_crops(store: DatasetStore, sets: str | list[str], input_size: int, mean: float,
+               std: float) -> Iterator[tuple[Any, str]]:
     """
     Yield `(crop, "d20:14")` for every confirmed die.
 
@@ -75,28 +88,31 @@ def iter_crops(store: DatasetStore, set_id: str, input_size: int, mean: float, s
     """
     import cv2
 
-    for sample in store.iter_samples(set_id):
-        confirmed = [d for d in sample.dice if d.confirmed]
-        if not confirmed:
-            continue
-        path: Path = store.frame_path(set_id, sample.id)
-        image = cv2.imread(str(path))
-        if image is None:
-            continue
-        for die in confirmed:
-            yield prepare_crop(image, die.box, input_size, mean, std), f"{die.kind}:{die.value}"
+    for set_id in as_ids(sets):
+        for sample in store.iter_samples(set_id):
+            confirmed = [d for d in sample.dice if d.confirmed]
+            if not confirmed:
+                continue
+            path: Path = store.frame_path(set_id, sample.id)
+            image = cv2.imread(str(path))
+            if image is None:
+                continue
+            for die in confirmed:
+                yield (prepare_crop(image, die.box, input_size, mean, std),
+                       f"{die.kind}:{die.value}")
 
 
-def build_arrays(store: DatasetStore, set_id: str, input_size: int, mean: float, std: float):
+def build_arrays(store: DatasetStore, sets: str | list[str], input_size: int, mean: float,
+                 std: float):
     """Everything in memory as `(X, y, classes)`. A full evening of rolling is ~50 MB."""
     import numpy as np
 
     crops, labels = [], []
-    for crop, label in iter_crops(store, set_id, input_size, mean, std):
+    for crop, label in iter_crops(store, sets, input_size, mean, std):
         crops.append(crop)
         labels.append(label)
     if not crops:
-        raise ValueError("No confirmed dice in this set yet.")
+        raise ValueError("No confirmed dice in those sets yet.")
     classes = sorted(set(labels))
     index = {name: i for i, name in enumerate(classes)}
     return (np.stack(crops).astype("float32"),

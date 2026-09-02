@@ -2,6 +2,28 @@
 
 Notable changes, newest first. Dates are the day the work landed.
 
+## 0.12.0 (2026-09-02)
+
+### Added
+- **A model can be trained from several sets at once.** It was one set per model, which
+  meant a friend's d20s and your own six-siders could never end up in the same model — the
+  exact thing somebody would want. Pick the sets in the Train panel; the combined face
+  counts update as you tick them.
+- **Export and import a set** as a plain zip of the frames and the labels. Your friend
+  collects a few hundred throws of his d20s on his own tower, sends you a file, and you
+  train one model from his set and yours. It is also just a way to look at your own data
+  with the tools you already have. An archive is never merged into an existing set, and a
+  path inside one can never write outside it.
+- **The second Avrae alias**, `!pr`, which is what most people actually want: it hands Avrae
+  a die clamped to the number you threw (`1d20mi17ma17`), so the result goes through Avrae's
+  own roller in Avrae's own format, bonuses and all.
+- The setup page now explains, where the question gets asked: what a set is, what a model
+  is, that a model is trained from sets rather than tied to one, and three worked examples —
+  ordinary six-siders, Kniffel, and a roleplaying set.
+- The Avrae panel now answers the question everybody asks first, plainly: **no, Avrae does
+  not silently roll your number for whatever you type next**, and here is what it does
+  instead.
+
 ## 0.11.0 (2026-09-02)
 
 ### Added

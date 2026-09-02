@@ -12,6 +12,28 @@ that is head-on and reading only that. Add that dice differ in colour, transluce
 finish — and that a 6 and a 9 are the same glyph — and hand-written rules stop being worth
 writing. A classifier that has seen a few hundred of *your* dice is both easier and better.
 
+## Sets, models, and which is which
+
+Two words that are easy to mix up, and everything else follows from the difference.
+
+**A set** is one lot of dice photographed under one light. It is the unit you *collect*
+into: frames on disk with a label per die. Name it after both the dice and the setup —
+"black d20s, desk lamp" — because a model trained across two different setups learns the
+average of them and is worse at each.
+
+**A model** is what the engine loads and reads with. It is trained from **one or more sets
+at once**, and it knows exactly the faces that were in them and nothing else. Train from a
+set of d6s and it reads d6s; add a set of d20s and the same model reads both.
+
+That is what makes a set worth carrying between machines: your friend owns the d20s, so he
+collects a few hundred throws on his own tower, sends you the file, and you train one model
+from his set and yours together. **Export this set (.zip)** and the file input beside it do
+exactly that — a plain zip of the frames and the labels, so you can also just unzip it and
+look at your own data.
+
+Only one model is loaded at a time. Under **Models** you pick which; the engine uses that
+one, and it can recognise whatever went into it.
+
 ## The loop
 
 **Training → New set**, then:
@@ -26,6 +48,28 @@ writing. A classifier that has seen a few hundred of *your* dice is both easier 
 
 Watch the face counts under the set. "412 samples" means nothing if 400 of them are a d20
 showing 1; the thin faces are listed so the next handful of rolls can be aimed at them.
+
+## Three examples, start to finish
+
+**Ordinary six-siders.** You may not need training at all — the classic reader counts pips
+without any. Train only if your dice are unusual: dark, translucent, oddly inked. New set
+*"white d6, kitchen lamp"*, then roll and confirm about sixty dice. Every throw of three
+gives you three, so that is twenty throws.
+
+**Kniffel.** The same, and five dice a throw means twelve throws gets you sixty. Tick *keep
+rolling*, throw, glance, correct, repeat. The engine usually has the pips right already, so
+most throws are one glance and nothing to type.
+
+**A roleplaying set.** This is where training earns its keep: the classic reader cannot read
+numerals at all, so a d20 is unreadable until a model exists. Set which dice may appear under
+*Detection*, then roll the d20 on its own until each of its twenty faces has come up about
+ten times — two hundred confirmed dice, an evening. Do the d8, d12 and the rest in the same
+set or in sets of their own; they can all go into one model either way.
+
+The awkward part of a d20 is that faces come up at random, so the last few need patience.
+The per-face counts under the set show which are thin; aim the next throws at those, or pick
+the die up and place it — a placed die is not a fair roll but it is a perfectly good
+photograph, and the model only ever sees the picture.
 
 ## How much is enough
 

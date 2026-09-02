@@ -276,3 +276,24 @@ def test_a_pool_celebrates_in_proportion_to_the_pool():
 def test_a_half_hearted_pool_does_not_celebrate():
     dice = [d("d6", 6), d("d6", 1), d("d6", 1), d("d6", 1), d("d6", 1), d("d6", 1)]
     assert not interpret(dice, "pool", {"threshold": 4}).celebrate
+
+
+def test_a_model_can_be_trained_from_several_sets_at_once(tmp_path):
+    # The case it exists for: you collect your six-siders and a friend collects his d20s.
+    from dicecore.dataset import DatasetStore
+    from dicecore.dice import Box as B
+    from dicecore.dice import Die as D
+    from dicecore.dice import RollResult
+    from dicecore.training.data import readiness
+
+    store = DatasetStore(tmp_path)
+    mine = store.create_set("my d6")
+    his = store.create_set("his d20")
+    for record, kind, values in ((mine, "d6", range(1, 7)), (his, "d20", range(1, 21))):
+        for value in values:
+            sample = store.add_sample(record.id, b"jpeg", RollResult(
+                dice=[D(kind, 0, B(0, 0, 30, 30), confidence=0.0)]))
+            store.update_sample(record.id, sample.id, [{"kind": kind, "value": value}])
+
+    assert len(readiness(store, mine.id).classes) == 6
+    assert len(readiness(store, [mine.id, his.id]).classes) == 26

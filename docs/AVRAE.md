@@ -20,6 +20,23 @@ What *is* possible, and is what this does:
 
 You still type something in Discord. The *number* comes off your table.
 
+### Two shapes of alias, and the difference matters
+
+**`!phys` — show what I threw.** Avrae prints your roll. Simple, and certain to work.
+
+**`!pr` — make Avrae roll my number.** This is the one most people are after. It hands Avrae
+a die that *can only* land on what you threw — `1d20mi17ma17` is a d20 clamped to 17 — so the
+result goes through Avrae's own roller and comes out in Avrae's own format, bonuses and all.
+`!pr +5` after a throw of 17 gives you Avrae rolling 17+5.
+
+What it still is not: `!check athletics` does not consult your table. If you want the
+physical die in a check, you build the alias that does it, and this is the shape to build it
+from.
+
+**What was verified and what was not.** The API this writes to is verified against Avrae's
+own source. The aliases are not — I have no Avrae account to try them on, and the clamping
+trick relies on dice syntax that may have moved. Try them in a quiet channel first.
+
 Verified against Avrae's own source (`avrae/avrae-service`, `blueprints/customizations.py`
 and `avrae/avrae`, `aliasing/evaluators.py`):
 
@@ -79,10 +96,10 @@ only when the fair-play watch saw the dice change after they were read.
 
 ### Using it in your own aliases
 
-The value is yours once `load_json` has it. A common shape is to clamp Avrae's own die to
-the number you threw — `1d20mi17ma17` is a d20 that can only roll 17 — and build the command
-from there. That is a pattern rather than a recipe: which flag your table's command takes
-depends on the command, and you will want to try it in a quiet channel first.
+The value is yours once `load_json` has it, and the clamping trick above generalises:
+`1d20mi{v}ma{v}` is the physical die expressed in Avrae's own dice language, so anywhere a
+command takes a dice expression, it takes your throw. Which flag your table's command uses
+depends on the command.
 
 ## Discord, without Avrae
 

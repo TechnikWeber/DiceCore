@@ -94,7 +94,7 @@ def augment(batch: Any) -> Any:
 
 def train_model(
     store: DatasetStore,
-    set_id: str,
+    sets: str | list[str],
     out_dir: Path,
     epochs: int = 30,
     batch_size: int = 32,
@@ -118,7 +118,10 @@ def train_model(
             progress(fields)
 
     emit(stage="loading", message="Reading confirmed rolls…")
-    features, labels, classes = build_arrays(store, set_id, INPUT_SIZE, MEAN, STD)
+    from .data import as_ids
+
+    set_ids = as_ids(sets)
+    features, labels, classes = build_arrays(store, set_ids, INPUT_SIZE, MEAN, STD)
     emit(stage="loading", message=f"{len(labels)} dice, {len(classes)} faces",
          samples=len(labels), classes=classes)
 
@@ -188,7 +191,7 @@ def train_model(
     meta = ModelMeta(
         classes=classes, input_size=INPUT_SIZE, mean=MEAN, std=STD,
         trained_at=time.time(), samples=int(len(labels)), accuracy=round(best_accuracy, 4),
-        note=f"set={set_id}, epochs={epochs}",
+        note=f"sets={','.join(set_ids)}, epochs={epochs}",
     )
     (out_dir / META_FILE).write_text(json.dumps(meta.to_json(), indent=2) + "\n")
     emit(stage="done", message=f"Validation accuracy {best_accuracy:.1%}",

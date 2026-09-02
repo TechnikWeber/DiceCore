@@ -27,6 +27,7 @@ from typing import Any
 
 from ..capture import SOURCES, CaptureError
 from ..config import Settings, config_path
+from ..dataset import transfer
 from ..dataset.store import DatasetStore
 from ..dice import DIE_FACES, DIE_KINDS, values_for
 from ..engine import MODES, EngineError
@@ -92,7 +93,7 @@ def create_app(settings: Settings | None = None) -> Any:
     buttons = ButtonPanel(loaded.panel.signals, on_chip, on_next)
     state["buttons"] = buttons
 
-    app = FastAPI(title="DiceCore", version="0.11.0",
+    app = FastAPI(title="DiceCore", version="0.12.0",
                   description="Reads real dice with a camera.")
     app.state.reader = reader
     app.state.training = training
@@ -673,6 +674,19 @@ def create_app(settings: Settings | None = None) -> Any:
         return [{**s.to_json(), "stats": store().stats(s.id),
                  "readiness": readiness(store(), s.id).to_json()} for s in store().list_sets()]
 
+    @app.post("/api/setup/sets/readiness")
+    async def combined_readiness(request: Request) -> Any:
+        """Whether these sets *together* can train a model — which is how training works."""
+        body = await request.json()
+        sets = [str(s) for s in (body.get("set_ids") or [])]
+        if not sets:
+            return {"total": 0, "classes": {}, "thin": [], "ready": False,
+                    "reasons": ["Pick at least one set."]}
+        try:
+            return readiness(store(), sets).to_json()
+        except FileNotFoundError as exc:
+            raise HTTPException(404, str(exc)) from exc
+
     @app.post("/api/setup/sets")
     async def create_set(request: Request) -> Any:
         body = await request.json()
@@ -734,6 +748,33 @@ def create_app(settings: Settings | None = None) -> Any:
     def delete_sample(set_id: str, sample_id: str) -> Any:
         store().delete_sample(set_id, sample_id)
         return {"ok": True}
+
+    @app.get("/api/setup/sets/{set_id}/export.zip")
+    def export_set(set_id: str) -> Any:
+        """
+        The whole set as a zip: the frames, the labels, and its own description.
+
+        For the case this exists for — a friend who owns the d20s collects a few hundred
+        throws on his own tower and sends you a file — and for looking at your own data with
+        the tools you already have.
+        """
+        try:
+            payload = transfer.export_set(store(), set_id)
+        except FileNotFoundError as exc:
+            raise HTTPException(404, str(exc)) from exc
+        return Response(payload, media_type="application/zip", headers={
+            "Content-Disposition": f'attachment; filename="dicecore-{set_id}.zip"'})
+
+    @app.post("/api/setup/sets/import")
+    async def import_set(archive: UploadFile = File(...), name: str = "") -> Any:
+        """Unpack an exported set into a new one of its own — never merged into another."""
+        payload = await archive.read()
+        try:
+            return transfer.import_set(store(), payload, name)
+        except (ValueError, KeyError) as exc:
+            raise HTTPException(400, str(exc)) from exc
+        except Exception as exc:
+            return fail(exc, 400)
 
     @app.get("/api/setup/sets/{set_id}/samples/{sample_id}.jpg")
     def sample_frame(set_id: str, sample_id: str) -> Any:
@@ -806,8 +847,11 @@ def create_app(settings: Settings | None = None) -> Any:
     @app.post("/api/setup/training/start")
     async def training_start(request: Request) -> Any:
         body = await request.json()
+        # One set or several: a model is not tied to one, so a friend's d20s and your own
+        # six-siders can go into the same one.
+        sets = body.get("set_ids") or ([body["set_id"]] if body.get("set_id") else [])
         try:
-            job = training.start(str(body.get("set_id", "")), int(body.get("epochs", 30)),
+            job = training.start([str(s) for s in sets], int(body.get("epochs", 30)),
                                  str(body.get("name", "")))
         except RuntimeError as exc:
             return fail(exc, 409)

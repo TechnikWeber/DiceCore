@@ -37,7 +37,9 @@ class JobState:
 @dataclass
 class TrainingJob:
     id: str
-    set_id: str
+    #: Which sets went into this model. A model is not tied to one: you collect your
+    #: six-siders and a friend collects his d20s, and one model can learn both.
+    set_ids: list[str]
     epochs: int
     state: str = JobState.IDLE
     started: float = field(default_factory=time.time)
@@ -51,7 +53,8 @@ class TrainingJob:
 
     def to_json(self) -> dict[str, Any]:
         return {
-            "id": self.id, "set_id": self.set_id, "epochs": self.epochs, "state": self.state,
+            "id": self.id, "set_ids": list(self.set_ids), "epochs": self.epochs,
+            "state": self.state,
             "started": self.started, "finished": self.finished, "progress": self.progress,
             "log": self.log, "error": self.error, "model_path": self.model_path,
             "accuracy": self.accuracy,
@@ -74,7 +77,7 @@ class TrainingManager:
     def is_running(self) -> bool:
         return self._job is not None and self._job.state == JobState.RUNNING
 
-    def start(self, set_id: str, epochs: int = 30, name: str = "") -> TrainingJob:
+    def start(self, sets: str | list[str], epochs: int = 30, name: str = "") -> TrainingJob:
         from .trainer import torch_available
 
         with self._lock:
@@ -85,8 +88,14 @@ class TrainingManager:
                 raise RuntimeError(why)
 
             stamp = time.strftime("%Y%m%d-%H%M%S")
-            out_dir = self.settings.models_dir / (name or f"{set_id}-{stamp}")
-            job = TrainingJob(id=out_dir.name, set_id=set_id, epochs=epochs,
+            from .data import as_ids
+
+            set_ids = as_ids(sets)
+            if not set_ids:
+                raise RuntimeError("Pick at least one set to train from.")
+            stem = set_ids[0] if len(set_ids) == 1 else f"{len(set_ids)}-sets"
+            out_dir = self.settings.models_dir / (name or f"{stem}-{stamp}")
+            job = TrainingJob(id=out_dir.name, set_ids=set_ids, epochs=epochs,
                               state=JobState.RUNNING)
             self._job = job
             self._stop.clear()
@@ -111,7 +120,7 @@ class TrainingManager:
         try:
             store = DatasetStore(self.settings.dataset_dir)
             meta = train_model(
-                store, job.set_id, out_dir, epochs=job.epochs,
+                store, job.set_ids, out_dir, epochs=job.epochs,
                 progress=progress, should_stop=self._stop.is_set,
             )
             job.accuracy = meta.accuracy

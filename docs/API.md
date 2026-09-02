@@ -145,6 +145,12 @@ const roll = await (await fetch("http://dicecore.local:8099/api/v1/roll")).json(
 console.log(roll.total, roll.notation);
 ```
 
+## Datasets
+
+`GET /api/setup/sets/{id}/export.zip` hands the whole set over as a zip — frames, labels and
+its description. `POST /api/setup/sets/import` takes one back, always as a new set. That is
+how a friend's dice reach your model.
+
 ## The other direction
 
 DiceCore can also hand each finished roll over by itself — into a Discord channel, into an

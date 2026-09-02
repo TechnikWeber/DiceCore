@@ -372,12 +372,44 @@
         examples per face, so a d6 wants sixty and a d20 about two hundred. The classic
         reader counts pips and cannot read numerals at all; teaching a model is exactly how
         a d20 becomes readable.</p>
+      <p class="hint"><b>How it fits together.</b> A <em>set</em> is one lot of dice
+        photographed under one light — that is the unit you collect into. A <em>model</em> is
+        what the engine actually loads, and it is trained from <b>one or more sets at once</b>.
+        So you can collect your six-siders and a friend can collect his d20s on his own
+        tower, and one model can learn both. The model knows exactly the faces that were in
+        the sets it was trained from, and nothing else.</p>
       <div class="row">
         <select id="set-select" style="max-width:280px"></select>
         <button id="btn-new-set">New set</button>
         <button class="primary" id="btn-capture">Roll and store</button>
         <label class="row" style="margin:0;gap:6px"><input type="checkbox" id="auto-capture"> keep rolling</label>
       </div>
+      <div class="row" style="margin-top:10px">
+        <button id="btn-export-set">Export this set (.zip)</button>
+        <label class="row" style="margin:0;gap:6px">
+          <span class="muted">Import a set:</span>
+          <input type="file" id="import-set" accept=".zip" style="max-width:220px">
+        </label>
+      </div>
+      <details style="margin-top:14px">
+        <summary class="muted" style="cursor:pointer">Three examples, start to finish</summary>
+        <div class="hint" style="margin-top:10px">
+          <p><b>Ordinary six-siders.</b> You may not need this at all — the classic reader
+            counts pips without any training. Train only if your dice are unusual: dark,
+            translucent, oddly inked. New set “white d6, kitchen lamp”, then roll and confirm
+            about sixty dice — ten per face. Every throw of three dice gives you three.</p>
+          <p><b>Kniffel.</b> Same as above, and five dice a throw means twelve throws gets
+            you sixty. Tick <em>keep rolling</em>, throw, glance, correct, repeat. The engine
+            usually has the pips right already, so most throws are one glance and no
+            typing.</p>
+          <p><b>A roleplaying set.</b> This is where training earns its keep: the classic
+            reader cannot read numerals at all, so a d20 is unreadable until a model exists.
+            Set the dice under <em>Detection → Dice that may appear</em> first, then roll the
+            d20 on its own until every one of its twenty faces has come up about ten times —
+            two hundred confirmed dice, an evening. Do the d8, d12 and the rest in the same
+            set or in sets of their own; they can all go into one model either way.</p>
+        </div>
+      </details>
       <div id="set-stats" style="margin-top:12px"></div>
     </div>
 
@@ -392,6 +424,11 @@
       <h2>Train</h2>
       <div id="train-availability"></div>
       <div id="install-panel"></div>
+      <p class="hint">Pick the sets that go into this model. Several at once is the normal
+        case once more than one person has been collecting — the model learns everything
+        that was in them.</p>
+      <div id="train-sets" class="row" style="margin-bottom:10px"></div>
+      <div id="train-readiness"></div>
       <div class="row">
         <div style="max-width:140px"><label>Epochs</label><input id="train-epochs" type="number" value="30"></div>
         <button class="primary" id="btn-train">Start training</button>
@@ -426,22 +463,40 @@
       </div>
 
       <h3 style="margin:20px 0 6px;font-size:14px">Avrae</h3>
-      <p class="hint"><b>Avrae rolls its own dice and cannot be made to use yours</b> — no
-        bot can. What works, and is what this does: DiceCore writes each roll into an Avrae
-        <em>user variable</em>, and a one-line alias in Discord reads it out. You still type
-        something; the number comes off your table. Get the token from
+      <p class="hint"><b>The honest answer first, because it is the question everybody
+        asks.</b> When you throw a die here, Avrae does <em>not</em> silently produce the
+        same number for whatever you type next. Avrae's dice are Avrae's, and
+        <code>!check athletics</code> will always roll its own. Nothing can change that —
+        not this project, not any other.</p>
+      <p class="hint">What happens instead: DiceCore writes each roll into an Avrae
+        <em>user variable</em>, and an alias in Discord reads it back. You still type
+        something — but the number in the answer is the one on your table. There are two
+        shapes of alias below, and they differ in exactly that.</p>
+      <p class="hint">Get the token from
         <a href="https://avrae.io/dashboard" target="_blank" rel="noreferrer">avrae.io/dashboard</a>,
-        then paste the alias below into Discord once.</p>
+        press <b>Send a test roll</b> to check it, then paste an alias into Discord once.</p>
       <div class="grid">
         <div><label>Write rolls to an Avrae variable</label><input id="pb-avrae" type="checkbox"></div>
         <div><label>Avrae token</label><input id="pb-avrae-token" type="password" placeholder="from avrae.io/dashboard"></div>
         <div><label>Variable name</label><input id="pb-avrae-uvar" placeholder="dicecore"></div>
         <div><label>API base (blank = official)</label><input id="pb-avrae-api" placeholder="https://api.avrae.io"></div>
       </div>
-      <p class="hint" style="margin-top:10px">Paste this into Discord once, then type
-        <code>!phys</code> after a throw:</p>
+      <p class="hint" style="margin-top:14px"><b>1 — show what I threw.</b> Type
+        <code>!phys</code> after a throw and Avrae prints it. Simple, and certain to work.</p>
       <pre id="avrae-alias"></pre>
-      <div class="row"><button id="btn-copy-alias">Copy the alias</button></div>
+      <div class="row"><button id="btn-copy-alias">Copy this alias</button></div>
+
+      <p class="hint" style="margin-top:16px"><b>2 — make Avrae roll my number.</b> This is
+        the one people are usually after. It hands Avrae a die that <em>can only</em> land on
+        what you threw (<code>1d20mi17ma17</code> is a d20 clamped to 17), so the result goes
+        through Avrae's own roller and comes out in Avrae's own format — bonuses and all.
+        Type <code>!pr +5</code> after throwing.</p>
+      <pre id="avrae-alias-roll"></pre>
+      <div class="row"><button id="btn-copy-alias-roll">Copy this alias</button></div>
+      <p class="hint"><b>What I checked and what I did not.</b> The API this writes to is
+        verified against Avrae's own source. The aliases are not: I have no Avrae account to
+        try them on, and the clamping trick in the second one relies on dice syntax that may
+        have moved. Try them in a quiet channel first.</p>
 
       <h3 style="margin:20px 0 6px;font-size:14px">Discord</h3>
       <p class="hint">A message in a channel, so the table sees the physical roll. Channel

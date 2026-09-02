@@ -290,6 +290,7 @@ function loadForm() {
       $("pb-webhook").checked = pb.webhook_enabled;
       $("pb-webhook-url").value = pb.webhook_url;
       $("avrae-alias").textContent = avraeAlias(pb.avrae_uvar || "dicecore");
+      $("avrae-alias-roll").textContent = avraeRollAlias(pb.avrae_uvar || "dicecore");
     },
     server: () => {
       $("sv-stream").checked = s.server.stream_enabled;
@@ -544,6 +545,7 @@ async function loadSets() {
   $("auto-capture").disabled = empty;
   if (empty) $("auto-capture").checked = false;
   renderSetStats();
+  renderTrainSets();
   loadSamples();
 }
 
@@ -567,6 +569,49 @@ function renderSetStats() {
       ${set.stats.engine_agreement !== null ? `· engine agrees ${Math.round(set.stats.engine_agreement * 100)}%` : ""}</span></div>
     <div class="chips">${classes || '<span class="muted">nothing confirmed yet</span>'}</div>
     ${r.reasons.map((x) => `<div class="msg warn" style="margin-top:8px">${escapeHtml(x)}</div>`).join("")}`;
+}
+
+//: Which sets go into the next model. Defaults to everything with confirmed dice in it,
+//: because that is almost always what somebody means by "train".
+function renderTrainSets() {
+  const usable = state.sets.filter((s) => s.stats.confirmed_dice > 0);
+  if (state.trainSets === undefined) state.trainSets = usable.map((s) => s.id);
+  $("train-sets").innerHTML = state.sets.length
+    ? state.sets.map((s) => `
+        <label class="row" style="margin:0;gap:6px">
+          <input type="checkbox" class="ts" value="${s.id}"
+            ${state.trainSets.includes(s.id) ? "checked" : ""}
+            ${s.stats.confirmed_dice ? "" : "disabled"}>
+          ${escapeHtml(s.name)}
+          <span class="muted">${s.stats.confirmed_dice} dice</span>
+        </label>`).join("")
+    : `<span class="muted">No sets yet.</span>`;
+  $("train-sets").querySelectorAll(".ts").forEach((box) => {
+    box.onchange = () => {
+      state.trainSets = [...document.querySelectorAll(".ts:checked")].map((c) => c.value);
+      refreshTrainReadiness();
+    };
+  });
+  refreshTrainReadiness();
+}
+
+async function refreshTrainReadiness() {
+  const chosen = state.trainSets || [];
+  if (!chosen.length) {
+    $("train-readiness").innerHTML = `<div class="msg warn">Pick at least one set.</div>`;
+    return;
+  }
+  try {
+    const r = await api("/api/setup/sets/readiness", json("POST", { set_ids: chosen }));
+    const classes = Object.entries(r.classes)
+      .map(([k, v]) => `<span class="chip ${v < 10 ? "weak" : ""}">${k}
+        <span class="muted">${v}</span></span>`).join("");
+    $("train-readiness").innerHTML =
+      `<p class="muted">${chosen.length} set(s) · ${r.total} confirmed dice ·
+        ${Object.keys(r.classes).length} faces</p>
+       <div class="chips">${classes || "<span class='muted'>nothing yet</span>"}</div>
+       ${r.reasons.map((x) => `<div class="msg warn" style="margin-top:8px">${escapeHtml(x)}</div>`).join("")}`;
+  } catch { $("train-readiness").innerHTML = ""; }
 }
 
 async function loadSamples() {
@@ -909,6 +954,20 @@ async function testOutputs(phase) {
 //: The alias a player pastes into Discord once. Written in Draconic without f-strings or
 //: anything clever, because the point is that it works the first time on somebody else's
 //: Avrae rather than that it is elegant.
+//: The second shape: hand Avrae a die that can only land on the number you threw, so the
+//: result goes through its own roller and comes out in its own format.
+function avraeRollAlias(uvar) {
+  return [
+    `!alias pr r <drac2>`,
+    `if not uvar_exists("${uvar}"):`,
+    `    return "0"`,
+    `r = load_json(get_uvar("${uvar}"))`,
+    `v = str(r["total"])`,
+    `return "1d20mi" + v + "ma" + v`,
+    `</drac2> &*&`,
+  ].join("\n");
+}
+
 function avraeAlias(uvar) {
   return [
     `!alias phys echo <drac2>`,
@@ -1014,11 +1073,33 @@ $("btn-new-set").onclick = async () => {
 $("btn-train").onclick = async () => {
   try {
     await api("/api/setup/training/start",
-      json("POST", { set_id: state.setId, epochs: Number($("train-epochs").value) }));
+      json("POST", { set_ids: state.trainSets || [], epochs: Number($("train-epochs").value) }));
     pollTraining();
   } catch (err) { alertBox(err.message); }
 };
 $("btn-train-stop").onclick = () => api("/api/setup/training/stop", { method: "POST" }).catch(() => {});
+$("btn-export-set").onclick = () => {
+  if (!state.setId) { alertBox("Pick a set first."); return; }
+  // A plain download: the browser is better at saving a file than any code here would be.
+  window.location = `/api/setup/sets/${state.setId}/export.zip`;
+};
+$("import-set").onchange = async (event) => {
+  const file = event.target.files[0];
+  if (!file) return;
+  const form = new FormData();
+  form.append("archive", file);
+  try {
+    const answer = await fetch("/api/setup/sets/import", { method: "POST", body: form });
+    const data = await answer.json();
+    if (!answer.ok) throw new Error(data.detail || "Import failed");
+    alertBox(`Imported “${data.set.name}” — ${data.frames} frames, ${data.labels} labels.`,
+             "good");
+    state.setId = data.set.id;
+    state.trainSets = undefined;
+    await loadSets();
+  } catch (err) { alertBox(err.message, "bad"); }
+  event.target.value = "";
+};
 $("btn-ws").onclick = toggleWebsocket;
 $("btn-copy-alias").onclick = async () => {
   try {
@@ -1039,8 +1120,18 @@ $("btn-publish-test").onclick = async () => {
   } catch (err) { alertBox(err.message); }
 };
 $("pb-avrae-uvar").addEventListener("input", () => {
-  $("avrae-alias").textContent = avraeAlias($("pb-avrae-uvar").value.trim() || "dicecore");
+  const uvar = $("pb-avrae-uvar").value.trim() || "dicecore";
+  $("avrae-alias").textContent = avraeAlias(uvar);
+  $("avrae-alias-roll").textContent = avraeRollAlias(uvar);
 });
+$("btn-copy-alias-roll").onclick = async () => {
+  try {
+    await navigator.clipboard.writeText($("avrae-alias-roll").textContent);
+    alertBox("Alias copied — paste it into Discord once.", "good");
+  } catch {
+    alertBox("Could not reach the clipboard; select the text and copy it.", "warn");
+  }
+};
 $("mode-select").addEventListener("change", renderModeEditor);
 $("btn-players").onclick = async () => {
   const players = $("play-players").value.split("\n").map((n) => n.trim()).filter(Boolean);
