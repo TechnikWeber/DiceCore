@@ -96,11 +96,20 @@ MODES: tuple[GameMode, ...] = (
         turns=TurnRules(rolls=3, holds=True, chips=0, auto_end=False),
     ),
     GameMode(
-        "farkle", "Farkle / Zehntausend",
-        "Six dice scored on the common house rules — ones and fives, triples and straights.",
-        ("d6",), "farkle", "1–6",
+        "yahtzee_extreme", "Kniffel Extreme",
+        "Six dice and a longer sheet: five and six of a kind, two and three pairs, a big "
+        "full house, and a straight all the way from one to six.",
+        ("d6",), "yahtzee", "6",
         {"rolls": 3, "chips": 0},
         turns=TurnRules(rolls=3, holds=True, chips=0, auto_end=False),
+    ),
+    GameMode(
+        "farkle", "Farkle / Zehntausend",
+        "Throw as often as you dare: set aside the dice that score, then bank or throw "
+        "again. A throw that scores nothing loses the whole turn.",
+        ("d6",), "farkle", "1–6",
+        {"target": 10000, "entry": 500, "chips": 0},
+        turns=TurnRules(rolls=1, holds=True, chips=0, auto_end=False, unlimited=True),
     ),
     GameMode(
         "backgammon", "Backgammon",
@@ -155,4 +164,5 @@ def rules_for(mode: GameMode, overrides: dict[str, Any] | None = None) -> TurnRu
         holds=mode.turns.holds,
         chips=max(0, min(3, int(values.get("chips", mode.turns.chips)))),
         auto_end=mode.turns.auto_end,
+        unlimited=mode.turns.unlimited,
     )

@@ -311,5 +311,57 @@ def test_a_zero_on_a_ten_sided_die_can_be_worth_nothing_instead_of_ten(client):
     assert client.get("/api/setup/settings").json()["mode"]["d10_zero_counts_as_ten"] is False
 
 
+def test_the_extended_kniffel_sheet_is_offered_and_described(client):
+    modes = [m["id"] for m in client.get("/api/v1/modes").json()["modes"]]
+    assert "yahtzee_extreme" in modes
+    client.post("/api/setup/mode", json={"mode": "yahtzee_extreme"})
+    sheet = client.get("/api/v1/game").json()["game"]["sheet"]
+    assert sheet["dice"] == 6 and sheet["bonus_at"] == 84
+    assert "six_of_a_kind" in sheet["lower"]
+    # The browser draws the card from this, so the labels have to come with it.
+    assert sheet["labels"]["three_pairs"]
+
+
+def test_farkle_is_played_by_setting_dice_aside_and_banking(client):
+    client.post("/api/setup/mode", json={"mode": "farkle"})
+    client.post("/api/v1/game/reset", json={"players": ["A", "B"]})
+    state = client.get("/api/v1/game").json()["game"]
+    assert state["farkle"]["target"] == 10000 and state["turn"]["unlimited"]
+
+    client.get("/api/v1/roll?verify=0")
+    game = client.get("/api/v1/game").json()["game"]
+    # Hold whichever dice actually score, then set them aside.
+    scoring = [i for i, die in enumerate(game["turn"]["dice"]) if die["value"] in (1, 5)]
+    for index in scoring:
+        client.post("/api/v1/game/hold", json={"index": index})
+    aside = client.post("/api/v1/game/aside").json()
+    if scoring:
+        assert aside["ok"] and aside["farkle"]["turn_points"] > 0
+    else:
+        assert not aside["ok"] and "score" in aside["detail"]
+
+
+def test_setting_aside_a_die_that_scores_nothing_is_refused(client):
+    client.post("/api/setup/mode", json={"mode": "farkle"})
+    client.post("/api/v1/game/reset", json={"players": ["A"]})
+    client.get("/api/v1/roll?verify=0")
+    answer = client.post("/api/v1/game/aside").json()      # nothing held at all
+    assert not answer["ok"]
+
+
+def test_a_game_without_a_board_refuses_to_bank(client):
+    client.post("/api/setup/mode", json={"mode": "normal"})
+    assert client.post("/api/v1/game/bank").status_code == 400
+
+
+def test_chips_belong_to_the_player_for_the_whole_game(client):
+    client.post("/api/setup/mode", json={"mode": "yahtzee", "params": {"chips": 2}})
+    client.post("/api/v1/game/reset", json={"players": ["A", "B"]})
+    for _ in range(3):
+        client.get("/api/v1/roll?verify=0")
+    client.post("/api/v1/game/chip")
+    assert client.get("/api/v1/game").json()["game"]["chips"] == [1, 2]
+
+
 def test_the_page_itself_is_served(client):
     assert "DiceCore" in client.get("/setup").text

@@ -2,6 +2,31 @@
 
 Notable changes, newest first. Dates are the day the work landed.
 
+## 0.6.0 (2026-09-02)
+
+A second board, an extended sheet, and chips that belong to a player rather than to a turn.
+
+### Added
+- **Farkle has a board**, and it is deliberately the opposite shape to Kniffel: throw as
+  often as you dare, set aside the dice that score — they leave the tray, so the next throw
+  really does have fewer dice in it — then bank or throw again. A throw with nothing in it
+  loses the whole turn; six dice set aside brings the whole hand back.
+- Setting aside a die that scores nothing is **refused**, because carrying one along would
+  quietly cost a throw's worth of dice.
+- **Kniffel Extreme**: six dice and eighteen boxes — five and six of a kind, two pairs and
+  three pairs, a big full house of three and three, a straight from one to six. The bonus
+  asks for 84 and pays 50. A defined house sheet, stated as such, not a boxed product.
+- A scorecard is now a **sheet in a table**, so a third variant is an entry rather than a
+  file — and the browser draws whatever sheet the server describes.
+- `POST /api/v1/game/aside` and `/api/v1/game/bank`.
+
+### Changed
+- **Chips are per game, not per turn.** Three chips means three for the evening, so
+  spending one is a decision; refilling them every turn left only a button. A new game
+  hands them back.
+- A game with no throw limit says a chip would buy nothing, rather than "no chips left" —
+  the second sends someone looking for more.
+
 ## 0.5.0 (2026-09-02)
 
 DiceCore stops only reading and starts playing. Two front doors, one service: `/` is the

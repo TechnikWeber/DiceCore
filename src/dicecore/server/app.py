@@ -70,7 +70,7 @@ def create_app(settings: Settings | None = None) -> Any:
     buttons = ButtonPanel(loaded.panel.signals, on_chip, on_next)
     state["buttons"] = buttons
 
-    app = FastAPI(title="DiceCore", version="0.5.0",
+    app = FastAPI(title="DiceCore", version="0.6.0",
                   description="Reads real dice with a camera.")
     app.state.reader = reader
     app.state.training = training
@@ -154,6 +154,24 @@ def create_app(settings: Settings | None = None) -> Any:
         except ValueError as exc:
             return fail(exc, 400)
         return {"ok": True, **outcome, "game": reader.game.to_json()}
+
+    @app.post("/api/v1/game/aside")
+    def game_set_aside() -> Any:
+        """Farkle: take the held dice off the tray and put their points into the turn."""
+        try:
+            outcome = reader.game.set_aside()
+        except ValueError as exc:
+            return fail(exc, 400)
+        return {**outcome, "game": reader.game.to_json()}
+
+    @app.post("/api/v1/game/bank")
+    def game_bank() -> Any:
+        """Farkle: take what the turn has earned and hand the tower on."""
+        try:
+            outcome = reader.game.bank()
+        except ValueError as exc:
+            return fail(exc, 400)
+        return {**outcome, "game": reader.game.to_json()}
 
     @app.post("/api/v1/game/next")
     def game_next() -> Any:

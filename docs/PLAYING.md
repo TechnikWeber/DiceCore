@@ -41,11 +41,16 @@ which the camera does several times a second — is not a throw, and does not bu
 ### Chips
 
 A chip buys one more throw when the ordinary ones are gone. Set how many each player gets
-per turn under **Detection → Game mode** (up to three; zero by default, since it is a house
-rule rather than part of Kniffel).
+under **Detection → Game mode** (up to three; zero by default, since it is a house rule
+rather than part of Kniffel).
+
+**Chips are per game, not per turn.** Three chips means three for the whole evening, so
+spending one is a decision — refilling them every turn would take the decision away and
+leave only the button. A new game hands them back.
 
 A chip **cannot be spent while ordinary throws remain**. Spending one by fumbling a button
-is exactly the kind of mistake a game should not allow.
+is exactly the kind of mistake a game should not allow. In a game with no throw limit at
+all, like Farkle, a chip buys nothing and says so.
 
 ## The two buttons
 
@@ -74,6 +79,51 @@ each chip, and a caption that changes with what you may do next —
 | **TURN OVER** | nothing left to do but book |
 
 The green lamp means the same thing it always did: it is your turn to throw.
+
+## The boards
+
+Two games have a board of their own, and they are deliberately opposite shapes — which is
+what shows the turn machine is a machine rather than a Kniffel-shaped hole.
+
+### Kniffel, and Kniffel Extreme
+
+Three throws, dice kept in between, then a category. Every open box shows what it would
+score right now; tapping one books it and hands the tower on. Crossing a box out for nothing
+is a real move and has to be confirmed.
+
+**Kniffel Extreme** is the same shape with six dice and a longer sheet: five and six of a
+kind, two pairs and three pairs, a big full house of three and three, and a straight running
+all the way from one to six. The upper bonus asks for 84 rather than 63 — with six dice you
+expect one of every face in a throw, so three of one is no longer the effort the standard
+bonus rewards — and pays 50.
+
+> The extended sheet is a **defined house sheet, not a transcription of a boxed product**.
+> If the version on your table says otherwise, the numbers are a table in
+> `src/dicecore/play/kniffel.py` and changing them is a one-line job.
+
+| | Kniffel | Kniffel Extreme |
+|---|---|---|
+| Dice | 5 | 6 |
+| Boxes | 13 | 18 |
+| Bonus | 35 at 63 | 50 at 84 |
+| Best box | Kniffel, 50 | Six of a kind, 100 |
+
+### Farkle
+
+The opposite of a fixed number of throws: you throw as often as you dare. Set aside the
+dice that score — they leave the tray, so the next throw genuinely has fewer dice in it,
+which the camera sees directly — then either bank what the turn has earned or throw again.
+
+A throw with nothing scoring in it is a **Farkle** and the whole turn is lost. Set aside all
+six and the dice are *hot*: the whole hand comes back and you keep going.
+
+Every die you set aside has to score. A selection with a dead die in it is refused rather
+than scored, because carrying one along would quietly cost you a throw's worth of dice.
+
+House rules, as implemented: single 1 is 100 and single 5 is 50; three of a kind is 100×
+the face except three ones at 1000; four, five and six of a kind double, quadruple and
+octuple that; a straight or three pairs is 1500; you need 500 in one turn to get on the
+board; first to 10 000 wins. The target and the entry threshold are settings.
 
 ## Several players
 

@@ -30,8 +30,9 @@ builds its settings form from the mode's own parameters.
 | **Best or worst of several** | 2–4 | Only the highest die counts — or the lowest. |
 | **Exploding dice** | 1–3 | A die showing its maximum is thrown again and added. |
 | **Roll under a target** | 1–3 | Success when the roll comes in at or under a target. |
-| **Kniffel / Yahtzee** | 5 × d6 | The combination, not the sum. |
-| **Farkle / Zehntausend** | 1–6 × d6 | Ones, fives, triples, straights. |
+| **Kniffel / Yahtzee** | 5 × d6 | The combination, not the sum. Three throws and a scorecard. |
+| **Kniffel Extreme** | 6 × d6 | A longer sheet: five and six of a kind, two and three pairs, a 1–6 straight. |
+| **Farkle / Zehntausend** | 1–6 × d6 | Throw as often as you dare; set aside, bank, or lose the lot. |
 | **Backgammon** | 2 × d6 | `5-3`, or `double 4 — four moves`. |
 | **Mäxchen** | 2 × d6 | Two dice as a two-digit number. 21 is the Mäxchen. |
 | **One die, big** | 1 | A single number, as large as the screen allows. |

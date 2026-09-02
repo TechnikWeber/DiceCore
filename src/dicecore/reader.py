@@ -276,8 +276,9 @@ class Reader:
         mode = mode_by_id(self.settings.mode.active)
         if mode is None:
             return
-        rules = rules_for(mode, self.settings.mode.params.get(mode.id))
-        self.game.configure(mode.id, rules, list(self.settings.play.players))
+        params = self.settings.mode.params.get(mode.id) or {}
+        rules = rules_for(mode, params)
+        self.game.configure(mode.id, rules, list(self.settings.play.players), params=params)
 
     def session_for(self, mode_id: str) -> ModeSession:
         session = self.mode_sessions.get(mode_id)

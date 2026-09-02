@@ -33,14 +33,19 @@ class TurnRules:
     rolls: int = 1
     #: Whether keeping dice between throws is part of the game.
     holds: bool = False
-    #: Extra throws a player may buy during a game, one throw each.
+    #: Extra throws a player may buy, one throw each. **Per game, not per turn** — a chip
+    #: is something you have three of for the evening and have to decide when to spend, and
+    #: refilling them every turn would take that decision away.
     chips: int = 0
     #: Whether the turn ends by itself once the throws are used up, or waits for the player.
     auto_end: bool = True
+    #: Throw as often as you dare — Farkle, where the limit is nerve rather than a number.
+    #: A turn counter would be meaningless, so the screens show what is at stake instead.
+    unlimited: bool = False
 
     @property
     def multi(self) -> bool:
-        return self.rolls > 1 or self.chips > 0
+        return self.rolls > 1 or self.chips > 0 or self.unlimited
 
 
 @dataclass
@@ -73,6 +78,8 @@ class Turn:
     finished: bool = False
     #: Set when the turn ended because the throws ran out rather than by a decision.
     spent: bool = False
+    #: No throw limit — the turn ends when the player banks or the game takes it away.
+    unlimited: bool = False
 
     @property
     def rolls_left(self) -> int:
@@ -80,7 +87,7 @@ class Turn:
 
     @property
     def can_roll(self) -> bool:
-        return not self.finished and self.rolls_left > 0
+        return not self.finished and (self.unlimited or self.rolls_left > 0)
 
     @property
     def can_spend_chip(self) -> bool:
@@ -92,7 +99,7 @@ class Turn:
 
     def to_json(self) -> dict[str, Any]:
         return {
-            "number": self.number, "player": self.player,
+            "number": self.number, "player": self.player, "unlimited": self.unlimited,
             "rolls_used": self.rolls_used, "rolls_allowed": self.rolls_allowed,
             "rolls_left": self.rolls_left, "chips_left": self.chips_left,
             "dice": [slot.to_json() for slot in self.dice],
@@ -104,7 +111,8 @@ class Turn:
 def start_turn(rules: TurnRules, number: int = 1, player: int = 0,
                chips_left: int | None = None) -> Turn:
     return Turn(number=number, player=player, rolls_allowed=rules.rolls,
-                chips_left=rules.chips if chips_left is None else chips_left)
+                chips_left=rules.chips if chips_left is None else chips_left,
+                unlimited=rules.unlimited)
 
 
 def detect_holds(previous: list[DieSlot], dice: list[Die]) -> list[bool]:
@@ -154,7 +162,7 @@ def apply_roll(turn: Turn, dice: list[Die], rules: TurnRules) -> Turn:
     held = detect_holds(turn.dice, dice) if (rules.holds and turn.dice) else None
     turn.dice = slots_from(dice, held)
     turn.rolls_used += 1
-    if rules.auto_end and turn.rolls_left == 0 and turn.chips_left == 0:
+    if rules.auto_end and not rules.unlimited and turn.rolls_left == 0 and turn.chips_left == 0:
         turn.finished = True
         turn.spent = True
     return turn
@@ -177,6 +185,10 @@ def spend_chip(turn: Turn) -> tuple[Turn, str | None]:
     """
     if turn.finished:
         return turn, "This turn is over."
+    # Checked before the purse: in a game with no throw limit a chip buys nothing whether
+    # you have three or none, and "no chips left" would send someone looking for more.
+    if turn.unlimited:
+        return turn, "This game has no throw limit — a chip would buy nothing."
     if turn.chips_left <= 0:
         return turn, "No chips left."
     if turn.rolls_left > 0:

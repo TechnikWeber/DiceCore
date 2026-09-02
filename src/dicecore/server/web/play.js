@@ -67,6 +67,14 @@ function renderDice(game) {
 function renderTurn(game) {
   const turn = game.turn;
   if (!game.rules.multi) { $("turnbar").innerHTML = ""; return; }
+  if (turn.unlimited) {
+    // No counter to draw: in Farkle the interesting number is what is at stake, not how
+    // many throws are left, because there is no limit but nerve.
+    const farkle = game.farkle || {};
+    $("turnbar").innerHTML = `<span>turn ${turn.number} · ${farkle.turn_points || 0} at stake`
+      + ` · ${farkle.dice_left || 6} dice</span>`;
+    return;
+  }
   const base = game.rules.rolls;
   const dots = [];
   for (let i = 0; i < turn.rolls_allowed; i += 1) {
@@ -83,26 +91,16 @@ function renderTurn(game) {
 
 // --- the scorecard ----------------------------------------------------------
 
-const SECTIONS = [
-  ["Upper", ["ones", "twos", "threes", "fours", "fives", "sixes"]],
-  ["Lower", ["three_of_a_kind", "four_of_a_kind", "full_house", "small_straight",
-             "large_straight", "kniffel", "chance"]],
-];
-const LABELS = {
-  ones: "Ones", twos: "Twos", threes: "Threes", fours: "Fours", fives: "Fives",
-  sixes: "Sixes", three_of_a_kind: "Three of a kind", four_of_a_kind: "Four of a kind",
-  full_house: "Full house", small_straight: "Small straight",
-  large_straight: "Large straight", kniffel: "Kniffel", chance: "Chance",
-};
-
+// The card is drawn from the sheet the server describes, so a longer variant — six dice,
+// two pairs, a straight from one to six — needs no change here at all.
 function renderCard(game) {
-  if (!game.cards.length) { $("side").hidden = true; $("main").classList.remove("with-card"); return; }
-  $("side").hidden = false;
-  $("main").classList.add("with-card");
-
+  if (!game.cards.length || !game.sheet) return false;
+  const sheet = game.sheet;
+  const label = (c) => sheet.labels[c] || c;
   const mine = game.turn.player;
   const rows = [];
-  for (const [title, categories] of SECTIONS) {
+
+  const section = (title, categories) => {
     rows.push(`<tr class="section"><td colspan="${game.cards.length + 1}">${title}</td></tr>`);
     for (const category of categories) {
       const cells = game.cards.map((card, index) => {
@@ -116,20 +114,21 @@ function renderCard(game) {
         const playable = game.turn.rolls_used > 0;
         return `<td class="you open"><button data-book="${category}"
           class="${worth ? "worth" : ""}" ${playable ? "" : "disabled"}
-          title="Book ${LABELS[category]}">${playable ? (worth || "—") : "·"}</button></td>`;
+          title="Book ${escapeHtml(label(category))}">${playable ? (worth || "—") : "·"}</button></td>`;
       }).join("");
-      rows.push(`<tr><td>${LABELS[category]}</td>${cells}</tr>`);
+      rows.push(`<tr><td>${escapeHtml(label(category))}</td>${cells}</tr>`);
     }
-    if (title === "Upper") {
-      rows.push(`<tr><td>Bonus at 63</td>${game.cards.map((c) =>
-        `<td>${c.bonus ? `+${c.bonus}` : (c.to_bonus ? `${c.to_bonus} to go` : "0")}</td>`)
-        .join("")}</tr>`);
-    }
-  }
+  };
+
+  section("Upper", sheet.upper);
+  rows.push(`<tr><td>Bonus at ${sheet.bonus_at}</td>${game.cards.map((c) =>
+    `<td>${c.bonus ? `+${c.bonus}` : (c.to_bonus ? `${c.to_bonus} to go` : "0")}</td>`)
+    .join("")}</tr>`);
+  section("Lower", sheet.lower);
   rows.push(`<tr class="total"><td>Total</td>${game.cards.map((c, i) =>
     `<td class="${i === game.leader ? "leader" : ""}">${c.total}</td>`).join("")}</tr>`);
 
-  $("card").innerHTML = `<h2>Scorecard</h2><table>
+  $("card").innerHTML = `<h2>${escapeHtml(sheet.label)}</h2><table>
     <tr><th></th>${game.cards.map((c, i) =>
       `<th class="${i === mine ? "you" : ""}">${escapeHtml(c.name)}</th>`).join("")}</tr>
     ${rows.join("")}</table>
@@ -140,10 +139,43 @@ function renderCard(game) {
     button.onclick = () => {
       const worth = game.options[button.dataset.book] || 0;
       // Booking a zero is a real move — crossing a box out — but it should be deliberate.
-      if (!worth && !confirm(`Cross out ${LABELS[button.dataset.book]} for 0?`)) return;
+      if (!worth && !confirm(`Cross out ${label(button.dataset.book)} for 0?`)) return;
       post("/api/v1/game/book", { category: button.dataset.book, cross_out: !worth });
     };
   });
+  return true;
+}
+
+// Farkle is not a card but a running total and a decision: keep going, or take the points.
+function renderFarkle(game) {
+  const farkle = game.farkle;
+  if (!farkle) return false;
+  const selection = game.selection || { points: 0, used: 0 };
+  const rows = game.players.map((name, index) => `
+    <tr class="${index === game.turn.player ? "" : ""}">
+      <td class="${index === game.turn.player ? "you" : ""}">${escapeHtml(name)}</td>
+      <td>${farkle.banked[index]}</td>
+      <td>${farkle.on_board[index] ? "" : `needs ${farkle.entry}`}</td>
+    </tr>`).join("");
+
+  $("card").innerHTML = `<h2>Farkle — first to ${farkle.target}</h2>
+    <table><tr><th></th><th>Banked</th><th></th></tr>${rows}
+      <tr class="total"><td>This turn</td><td>${farkle.turn_points}</td>
+        <td>${farkle.dice_left} dice</td></tr></table>
+    ${farkle.farkled
+      ? `<p class="leader" style="color:var(--bad)">Farkle — the turn is lost.</p>`
+      : `<p class="log">Set aside every die that scores, then bank or throw again.
+         ${selection.points ? `Selected: <b>${selection.points}</b>` : "Nothing selected."}</p>`}
+    ${farkle.winner !== null && farkle.winner !== undefined
+      ? `<p class="leader">${escapeHtml(game.players[farkle.winner])} wins.</p>` : ""}`;
+  return true;
+}
+
+function renderBoard(game) {
+  const has = renderCard(game) || renderFarkle(game);
+  $("side").hidden = !has;
+  $("main").classList.toggle("with-card", has);
+  return has;
 }
 
 function renderLog(game) {
@@ -175,12 +207,20 @@ function render(game, roll) {
 
   renderTurn(game);
   renderDice(game);
-  renderCard(game);
+  renderBoard(game);
   renderLog(game);
 
   $("btn-chip").disabled = !game.turn.can_spend_chip;
   $("btn-chip").hidden = !game.rules.chips;
-  $("btn-next").hidden = game.cards.length > 0 && !game.complete;
+  $("btn-aside").hidden = !game.farkle;
+  $("btn-bank").hidden = !game.farkle;
+  if (game.farkle) {
+    $("btn-aside").disabled = !(game.selection && game.selection.points) || game.farkle.farkled;
+    $("btn-bank").disabled = game.turn.rolls_used === 0;
+    $("btn-bank").textContent = game.farkle.farkled
+      ? "Take the loss" : `Bank ${game.farkle.turn_points}`;
+  }
+  $("btn-next").hidden = Boolean(game.farkle) || (game.cards.length > 0 && !game.complete);
   $("btn-next").disabled = game.turn.rolls_used === 0;
 
   if (roll && roll.verdict === "void") {
@@ -212,6 +252,8 @@ function connect() {
 }
 
 $("btn-chip").onclick = () => post("/api/v1/game/chip");
+$("btn-aside").onclick = () => post("/api/v1/game/aside");
+$("btn-bank").onclick = () => post("/api/v1/game/bank");
 $("btn-next").onclick = () => post("/api/v1/game/next");
 $("btn-reset").onclick = () => {
   if (confirm("Start a new game? Scores are cleared.")) post("/api/v1/game/reset");

@@ -11,6 +11,7 @@ import pytest
 
 from dicecore.dice import Box, Die, RollResult
 from dicecore.modes.catalogue import mode_by_id, rules_for
+from dicecore.play import farkle as farkle_rules
 from dicecore.play import kniffel
 from dicecore.play.session import GameSession
 from dicecore.play.turns import (
@@ -263,6 +264,174 @@ def test_a_game_without_a_scorecard_still_counts_turns():
     assert not session.cards
     session.finish_turn("6")
     assert session.turn.number == 2 and session.to_json()["log"][0]["headline"] == "6"
+
+
+# --- chips belong to a player, for the whole game ---------------------------------
+
+
+def test_chips_are_not_refilled_every_turn():
+    # Which is the point of having them: spending one is a decision about the evening.
+    session = game()
+    session.observe(result(1, 2, 3, 4, 5))
+    for _ in range(2):
+        session.observe(result(1, 2, 3, 4, 5))
+    session.chip()
+    assert session.chips == [1, 2]
+    session.observe(result(1, 2, 3, 4, 5))
+    session.book("chance")                       # player B's turn
+    assert session.turn.chips_left == 2
+    session.observe(result(1, 2, 3, 4, 5))
+    session.book("chance")                       # back to A
+    assert session.turn.chips_left == 1
+
+
+def test_a_new_game_hands_the_chips_back():
+    session = game()
+    for _ in range(3):
+        session.observe(result(1, 2, 3, 4, 5))
+    session.chip()
+    session.reset()
+    assert session.chips == [2, 2] and session.turn.chips_left == 2
+
+
+# --- the extended sheet -----------------------------------------------------------
+
+
+def test_the_extended_sheet_has_the_categories_six_dice_make_possible():
+    assert "six_of_a_kind" in kniffel.EXTREME.categories
+    assert "three_pairs" in kniffel.EXTREME.categories
+    assert "extreme_straight" in kniffel.EXTREME.categories
+    assert kniffel.EXTREME.dice == 6
+
+
+def test_the_extended_categories_score():
+    assert kniffel.score_for("six_of_a_kind", [4] * 6) == 100
+    assert kniffel.score_for("five_of_a_kind", [4] * 5 + [2]) == 60
+    assert kniffel.score_for("three_pairs", [2, 2, 4, 4, 6, 6]) == 35
+    assert kniffel.score_for("two_pairs", [6, 6, 3, 3, 1, 2]) == 18
+    assert kniffel.score_for("big_full_house", [5, 5, 5, 2, 2, 2]) == 40
+    assert kniffel.score_for("extreme_straight", [1, 2, 3, 4, 5, 6]) == 60
+
+
+def test_the_extended_categories_are_refused_when_not_made():
+    assert kniffel.score_for("three_pairs", [2, 2, 4, 4, 6, 1]) == 0
+    assert kniffel.score_for("big_full_house", [5, 5, 5, 2, 2, 3]) == 0
+    assert kniffel.score_for("extreme_straight", [1, 2, 3, 4, 5, 5]) == 0
+
+
+def test_a_full_house_needs_two_different_faces():
+    # Five of a kind is not a full house, however it is counted.
+    assert kniffel.score_for("full_house", [4] * 5) == 0
+
+
+def test_the_extended_bonus_asks_for_more():
+    assert kniffel.EXTREME.bonus_at == 84 and kniffel.EXTREME.bonus == 50
+    card = kniffel.Card("A", kniffel.EXTREME)
+    for face, category in zip(range(1, 7), kniffel.UPPER, strict=True):
+        card.book(category, [face] * 4 + [1, 1])
+    assert card.upper >= 84 and card.bonus == 50
+
+
+def test_a_card_only_takes_categories_from_its_own_sheet():
+    card = kniffel.Card("A", kniffel.STANDARD)
+    with pytest.raises(ValueError, match="not a category"):
+        card.book("six_of_a_kind", [4] * 6)
+
+
+# --- Farkle -----------------------------------------------------------------------
+
+
+def test_farkle_scores_only_the_dice_that_earn_their_keep():
+    assert farkle_rules.breakdown([1, 1, 1, 5]).points == 1050
+    assert farkle_rules.breakdown([1, 1, 1, 5]).used == 4
+    assert farkle_rules.breakdown([1, 2]).used == 1          # the 2 does nothing
+
+
+def test_a_selection_with_a_dead_die_in_it_is_refused():
+    # Carrying one along would quietly cost a throw's worth of dice.
+    assert farkle_rules.is_legal_selection([1, 5])
+    assert not farkle_rules.is_legal_selection([1, 2])
+    assert not farkle_rules.is_legal_selection([])
+
+
+def test_a_straight_and_three_pairs_use_the_whole_hand():
+    assert farkle_rules.breakdown([1, 2, 3, 4, 5, 6]).points == 1500
+    assert farkle_rules.breakdown([2, 2, 4, 4, 6, 6]).points == 1500
+
+
+def test_setting_dice_aside_takes_them_off_the_tray():
+    state = farkle_rules.FarkleState(players=1)
+    assert state.set_aside([1, 1, 1])[0]
+    assert state.turn_points == 1000 and state.dice_left == 3
+
+
+def test_using_every_die_brings_the_whole_hand_back():
+    state = farkle_rules.FarkleState(players=1)
+    state.set_aside([1, 1, 1])
+    state.set_aside([5, 5, 5])
+    assert state.dice_left == 6 and state.turn_points == 1500
+
+
+def test_a_throw_with_nothing_in_it_loses_the_turn():
+    state = farkle_rules.FarkleState(players=1)
+    state.set_aside([1, 1, 1])
+    state.farkle()
+    assert state.farkled and state.turn_points == 0
+    assert state.bank(0) == (0, "Farkled — nothing to bank.")
+
+
+def test_you_have_to_get_on_the_board_before_anything_counts():
+    state = farkle_rules.FarkleState(players=1, entry=500)
+    state.set_aside([5])                       # 50, well under the entry
+    gained, problem = state.bank(0)
+    assert gained == 0 and "under the 500" in problem
+    assert state.banked == [0]
+
+
+def test_once_on_the_board_a_small_turn_counts():
+    state = farkle_rules.FarkleState(players=1, entry=500)
+    state.set_aside([1, 1, 1])
+    state.bank(0)
+    state.set_aside([5])
+    assert state.bank(0)[0] == 50 and state.banked == [1050]
+
+
+def test_the_winner_is_the_one_past_the_target():
+    state = farkle_rules.FarkleState(players=2, target=1000)
+    assert state.winner is None
+    state.banked[1] = 1200
+    assert state.winner == 1
+
+
+def test_a_farkle_game_plays_through_the_session():
+    from dicecore.modes.catalogue import mode_by_id
+
+    mode = mode_by_id("farkle")
+    session = GameSession("farkle", rules_for(mode, mode.defaults), ["A", "B"], mode.defaults)
+    session.observe(result(1, 1, 1, 3, 4, 2))
+    for slot in session.turn.dice:
+        slot.held = slot.value == 1
+    assert session.set_aside()["ok"]
+    assert session.farkle.turn_points == 1000
+    # A throw with nothing in it, and the turn is gone.
+    session.observe(result(2, 3, 4))
+    assert session.farkle.farkled and "Farkle" in session.message
+    assert session.bank()["gained"] == 0
+    assert session.turn.player == 1
+
+
+def test_farkle_has_no_throw_limit_and_no_use_for_chips():
+    from dicecore.modes.catalogue import mode_by_id
+
+    mode = mode_by_id("farkle")
+    rules = rules_for(mode, mode.defaults)
+    assert rules.unlimited and rules.multi
+    turn = start_turn(rules)
+    for _ in range(6):
+        apply_roll(turn, hand(1, 1, 1), rules)
+    assert turn.can_roll and not turn.finished
+    _, problem = spend_chip(turn)
+    assert problem is not None and "no throw limit" in problem
 
 
 def test_the_winner_is_only_named_when_there_is_one():
