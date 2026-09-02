@@ -101,6 +101,11 @@ python3 -m venv .venv && .venv/bin/pip install -e '.[vision,server,dev]'
   lobby first: it opened into whatever mode was configured and started reading, and a player
   watching numbers change had no idea what was going on. **Nothing reads the tray until
   `game.running`.**
+- **Nothing outbound may slow down a reading.** Publishing runs on a thread and a failed
+  delivery is recorded and forgotten — never retried. A dice roll is interesting for about
+  ten seconds, and a queue of stale ones is worse than none.
+- **Credentials are never handed back out.** `Publisher.describe()` says whether a token is
+  set, never what it is; `tests/test_publish.py` guards that.
 - **A control that does nothing is worse than no control.** Three shipped that way — a
   checkbox list the engine ignored, a "show the scorecard" flag nothing read, a
   `restrict_kinds` that was pure decoration. Before adding a setting, name the line that

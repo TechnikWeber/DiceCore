@@ -50,6 +50,9 @@ event stream a bot or a game can subscribe to.
   instant the dice stop, with a small animation for a natural 20; a green and a red LED plus
   a buzzer say whose turn it is without anyone reading anything. Both are optional, both run
   at once, and both are previewed in the browser before a single wire is soldered.
+- **Sends rolls out.** A finished roll can go straight into a Discord channel, into an
+  Avrae variable a `!phys` alias reads back, or as JSON to any URL of yours — so the number
+  off your table lands where the game already is.
 - **A versioned API** and a websocket stream, meant to be embedded by other projects.
 - **CSI camera modules as configuration** — including Arducam IMX519 / 64MP / Owlsight /
   Pivariety, which a Pi does not auto-detect. Picking one in the UI writes the `dtoverlay`
@@ -160,6 +163,7 @@ A die that could not be read has `"value": 0` and prints as `?`. Never add it up
 | [docs/TRAINING.md](docs/TRAINING.md) | Teaching it your own dice |
 | [docs/ANTI-CHEAT.md](docs/ANTI-CHEAT.md) | What the fair-play watch catches, and what it cannot |
 | [docs/PLAYING.md](docs/PLAYING.md) | The game screen, turns, chips and the two buttons |
+| [docs/AVRAE.md](docs/AVRAE.md) | Sending rolls to Avrae, to Discord, or anywhere else |
 | [docs/GAME-MODES.md](docs/GAME-MODES.md) | The modes, what each one scores, and how to add another |
 | [docs/DISPLAYS.md](docs/DISPLAYS.md) | The screen, the lamps and the buzzer — panels, pins, wiring |
 

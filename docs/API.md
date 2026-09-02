@@ -145,6 +145,11 @@ const roll = await (await fetch("http://dicecore.local:8099/api/v1/roll")).json(
 console.log(roll.total, roll.notation);
 ```
 
+## The other direction
+
+DiceCore can also hand each finished roll over by itself — into a Discord channel, into an
+Avrae variable, or as JSON to a URL of yours. See [AVRAE.md](AVRAE.md).
+
 ## Embedding it in Python directly
 
 For something running on the same machine, skip HTTP:

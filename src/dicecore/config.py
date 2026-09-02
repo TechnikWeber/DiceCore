@@ -273,6 +273,42 @@ class PlaySettings:
 
 
 @dataclass
+class PublishSettings:
+    """
+    Sending finished rolls somewhere else — Discord, Avrae, or any URL.
+
+    All off by default. Handing a number to a third party is a thing a table decides, and
+    two of these carry a credential.
+    """
+
+    enabled: bool = False
+    #: Skip rolls the fair-play watch voided. On by default: a number that was interfered
+    #: with is exactly the one you do not want turning up in a game.
+    only_usable: bool = True
+
+    # --- Avrae: write the roll into a user variable an alias can read ------
+    avrae_enabled: bool = False
+    #: From avrae.io/dashboard. A credential: it can read and write that account's aliases
+    #: and variables, and it sits in this config file in plain text.
+    avrae_token: str = ""
+    #: The variable name the Discord alias reads with get_uvar().
+    avrae_uvar: str = "dicecore"
+    #: Blank means the official API. Set it only if you run your own Avrae.
+    avrae_api: str = ""
+
+    # --- Discord: a message in a channel ----------------------------------
+    discord_enabled: bool = False
+    #: Channel settings → Integrations → Webhooks → New webhook → Copy URL.
+    discord_webhook: str = ""
+    discord_name: str = "DiceCore"
+
+    # --- anything else ----------------------------------------------------
+    webhook_enabled: bool = False
+    #: Gets the same JSON the API returns for a roll, POSTed as it happens.
+    webhook_url: str = ""
+
+
+@dataclass
 class ServerSettings:
     host: str = "0.0.0.0"
     port: int = 8099
@@ -302,6 +338,7 @@ class Settings:
     mode: ModeSettings = field(default_factory=ModeSettings)
     play: PlaySettings = field(default_factory=PlaySettings)
     panel: PanelSettings = field(default_factory=PanelSettings)
+    publish: PublishSettings = field(default_factory=PublishSettings)
     server: ServerSettings = field(default_factory=ServerSettings)
     #: Keys we did not recognise, kept verbatim so a downgrade is not a data loss.
     extra: dict[str, Any] = field(default_factory=dict)

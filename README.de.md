@@ -54,6 +54,9 @@ als JSON-API und als Live-Stream, den ein Bot oder ein Spiel abonnieren kann.
   sobald die Würfel liegen, mit kleiner Animation bei einer natürlichen 20; eine grüne und
   eine rote LED plus Summer sagen, wer dran ist, ganz ohne Hinsehen. Beides optional, beides
   gleichzeitig nutzbar, und beides im Browser vorschaubar, bevor ein einziger Draht gelötet ist.
+- **Schickt Würfe hinaus.** Ein fertiger Wurf kann direkt in einen Discord-Kanal gehen, in
+  eine Avrae-Variable, die ein `!phys`-Alias zurückliest, oder als JSON an eine beliebige
+  URL — die Zahl vom Tisch landet dort, wo das Spiel ohnehin stattfindet.
 - **Eine versionierte API** und ein WebSocket-Stream, gedacht zum Einbinden in andere Projekte.
 - **CSI-Kameramodule als Einstellung** — inklusive Arducam IMX519 / 64MP / Owlsight /
   Pivariety, die ein Pi nicht selbst erkennt. Die Auswahl in der Oberfläche schreibt den
@@ -167,6 +170,7 @@ mitrechnen.
 | [docs/TRAINING.md](docs/TRAINING.md) | Ihm die eigenen Würfel beibringen |
 | [docs/ANTI-CHEAT.md](docs/ANTI-CHEAT.md) | Was die Fair-Play-Überwachung erkennt — und was nicht |
 | [docs/PLAYING.md](docs/PLAYING.md) | Spielbildschirm, Züge, Chips und die beiden Taster |
+| [docs/AVRAE.md](docs/AVRAE.md) | Würfe an Avrae, an Discord oder sonstwohin schicken |
 | [docs/GAME-MODES.md](docs/GAME-MODES.md) | Die Modi, was jeder wertet, und wie ein weiterer dazukommt |
 | [docs/DISPLAYS.md](docs/DISPLAYS.md) | Display, Lampen und Summer — Panels, Pins, Verdrahtung |
 

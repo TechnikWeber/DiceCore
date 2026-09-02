@@ -484,3 +484,28 @@ def test_switching_the_live_view_on_is_reported(client):
     settings["server"]["stream_enabled"] = True
     client.put("/api/setup/settings", json=settings)
     assert client.get("/api/v1/health").json()["stream"] is True
+
+
+def test_the_page_can_see_what_is_configured_to_receive_rolls(client):
+    body = client.get("/api/setup/publish").json()
+    assert body["enabled"] is False
+    assert set(body["targets"]) == {"avrae", "discord", "webhook"}
+    # Whether a token is set, never the token.
+    assert body["targets"]["avrae"]["token"] is False
+
+
+def test_a_test_send_with_nothing_switched_on_says_so(client):
+    answer = client.post("/api/setup/publish/test")
+    assert answer.status_code == 409 and "Nothing is switched on" in answer.json()["detail"]
+
+
+def test_a_test_send_reports_what_actually_happened(client):
+    settings = client.get("/api/setup/settings").json()
+    settings["publish"]["enabled"] = True
+    settings["publish"]["webhook_enabled"] = True
+    settings["publish"]["webhook_url"] = "http://127.0.0.1:1/nowhere"
+    client.put("/api/setup/settings", json=settings)
+    attempts = client.post("/api/setup/publish/test").json()["attempts"]
+    # It waits for the answer rather than firing and forgetting: finding out whether the
+    # token is right is the entire point, and "sent" is not that answer.
+    assert len(attempts) == 1 and attempts[0]["ok"] is False

@@ -195,6 +195,9 @@ emphasised, never a different pipeline.
   arithmetic, and the mode's own detail.
 - **Consumers** — a Discord bot, a game, a scoreboard. They live in their own repos and
   depend on this API, not on this code. That direction is the whole point.
+- **Outbound** — the same roll pushed the other way: a Discord webhook, an Avrae user
+  variable an alias reads back, or JSON to any URL. Nothing about a roll changes; only who
+  starts the conversation. See [docs/AVRAE.md](AVRAE.md).
 
 ## Non-goals
 

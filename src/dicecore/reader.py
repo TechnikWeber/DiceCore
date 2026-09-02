@@ -34,6 +34,7 @@ from .modes.catalogue import mode_by_id, rules_for
 from .panel import state as phases
 from .play import GameSession
 from .play import store as game_store
+from .publish import Publisher
 
 
 class Reader:
@@ -71,6 +72,9 @@ class Reader:
         #: same tray differently: a screen in "normal" and a bot in "pool" are both right,
         #: and neither should be able to reset the other's tally.
         self.mode_sessions: dict[str, ModeSession] = {}
+        #: Hands finished rolls to Discord, Avrae or a webhook. Always on a thread: nothing
+        #: outside DiceCore may slow down the reading of a die.
+        self.publisher = Publisher(settings)
         #: The hold window runs on its own thread so the number is not held hostage to it.
         self._verifier: threading.Thread | None = None
         self._verify_stop = threading.Event()
@@ -97,6 +101,7 @@ class Reader:
             if settings is not None:
                 previous = self.settings.mode.active
                 self.settings = settings
+                self.publisher.settings = settings
                 self.configure_game()
                 if settings.mode.active != previous:
                     # An exploding roll or a fairness tally belongs to the mode that started
@@ -182,6 +187,10 @@ class Reader:
             if not guard.enabled:
                 # Nothing is being watched, so it is already your turn again.
                 self._show(result, phases.READY)
+
+            if not guard.enabled:
+                # Nothing to wait for, so the roll can go out now.
+                self.publisher.publish(result)
 
             if guard.enabled:
                 if verify:
@@ -277,6 +286,9 @@ class Reader:
                 result.warnings.append(event.detail)
         # The moment the lamps exist for: the watch is over, throw again.
         self._show(result, phases.VOID if result.verdict == VOID else phases.READY)
+        # Published only now, with the verdict attached: a number that was interfered with
+        # is exactly the one that should not turn up in somebody's game.
+        self.publisher.publish(result)
 
     def configure_game(self, force: bool = False) -> None:
         """

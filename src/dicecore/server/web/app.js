@@ -50,6 +50,7 @@ function showTab() {
   if (name === "signals") pollOutputs();
   if (name === "detection") { pollModeSession(); renderPlayState(); refreshTrayImage(); }
   if (name === "training") { loadSets(); pollTraining(); }
+  if (name === "api") pollPublish();
   if (name === "system") refreshStatus();
 }
 window.addEventListener("hashchange", showTab);
@@ -275,6 +276,21 @@ function loadForm() {
       $("cl-lament").checked = s.panel.lament_on_min;
       $("cl-frames").value = s.panel.animation_frames;
     },
+    publish: () => {
+      const pb = s.publish;
+      $("pb-enabled").checked = pb.enabled;
+      $("pb-usable").checked = pb.only_usable;
+      $("pb-avrae").checked = pb.avrae_enabled;
+      $("pb-avrae-token").value = pb.avrae_token;
+      $("pb-avrae-uvar").value = pb.avrae_uvar;
+      $("pb-avrae-api").value = pb.avrae_api;
+      $("pb-discord").checked = pb.discord_enabled;
+      $("pb-discord-url").value = pb.discord_webhook;
+      $("pb-discord-name").value = pb.discord_name;
+      $("pb-webhook").checked = pb.webhook_enabled;
+      $("pb-webhook-url").value = pb.webhook_url;
+      $("avrae-alias").textContent = avraeAlias(pb.avrae_uvar || "dicecore");
+    },
     server: () => {
       $("sv-stream").checked = s.server.stream_enabled;
       $("sv-fps").value = s.server.stream_fps;
@@ -346,6 +362,17 @@ function collectForm() {
   s.panel.signals.next_pin = Number($("sg-nextbtn").value);
   s.panel.signals.button_pull_up = $("sg-pullup").checked;
   s.panel.signals.debounce_s = Number($("sg-debounce").value);
+  s.publish.enabled = $("pb-enabled").checked;
+  s.publish.only_usable = $("pb-usable").checked;
+  s.publish.avrae_enabled = $("pb-avrae").checked;
+  s.publish.avrae_token = $("pb-avrae-token").value.trim();
+  s.publish.avrae_uvar = $("pb-avrae-uvar").value.trim() || "dicecore";
+  s.publish.avrae_api = $("pb-avrae-api").value.trim();
+  s.publish.discord_enabled = $("pb-discord").checked;
+  s.publish.discord_webhook = $("pb-discord-url").value.trim();
+  s.publish.discord_name = $("pb-discord-name").value.trim() || "DiceCore";
+  s.publish.webhook_enabled = $("pb-webhook").checked;
+  s.publish.webhook_url = $("pb-webhook-url").value.trim();
   s.server.stream_enabled = $("sv-stream").checked;
   s.server.stream_fps = Number($("sv-fps").value);
   s.settle.enabled = $("st-enabled").checked;
@@ -877,6 +904,37 @@ async function testOutputs(phase) {
   } catch (err) { alertBox(err.message); }
 }
 
+// --- sending rolls out ------------------------------------------------------
+
+//: The alias a player pastes into Discord once. Written in Draconic without f-strings or
+//: anything clever, because the point is that it works the first time on somebody else's
+//: Avrae rather than that it is elegant.
+function avraeAlias(uvar) {
+  return [
+    `!alias phys echo <drac2>`,
+    `if not uvar_exists("${uvar}"):`,
+    `    return "No physical roll yet — throw the dice."`,
+    `r = load_json(get_uvar("${uvar}"))`,
+    `faces = ", ".join([str(d["kind"]) + " " + str(d["value"]) for d in r["dice"]])`,
+    `out = "**" + str(r["total"]) + "**  (" + faces + ")"`,
+    `if not r["usable"]:`,
+    `    out = out + "  ⚠️ voided — the dice changed after they were read"`,
+    `return out`,
+    `</drac2>`,
+  ].join("\n");
+}
+
+async function pollPublish() {
+  let info;
+  try { info = await api("/api/setup/publish"); } catch { return; }
+  const rows = info.log.slice(0, 6).map((entry) =>
+    `<div>${entry.ok ? "✓" : "✗"} ${escapeHtml(entry.target)} — ${escapeHtml(entry.detail)}</div>`);
+  $("publish-state").innerHTML = info.enabled
+    ? (rows.length ? `<div class="muted">${rows.join("")}</div>`
+       : `<p class="muted">Nothing sent yet.</p>`)
+    : `<p class="muted">Sending is switched off.</p>`;
+}
+
 // --- API tab ----------------------------------------------------------------
 
 function renderApiExamples() {
@@ -962,6 +1020,27 @@ $("btn-train").onclick = async () => {
 };
 $("btn-train-stop").onclick = () => api("/api/setup/training/stop", { method: "POST" }).catch(() => {});
 $("btn-ws").onclick = toggleWebsocket;
+$("btn-copy-alias").onclick = async () => {
+  try {
+    await navigator.clipboard.writeText($("avrae-alias").textContent);
+    alertBox("Alias copied — paste it into Discord once.", "good");
+  } catch {
+    alertBox("Could not reach the clipboard; select the text and copy it.", "warn");
+  }
+};
+$("btn-publish-test").onclick = async () => {
+  try {
+    const answer = await api("/api/setup/publish/test", json("POST", {}));
+    for (const attempt of answer.attempts) {
+      alertBox(`${attempt.target}: ${attempt.ok ? "delivered" : attempt.detail}`,
+               attempt.ok ? "good" : "bad");
+    }
+    pollPublish();
+  } catch (err) { alertBox(err.message); }
+};
+$("pb-avrae-uvar").addEventListener("input", () => {
+  $("avrae-alias").textContent = avraeAlias($("pb-avrae-uvar").value.trim() || "dicecore");
+});
 $("mode-select").addEventListener("change", renderModeEditor);
 $("btn-players").onclick = async () => {
   const players = $("play-players").value.split("\n").map((n) => n.trim()).filter(Boolean);

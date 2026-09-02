@@ -2,6 +2,27 @@
 
 Notable changes, newest first. Dates are the day the work landed.
 
+## 0.11.0 (2026-09-02)
+
+### Added
+- **Rolls can be sent out**, which is the API in the other direction: instead of somebody
+  asking DiceCore for a roll, DiceCore hands each finished one over.
+- **Avrae**: each roll is written into an Avrae user variable, and a one-line alias in
+  Discord reads it back. Verified against Avrae's own source rather than guessed —
+  `POST /customizations/uvars/<name>` with an `Authorization` header, and `get_uvar()` in
+  an alias. The setup page shows the alias with a copy button, already carrying the
+  variable name you chose. **Avrae rolls its own dice and cannot be made to use yours**;
+  what this does is put your number where an alias can reach it.
+- **Discord**: a webhook message in a channel, so the table sees the physical roll land.
+- **Anywhere else**: the same JSON the API returns, POSTed to a URL of yours.
+- A **test button** that waits for the answer rather than firing and forgetting — finding
+  out whether the token is right is the whole point, and "sent" is not that answer.
+- `docs/AVRAE.md`.
+
+All of it off by default. Sending happens once the fair-play verdict is in, so a voided roll
+never reaches anybody's game; it runs on a thread; a failed delivery is recorded and not
+retried; and the page can say whether a token is set but never what it is.
+
 ## 0.10.0 (2026-09-02)
 
 ### Added

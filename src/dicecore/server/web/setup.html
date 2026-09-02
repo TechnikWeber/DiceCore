@@ -415,6 +415,59 @@
       <pre id="api-examples"></pre>
     </div>
     <div class="card">
+      <h2>Send rolls out — Discord, Avrae, anywhere</h2>
+      <p class="hint">The other direction: instead of somebody asking DiceCore for a roll,
+        DiceCore hands each finished roll over. All off by default, and two of these carry a
+        credential that lives in the config file in plain text.</p>
+
+      <div class="grid">
+        <div><label>Send finished rolls</label><input id="pb-enabled" type="checkbox"></div>
+        <div><label>Skip rolls the fair-play watch voided</label><input id="pb-usable" type="checkbox"></div>
+      </div>
+
+      <h3 style="margin:20px 0 6px;font-size:14px">Avrae</h3>
+      <p class="hint"><b>Avrae rolls its own dice and cannot be made to use yours</b> — no
+        bot can. What works, and is what this does: DiceCore writes each roll into an Avrae
+        <em>user variable</em>, and a one-line alias in Discord reads it out. You still type
+        something; the number comes off your table. Get the token from
+        <a href="https://avrae.io/dashboard" target="_blank" rel="noreferrer">avrae.io/dashboard</a>,
+        then paste the alias below into Discord once.</p>
+      <div class="grid">
+        <div><label>Write rolls to an Avrae variable</label><input id="pb-avrae" type="checkbox"></div>
+        <div><label>Avrae token</label><input id="pb-avrae-token" type="password" placeholder="from avrae.io/dashboard"></div>
+        <div><label>Variable name</label><input id="pb-avrae-uvar" placeholder="dicecore"></div>
+        <div><label>API base (blank = official)</label><input id="pb-avrae-api" placeholder="https://api.avrae.io"></div>
+      </div>
+      <p class="hint" style="margin-top:10px">Paste this into Discord once, then type
+        <code>!phys</code> after a throw:</p>
+      <pre id="avrae-alias"></pre>
+      <div class="row"><button id="btn-copy-alias">Copy the alias</button></div>
+
+      <h3 style="margin:20px 0 6px;font-size:14px">Discord</h3>
+      <p class="hint">A message in a channel, so the table sees the physical roll. Channel
+        settings → Integrations → Webhooks → New webhook → Copy URL.</p>
+      <div class="grid">
+        <div><label>Post rolls to a channel</label><input id="pb-discord" type="checkbox"></div>
+        <div><label>Webhook URL</label><input id="pb-discord-url" type="password" placeholder="https://discord.com/api/webhooks/…"></div>
+        <div><label>Shown as</label><input id="pb-discord-name" placeholder="DiceCore"></div>
+      </div>
+
+      <h3 style="margin:20px 0 6px;font-size:14px">Anywhere else</h3>
+      <p class="hint">The same JSON the API returns for a roll, POSTed to a URL of yours as
+        it happens.</p>
+      <div class="grid">
+        <div><label>POST rolls to a URL</label><input id="pb-webhook" type="checkbox"></div>
+        <div><label>URL</label><input id="pb-webhook-url" placeholder="https://…"></div>
+      </div>
+
+      <div class="row" style="margin-top:14px">
+        <button class="primary" data-save>Save</button>
+        <button id="btn-publish-test">Send a test roll</button>
+      </div>
+      <div id="publish-state" style="margin-top:12px"></div>
+    </div>
+
+    <div class="card">
       <h2>Live result</h2>
       <p class="hint">The websocket pushes a result as soon as the dice settle. This is the
         same stream a Discord bot would consume.</p>

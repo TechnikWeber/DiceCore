@@ -92,7 +92,7 @@ def create_app(settings: Settings | None = None) -> Any:
     buttons = ButtonPanel(loaded.panel.signals, on_chip, on_next)
     state["buttons"] = buttons
 
-    app = FastAPI(title="DiceCore", version="0.10.0",
+    app = FastAPI(title="DiceCore", version="0.11.0",
                   description="Reads real dice with a camera.")
     app.state.reader = reader
     app.state.training = training
@@ -751,6 +751,33 @@ def create_app(settings: Settings | None = None) -> Any:
         return {"available": ok, "why": why, "job": job.to_json() if job else None,
                 "models": _list_models(state["settings"]),
                 "extras": available(), "can_install": bool(EXTRAS)}
+
+    @app.get("/api/setup/publish")
+    def publish_state() -> Any:
+        """What is configured to receive rolls, and how the last few deliveries went."""
+        return reader.publisher.describe()
+
+    @app.post("/api/setup/publish/test")
+    def publish_test() -> Any:
+        """
+        Send one made-up roll to everything that is switched on, and report what happened.
+
+        A test that waits for the answer rather than firing and forgetting: the whole point
+        is to find out whether the token is right, and "sent" is not that answer.
+        """
+        from ..dice import Box, Die, RollResult
+
+        sample = RollResult(
+            dice=[Die("d20", 17, Box(0, 0, 60, 60), 0.97),
+                  Die("d6", 4, Box(80, 0, 50, 50), 0.99)],
+            engine="test", verdict="clean")
+        sample.reading = {"headline": "21", "detail": "4, 17 — a test from DiceCore",
+                          "mode": "rpg"}
+        attempts = reader.publisher.publish(sample, blocking=True)
+        if not attempts:
+            return fail(RuntimeError(
+                "Nothing is switched on to send to. Turn on sending, then a target."), 409)
+        return {"attempts": [a.to_json() for a in attempts]}
 
     @app.get("/api/setup/install")
     def install_state() -> Any:
