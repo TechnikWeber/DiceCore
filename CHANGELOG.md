@@ -47,6 +47,8 @@ Notable changes, newest first. Dates are the day the work landed.
 - The "Throw the dice" prompt printed its letters on top of each other: `letter-spacing` is
   inherited as an absolute length resolved where it was declared, and the headline's `-.03em`
   is `-5px` at 168px — which is half a glyph at 18px.
+- `/api/v1/health` reported the version written out by hand in `app.py`, which had drifted a
+  release behind the package. It comes from `__version__` now, and a test says so.
 - An open scorecard box shows what it is worth to everyone at the table, not only to the
   player whose turn it is. Watching somebody decide is most of the game.
 

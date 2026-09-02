@@ -613,3 +613,10 @@ def test_a_guest_at_a_table_plays_the_hosts_game(sim):
             if message["type"] == "refused":
                 assert message["reason"] == "It is not your turn."
                 break
+
+
+def test_health_reports_the_package_version(client):
+    from dicecore import __version__
+
+    # It was written out by hand once and drifted a whole release behind the package.
+    assert client.get("/api/v1/health").json()["version"] == __version__

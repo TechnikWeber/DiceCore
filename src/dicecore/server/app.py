@@ -26,6 +26,7 @@ import time
 from pathlib import Path
 from typing import Any
 
+from .. import __version__
 from ..capture import SOURCES, CaptureError
 from ..config import Settings, config_path
 from ..dataset import transfer
@@ -125,7 +126,9 @@ def create_app(settings: Settings | None = None) -> Any:
         table.stop()
         guest.leave()
 
-    app = FastAPI(title="DiceCore", version="0.13.0",
+    # From the package, never written out here: a second copy of the version drifts,
+    # and it drifted — `/health` reported 0.13.0 out of a 0.14.0 install.
+    app = FastAPI(title="DiceCore", version=__version__,
                   description="Reads real dice with a camera.", lifespan=lifespan)
     app.state.reader = reader
     app.state.training = training
