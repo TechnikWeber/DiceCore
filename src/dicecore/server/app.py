@@ -53,7 +53,7 @@ def create_app(settings: Settings | None = None) -> Any:
     reader = Reader(loaded)
     training = TrainingManager(loaded)
 
-    app = FastAPI(title="DiceCore", version="0.1.0",
+    app = FastAPI(title="DiceCore", version="0.2.0",
                   description="Reads real dice with a camera.")
     app.state.reader = reader
     app.state.training = training
