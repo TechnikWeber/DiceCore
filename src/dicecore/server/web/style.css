@@ -120,3 +120,24 @@ pre {
 .bar > i { display: block; height: 100%; background: var(--accent); }
 .muted { color: var(--ink-soft); font-size: 13px; }
 .spread { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+
+/* Fair play verdicts. The colour is the whole message at a glance: green means the tray was
+   watched and nothing happened, red means do not count this number. */
+.verdict {
+  padding: 5px 12px; border-radius: 999px; font-size: 13px; font-weight: 600;
+  border: 1px solid var(--line); background: var(--panel-2); color: var(--ink-soft);
+}
+.verdict.clean { border-color: var(--good); color: var(--good);
+                 background: color-mix(in srgb, var(--good) 12%, transparent); }
+.verdict.disturbed { border-color: var(--warn); color: var(--warn);
+                     background: color-mix(in srgb, var(--warn) 12%, transparent); }
+.verdict.void { border-color: var(--bad); color: var(--bad);
+                background: color-mix(in srgb, var(--bad) 14%, transparent); }
+.verdict.pending { opacity: .75; }
+.events { margin: 10px 0 0; padding: 0; list-style: none; font-size: 13px; }
+.events li { padding: 5px 0 5px 20px; position: relative; color: var(--ink-soft); }
+.events li::before { content: "•"; position: absolute; left: 6px; }
+.events li.fault { color: var(--bad); }
+.events li.fault::before { content: "!"; font-weight: 700; }
+.events li.warn { color: var(--warn); }
+.voided .total { color: var(--bad); text-decoration: line-through; }

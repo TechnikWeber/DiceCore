@@ -45,6 +45,9 @@ Counting pips on a d6 lying on a clean tray is a solved exercise. The real probl
 - **Knowing when the roll is over.** A frame grabbed mid-tumble is worthless. Settling
   detection (frame differencing until motion stops, then N stable frames) is part of the
   pipeline, not an afterthought.
+- **Knowing the number is still true.** Reading the dice is only half of it: between the
+  camera and the game, a hand can turn a die over. Watching the tray afterwards is part of
+  the pipeline for the same reason settling is — see *Fair play*.
 
 ## Architecture
 
@@ -99,6 +102,24 @@ IMX519 needs the shipped `imx519-af.json` or its lens simply never moves.
   returns its answer. This is what makes an ARMv6 Zero useful: the Pi captures, a PC or a
   Pi 5 reads. The API is identical either way, so a consumer never knows the difference.
 
+### Fair play
+
+The tray does not stop mattering the moment it has been read. For `hold_s` afterwards it
+stays watched, and at the end the dice are read again and compared with what was published.
+A hand reaching in is *suspicious*; a **changed reading** is disqualifying. That split is
+the whole design: someone reaching past the tower for their drink must not lose a
+legitimate roll, and a die turned over between two frames must not slip through.
+
+The rules live in `integrity.py` and are decided on numbers, not pixels, so what counts as
+cheating is testable. `guard.py` only turns frames into events.
+
+**It is tamper evidence, not tamper proof**, and DiceCore never claims a roll was fair — it
+says what happened and lets the consumer decide. Anyone who controls the camera defeats it,
+which is why a frozen feed and a covered lens are themselves faults rather than silence.
+[docs/ANTI-CHEAT.md](ANTI-CHEAT.md) states the limits in full; they belong in the
+documentation, not in a footnote, because a fairness feature that overpromises is worse
+than none.
+
 ### Deployment shapes
 
 | Shape | Capture | Engine | For |
@@ -136,7 +157,8 @@ emphasised, never a different pipeline.
 
 - **Display** — the number, big, in the browser. Total, or per die.
 - **API** — `GET /api/v1/roll` (read now), `GET /api/v1/state` (last result), websocket
-  `/api/v1/events` (a result pushed as soon as the dice settle).
+  `/api/v1/events` (a result pushed as soon as the dice settle, then again with its
+  fair-play verdict).
 - **Notation** — a D&D-style summary for consumers that want text: `2d20+1d6 → 14, 3, 5`.
 - **Consumers** — a Discord bot, a game, a scoreboard. They live in their own repos and
   depend on this API, not on this code. That direction is the whole point.
@@ -147,8 +169,9 @@ emphasised, never a different pipeline.
   physical dice, full stop.
 - Not a general OCR project.
 - Not a cloud service. It runs on your network; nothing leaves it.
-- Not a fairness/casino-grade auditing tool. Detecting loaded dice is a statistics problem
-  that a consumer can solve on top of this data.
+- Not a fairness/casino-grade auditing tool. It reports interference with a *settled* tray;
+  it knows nothing about loaded dice or a controlled throw. Detecting those is a statistics
+  problem a consumer can solve on top of this data.
 
 ## Roadmap
 
@@ -157,6 +180,6 @@ emphasised, never a different pipeline.
 2. **Dataset + training loop** — set management, confirm/correct labelling, training job
    with live progress, ONNX export, `model` engine. *You can teach it your dice.*
 3. **Polyhedral quality** — top-face selection, 6/9 disambiguation, mixed-dice rolls,
-   settling detection tuned on real footage.
+   settling and fair-play thresholds tuned on real footage.
 4. **Consumers** — reference Discord bot and a minimal game integration, each in its own
    repo, to prove the API is actually embeddable.

@@ -115,6 +115,44 @@ class SettleSettings:
 
 
 @dataclass
+class GuardSettings:
+    """
+    Fair play. What happens to the tray *after* the number was read.
+
+    Defaults are deliberately mild: watch, report, do not withhold. A game night where a
+    legitimate roll gets thrown away because someone reached past the tower for their drink
+    is worse than one where a suspicious roll is merely marked as suspicious.
+    """
+
+    enabled: bool = True
+    #: off | flag (report and mark) | void (a disturbed roll is discarded)
+    policy: str = "flag"
+    #: How long the tray stays under watch after the reading, in seconds.
+    hold_s: float = 2.0
+    #: How often to look during the hold.
+    interval_s: float = 0.15
+    #: Mean frame difference (0..255) that counts as something happening.
+    motion_threshold: float = 2.0
+    #: A change region this large a fraction of the frame reads as a hand, not a die.
+    hand_area_frac: float = 0.05
+    #: Byte-identical frames in a row that mean the feed is frozen rather than the dice.
+    #: A real sensor always has noise, so this cannot happen by accident.
+    freeze_frames: int = 6
+    #: Brightness below this fraction of the reading frame's means the lens was covered.
+    dark_fraction: float = 0.35
+    #: How far a die may drift (as a fraction of its own size) before it counts as moved.
+    move_tolerance: float = 0.4
+    #: Under policy=void, void even when the dice read the same after a hand reached in.
+    void_on_touch: bool = False
+    #: Read the tray a second time even when nothing was seen. Cheap insurance against a
+    #: change that happened entirely between two frames.
+    always_recheck: bool = True
+    #: Refuse to report a reading that was never preceded by an actual throw — this is what
+    #: stops the same lucky roll being reported twice.
+    require_throw: bool = True
+
+
+@dataclass
 class ServerSettings:
     host: str = "0.0.0.0"
     port: int = 8099
@@ -129,6 +167,7 @@ class Settings:
     engine: EngineSettings = field(default_factory=EngineSettings)
     classic: ClassicSettings = field(default_factory=ClassicSettings)
     settle: SettleSettings = field(default_factory=SettleSettings)
+    guard: GuardSettings = field(default_factory=GuardSettings)
     server: ServerSettings = field(default_factory=ServerSettings)
     #: Keys we did not recognise, kept verbatim so a downgrade is not a data loss.
     extra: dict[str, Any] = field(default_factory=dict)

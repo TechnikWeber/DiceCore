@@ -21,6 +21,10 @@ class CaptureError(RuntimeError):
 class FrameSource(ABC):
     #: Identifier used in `Frame.source` and in the UI.
     name = "base"
+    #: Whether every grab is a genuinely new look at the world. False for the folder
+    #: simulator and for pushed frames, where the same image legitimately comes back twice.
+    #: The tamper guard's frozen-feed check only means something on a live source.
+    is_live = True
 
     @abstractmethod
     def grab(self) -> Frame:
@@ -28,6 +32,16 @@ class FrameSource(ABC):
 
     def close(self) -> None:
         """Release the device. Safe to call twice."""
+
+    def hold(self, enabled: bool) -> None:
+        """
+        Stay on the current scene while the tamper guard watches it.
+
+        A no-op for a real camera, which is already pointed at one tray and keeps
+        delivering it. It exists for the sources that advance on their own — the folder
+        simulator hands out the *next* roll on every grab, and without this the guard would
+        see a completely different tray a tenth of a second later and call it tampering.
+        """
 
     def describe(self) -> dict[str, Any]:
         """What the UI shows about this source."""

@@ -29,6 +29,8 @@ def main(argv: list[str] | None = None) -> int:
     roll = sub.add_parser("roll", help="read the dice once and print the result")
     roll.add_argument("--json", action="store_true", help="print the full result as JSON")
     roll.add_argument("--no-wait", action="store_true", help="do not wait for the dice to settle")
+    roll.add_argument("--no-verify", action="store_true",
+                      help="skip the fair-play hold window and answer immediately")
 
     synth = sub.add_parser("synth", help="write synthetic rolls so the simulator has something")
     synth.add_argument("folder", nargs="?", default=None)
@@ -78,17 +80,26 @@ def _cmd_roll(args, settings: Settings) -> int:
 
     reader = Reader(settings)
     try:
-        result = reader.read(wait_for_still=not args.no_wait)
+        result = reader.read(wait_for_still=not args.no_wait, verify=not args.no_verify)
     except (CaptureError, EngineError) as exc:
         print(exc, file=sys.stderr)
         return 2
     if args.json:
         print(json.dumps(result.to_json(), indent=2))
-    else:
-        print(f"{result.notation}   total {result.total}   ({result.engine}, {result.took_ms} ms)")
-        for warning in result.warnings:
+        # A voided roll is an error condition for anything scripting this, so say so in the
+        # exit code too — a shell pipeline should not have to parse JSON to notice.
+        return 0 if result.usable else 3
+
+    print(f"{result.notation}   total {result.total}   ({result.engine}, {result.took_ms} ms)")
+    if result.verdict != "unverified":
+        held = (result.integrity or {}).get("held_s", 0.0)
+        print(f"fair play: {result.verdict}" + (f"   (watched {held}s)" if held else ""))
+    for event in (result.integrity or {}).get("events", []):
+        print(f"  {'!' if event['severity'] == 'fault' else '·'} {event['detail']}")
+    for warning in result.warnings:
+        if warning not in [e["detail"] for e in (result.integrity or {}).get("events", [])]:
             print(f"  ! {warning}")
-    return 0
+    return 0 if result.usable else 3
 
 
 def _cmd_synth(args, settings: Settings) -> int:

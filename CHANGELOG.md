@@ -29,9 +29,26 @@ on a real dice tower yet.
 - **CLI**: `serve`, `roll`, `doctor`, `synth`, `sets`, `train`, `camera-module`.
 - **Synthetic dice** for tests and for a first run without hardware, including polyhedral
   silhouettes with a numeral on the top face.
-- 62 tests, none of which need a camera.
+- 110 tests, none of which need a camera.
+
+### Added — fair play
+- **The tray is watched after the reading.** For `hold_s` seconds any movement is recorded,
+  and at the end the dice are read again and compared with what was published. A hand
+  reaching in is flagged; a changed reading voids the roll under `policy=void`.
+- Caught: a die turned over, added, palmed or nudged; the same roll reported twice with
+  nothing thrown (`stale`); a frozen or replayed feed; a covered lens; a camera that drops
+  out mid-hold.
+- `verdict` and `usable` on every result, plus an `integrity` record of what was seen and a
+  `seal` identifying the exact frame and reading.
+- `GET /api/v1/roll?verify=0` and `POST /api/v1/verify` for callers that want the number
+  before the verdict; the websocket sends every roll twice, `pending` then judged.
+- **Detection → Fair play** in the UI, and the verdict shown next to the number.
+- `docs/ANTI-CHEAT.md`, which states the limits as plainly as the features: this is tamper
+  evidence, not tamper proof, and it knows nothing about a loaded die.
 
 ### Known gaps
 - No trained model exists yet, so numerals are not read.
 - Overlapping and cocked dice are not handled.
 - Every hardware path (picamera2, rpicam, config.txt) is written but unverified on a Pi.
+- Fair-play thresholds are set from synthetic scenes; `hand_area_frac` and
+  `motion_threshold` need checking against a real hand over a real tray.

@@ -34,6 +34,7 @@
           <div class="notation" id="notation">nothing read yet</div>
         </div>
         <div class="row">
+          <span class="verdict" id="verdict" hidden></span>
           <button class="primary" id="btn-roll">Read the dice</button>
           <label class="row" style="margin:0;gap:6px">
             <input type="checkbox" id="live"> live
@@ -42,6 +43,7 @@
       </div>
       <div class="chips" id="dice-chips"></div>
       <div id="roll-messages" style="margin-top:12px"></div>
+      <div id="roll-integrity"></div>
     </div>
 
     <div class="card">
@@ -139,6 +141,26 @@
         <div><label>Smallest die (fraction of tray area)</label><input id="cl-min" type="number" step="0.0001"></div>
         <div><label>Largest die (fraction of tray area)</label><input id="cl-max" type="number" step="0.001"></div>
         <div><label>Blur (px, odd)</label><input id="cl-blur" type="number"></div>
+      </div>
+      <div class="row" style="margin-top:12px"><button class="primary" data-save>Save</button></div>
+    </div>
+
+    <div class="card">
+      <h2>Fair play</h2>
+      <p class="hint">After the number is read the tray stays watched. A hand reaching in is
+        recorded; dice that are <em>not what was read</em> void the roll. This is tamper
+        evidence, not tamper proof — see
+        <a href="https://github.com/TechnikWeber/DiceCore/blob/main/docs/ANTI-CHEAT.md">docs/ANTI-CHEAT.md</a>
+        for what it cannot do.</p>
+      <div class="grid">
+        <div><label>Watch the tray after a reading</label><input id="gd-enabled" type="checkbox"></div>
+        <div><label>What a disturbed roll is worth</label><select id="gd-policy"></select></div>
+        <div><label>Hands off for (s)</label><input id="gd-hold" type="number" step="0.5"></div>
+        <div><label>Look every (s)</label><input id="gd-interval" type="number" step="0.05"></div>
+        <div><label>Motion that counts as something happening</label><input id="gd-motion" type="number" step="0.1"></div>
+        <div><label>A change this big is a hand, not a die</label><input id="gd-hand" type="number" step="0.01"></div>
+        <div><label>Void even if the dice did not change</label><input id="gd-touch" type="checkbox"></div>
+        <div><label>Refuse a reading nothing was thrown for</label><input id="gd-throw" type="checkbox"></div>
       </div>
       <div class="row" style="margin-top:12px"><button class="primary" data-save>Save</button></div>
     </div>

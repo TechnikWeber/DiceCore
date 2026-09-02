@@ -27,6 +27,9 @@ def client(tmp_path, monkeypatch):
     settings = Settings()
     settings.capture.source = "folder"
     settings.capture.folder = str(frames)
+    # A hold window the suite can afford; the behaviour is identical at two seconds.
+    settings.guard.hold_s = 0.2
+    settings.guard.interval_s = 0.05
     with TestClient(create_app(settings)) as client:
         yield client
 
@@ -42,6 +45,60 @@ def test_a_roll_carries_everything_a_consumer_needs(client):
     assert body["total"] == sum(d["value"] for d in body["dice"])
     assert set(body) >= {"dice", "total", "count", "notation", "engine", "warnings"}
     assert set(body["dice"][0]) >= {"kind", "value", "box", "confidence"}
+
+
+def test_a_roll_carries_a_fair_play_verdict(client):
+    body = client.get("/api/v1/roll").json()
+    assert body["verdict"] in ("clean", "disturbed", "void", "pending", "unverified")
+    assert body["usable"] is True
+    assert body["integrity"]["seal"].startswith("sha256:")
+
+
+def test_a_caller_in_a_hurry_takes_the_number_and_the_verdict_separately(client):
+    quick = client.get("/api/v1/roll?verify=0").json()
+    assert quick["verdict"] == "pending" and quick["integrity"] is None
+    verified = client.post("/api/v1/verify").json()
+    assert verified["verdict"] == "clean"
+    assert verified["total"] == quick["total"]
+
+
+def test_verifying_before_anything_was_read_says_so(client):
+    assert client.post("/api/v1/verify").status_code == 503
+
+
+def test_a_die_turned_over_after_the_reading_voids_the_roll_end_to_end(tmp_path, monkeypatch):
+    """
+    The whole chain, staged through the real API: read a tray, swap a die under it, ask for
+    the verdict. The `push` source is what makes this possible without a hand and a camera —
+    and it is the same path a capture-only Pi agent uses.
+    """
+    import cv2
+
+    from dicecore.synth import render_scene
+
+    monkeypatch.setenv("DICECORE_STATE", str(tmp_path))
+    settings = Settings()
+    settings.capture.source = "push"
+    settings.guard.policy = "void"
+    settings.guard.hold_s = 0.2
+    settings.guard.interval_s = 0.05
+
+    def jpeg_of(spec):
+        image, _ = render_scene(spec, seed=21, width=400, height=300, die_px=60)
+        return cv2.imencode(".jpg", image)[1].tobytes()
+
+    with TestClient(create_app(settings)) as client:
+        client.post("/api/v1/frame", files={"image": jpeg_of([("d6", 4), ("d6", 2)])})
+        honest = client.get("/api/v1/roll?verify=0").json()
+        assert honest["total"] == 6 and honest["verdict"] == "pending"
+
+        # Someone turns the 4 into a 6 while the tray is supposed to be untouched.
+        client.post("/api/v1/frame", files={"image": jpeg_of([("d6", 6), ("d6", 2)])})
+
+        verdict = client.post("/api/v1/verify").json()
+        assert verdict["verdict"] == "void"
+        assert verdict["usable"] is False
+        assert any("now read" in e["detail"] for e in verdict["integrity"]["events"])
 
 
 def test_state_returns_the_last_roll_without_capturing_again(client):
@@ -95,6 +152,7 @@ def test_the_setup_page_tells_the_ui_what_options_exist(client):
     assert any(m["id"] == "imx519" for m in body["csi_modules"])
     assert any(s["id"] == "folder" for s in body["sources"])
     assert any(k["id"] == "d20" and k["faces"] == 20 for k in body["kinds"])
+    assert [p["id"] for p in body["policies"]] == ["off", "flag", "void"]
 
 
 def test_settings_can_be_saved_and_come_back(client):

@@ -26,6 +26,12 @@ als JSON-API und als Live-Stream, den ein Bot oder ein Spiel abonnieren kann.
 - **Ehrliches Scheitern.** Vielseitige Würfel werden *gefunden* und als ungelesen gemeldet,
   statt geraten zu werden. Eine selbstbewusst falsche Zahl ist schlimmer als „dafür brauche
   ich ein Modell".
+- **Fair Play.** Nach dem Lesen wird die Landefläche weiter beobachtet. Eine Hand, die
+  hineingreift, wird protokolliert; Würfel, die *nicht mehr das zeigen, was gelesen wurde*,
+  machen den Wurf ungültig. Erkannt werden: ein nachträglich umgedrehter Würfel, ein
+  hinzugelegter oder verschwundener, derselbe Glückswurf zweimal gemeldet, ein eingefrorenes
+  Videobild und eine abgedeckte Linse — und es sagt offen, dass es
+  [Manipulations*nachweis*, kein Manipulations*schutz*](docs/ANTI-CHEAT.md) ist.
 - **Eine Label-Schleife statt eines Label-Werkzeugs.** Würfeln, hinschauen, korrigieren,
   bestätigen — jeder bestätigte Wurf ist ein Trainingsbeispiel, im Browser, ohne Kommandozeile.
 - **Training aus dem Browser**, mit laufender Loss- und Genauigkeitsanzeige, am Ende ein
@@ -54,8 +60,13 @@ Danach `curl localhost:8099/api/v1/roll`:
 
 ```json
 {"dice": [{"kind": "d6", "value": 3, "confidence": 0.99, "box": {"x": 88, "y": 154, "w": 98, "h": 98}}],
- "total": 3, "count": 1, "notation": "1d6 → 3", "engine": "classic", "warnings": []}
+ "total": 3, "count": 1, "notation": "1d6 → 3", "engine": "classic", "warnings": [],
+ "verdict": "clean", "usable": true, "stale": false}
 ```
+
+Der Aufruf dauert rund zwei Sekunden, und genau die sind der Punkt: so lange wird die
+Landefläche nach dem Lesen bewacht. `?verify=0` antwortet sofort, dann mit
+`verdict: "pending"`.
 
 ## Auf dem Raspberry Pi
 
@@ -95,7 +106,8 @@ Genau dafür ist das gedacht — siehe [docs/API.md](docs/API.md).
 ```python
 import requests
 roll = requests.get("http://dicecore.local:8099/api/v1/roll", timeout=15).json()
-print(roll["notation"], "=", roll["total"])      # 1d6+1d20 → 4, 14 = 18
+if roll["usable"]:                               # falsch nur bei manipulierter Landefläche
+    print(roll["notation"], "=", roll["total"])  # 1d6+1d20 → 4, 14 = 18
 ```
 
 Ein Würfel, der nicht gelesen werden konnte, hat `"value": 0` und erscheint als `?`. Niemals
@@ -109,6 +121,7 @@ mitrechnen.
 | [docs/HARDWARE.md](docs/HARDWARE.md) | Welcher Pi, welche Kamera, wohin montieren, wie beleuchten |
 | [docs/API.md](docs/API.md) | Der Vertrag, auf den andere Projekte sich verlassen |
 | [docs/TRAINING.md](docs/TRAINING.md) | Ihm die eigenen Würfel beibringen |
+| [docs/ANTI-CHEAT.md](docs/ANTI-CHEAT.md) | Was die Fair-Play-Überwachung erkennt — und was nicht |
 
 ## Befehle
 
@@ -138,6 +151,7 @@ nur importiert. Vor Änderungen [CLAUDE.md](CLAUDE.md) lesen.
 - [ ] Den ersten echten Datensatz sammeln und das erste Modell trainieren
 - [ ] Auswahl der oberen Fläche und 6/9-Unterscheidung an echten W20 überprüfen
 - [ ] Überlappende und verkantete Würfel erkennen und melden statt falsch lesen
+- [ ] Fair-Play-Schwellen (`hand_area_frac`, `motion_threshold`) an echten Händen prüfen
 - [ ] Ein Discord-Bot als Referenz, in eigenem Repo, der diese API benutzt
 - [ ] Provisionierung: Installer, systemd-Unit und die IMX519-Tuning-Datei ausliefern
 

@@ -17,6 +17,7 @@ from .base import CaptureError, FrameSource
 
 class PushSource(FrameSource):
     name = "push"
+    is_live = False
 
     def __init__(self) -> None:
         self._lock = threading.Lock()

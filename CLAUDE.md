@@ -22,7 +22,11 @@ Owner: Philipp Weber · GitHub: TechnikWeber/DiceCore
 - `src/dicecore/training/` — `data` (crops, readiness, no torch), `trainer` (torch),
   `job` (a watchable background run).
 - `src/dicecore/system/` — `boot_config` (CSI modules in config.txt), `diagnostics`.
-- `src/dicecore/reader.py` — capture → settle → engine. The single owner of the camera.
+- `src/dicecore/integrity.py` — fair play decided on numbers: comparing two readings,
+  classifying events, turning them into a verdict. No pixels.
+- `src/dicecore/guard.py` — the hold window after a reading: turns frames into events.
+- `src/dicecore/reader.py` — capture → settle → engine → guard. The single owner of the
+  camera, and the only place that knows about the *previous* roll (staleness, replay).
 - `src/dicecore/server/` — FastAPI, plus `web/` (one HTML, one JS, one CSS; no build step).
 - `src/dicecore/synth.py` — synthetic dice, for tests and for a first run without hardware.
 
@@ -59,6 +63,14 @@ python3 -m venv .venv && .venv/bin/pip install -e '.[vision,server,dev]'
 - **`prepare_crop` has exactly one implementation**, shared by training and inference. If the
   two ever crop differently the model degrades quietly instead of failing — the worst kind of
   bug.
+- **A reach is suspicious, a changed reading is disqualifying.** Do not "improve" the guard
+  by voiding on motion alone: someone reaching past the tower for their drink would lose a
+  legitimate roll, and that is worse than the cheating it would prevent. The re-read is what
+  decides.
+- **Frozen-feed detection compares raw frames, never the prepared ones.** After the downscale
+  and blur the motion detector uses, two genuinely different captures of a still tray come
+  out identical all the time — checking there called every quiet table a fake. And it only
+  runs on `source.is_live`; the folder simulator repeats frames by design.
 - **Only confirmed dice are trained on.** Training on the engine's own guesses teaches it its
   own mistakes.
 - **Rotation augmentation is not optional.** Dice land in any orientation; a model trained

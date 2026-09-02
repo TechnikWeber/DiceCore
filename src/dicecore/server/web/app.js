@@ -54,6 +54,29 @@ window.addEventListener("hashchange", showTab);
 
 // --- rolling ----------------------------------------------------------------
 
+const VERDICT_WORDS = {
+  clean: "watched · untouched",
+  disturbed: "disturbed — check below",
+  void: "VOID — do not count this",
+  pending: "not verified yet",
+  unverified: "not watched",
+};
+
+function renderVerdict(result) {
+  const badge = $("verdict");
+  const verdict = result.verdict || "unverified";
+  badge.hidden = verdict === "unverified";
+  badge.className = `verdict ${verdict}`;
+  badge.textContent = VERDICT_WORDS[verdict] || verdict;
+  document.getElementById("roll").classList.toggle("voided", verdict === "void");
+
+  const events = (result.integrity && result.integrity.events) || [];
+  $("roll-integrity").innerHTML = events.length
+    ? `<ul class="events">${events.map((e) =>
+        `<li class="${escapeHtml(e.severity)}">${escapeHtml(e.detail)}</li>`).join("")}</ul>`
+    : "";
+}
+
 function renderResult(result) {
   $("total").textContent = result.count ? result.total : "—";
   $("notation").textContent = result.notation + (result.engine ? `   ·   ${result.engine}` : "");
@@ -66,8 +89,16 @@ function renderResult(result) {
       <span class="muted">${trust}</span></span>`;
   });
   $("dice-chips").innerHTML = chips.join("");
+  // Warnings the guard already explains as events would otherwise be printed twice.
+  const events = new Set(((result.integrity && result.integrity.events) || []).map((e) => e.detail));
   $("roll-messages").innerHTML = (result.warnings || [])
+    .filter((w) => !events.has(w))
     .map((w) => `<div class="msg warn">${escapeHtml(w)}</div>`).join("");
+  if (result.stale) {
+    $("roll-messages").innerHTML +=
+      `<div class="msg warn">Nothing was thrown — these are the dice from the last reading.</div>`;
+  }
+  renderVerdict(result);
 
   const image = $("roll-image");
   image.onload = () => drawBoxes(result);
@@ -93,10 +124,16 @@ function drawBoxes(result) {
   }
 }
 
-async function roll() {
+async function roll(verify = true) {
   $("btn-roll").disabled = true;
   try {
-    renderResult(await api("/api/v1/roll"));
+    // The number goes up as soon as the dice settle; the verdict follows once the tray has
+    // been watched, so the page never sits blank for the length of the hold window.
+    const result = await api("/api/v1/roll?verify=0");
+    renderResult(result);
+    if (verify && state.settings && state.settings.guard.enabled) {
+      renderResult(await api("/api/v1/verify", { method: "POST" }));
+    }
   } catch (err) {
     alertBox(err.message);
   } finally {
@@ -118,6 +155,7 @@ function loadForm() {
   fillSelect($("eng-mode"), state.options.engines, s.engine.mode);
   fillSelect($("csi-module"), state.options.csi_modules.map((m) => ({ id: m.id, label: m.label })),
              s.capture.csi_module);
+  fillSelect($("gd-policy"), state.options.policies, s.guard.policy);
   $("cap-folder").value = s.capture.folder;
   $("cap-device").value = s.capture.device;
   $("cap-width").value = s.capture.width;
@@ -136,6 +174,13 @@ function loadForm() {
   $("cl-min").value = s.classic.min_area_frac;
   $("cl-max").value = s.classic.max_area_frac;
   $("cl-blur").value = s.classic.blur;
+  $("gd-enabled").checked = s.guard.enabled;
+  $("gd-hold").value = s.guard.hold_s;
+  $("gd-interval").value = s.guard.interval_s;
+  $("gd-motion").value = s.guard.motion_threshold;
+  $("gd-hand").value = s.guard.hand_area_frac;
+  $("gd-touch").checked = s.guard.void_on_touch;
+  $("gd-throw").checked = s.guard.require_throw;
   $("st-enabled").checked = s.settle.enabled;
   $("st-motion").value = s.settle.motion_threshold;
   $("st-frames").value = s.settle.stable_frames;
@@ -148,7 +193,8 @@ function loadForm() {
     </label>`).join("");
   updateCsiNote();
   $("settings-dump").textContent = JSON.stringify(s, null, 2);
-  $("subtitle").textContent = `${s.server.public_name} · ${s.capture.source} → ${s.engine.mode}`;
+  $("subtitle").textContent = `${s.server.public_name} · ${s.capture.source} → ${s.engine.mode}`
+    + (s.guard.enabled ? ` · fair play: ${s.guard.policy}` : "");
 }
 
 function collectForm() {
@@ -174,6 +220,14 @@ function collectForm() {
   s.classic.min_area_frac = Number($("cl-min").value);
   s.classic.max_area_frac = Number($("cl-max").value);
   s.classic.blur = Number($("cl-blur").value);
+  s.guard.enabled = $("gd-enabled").checked;
+  s.guard.policy = $("gd-policy").value;
+  s.guard.hold_s = Number($("gd-hold").value);
+  s.guard.interval_s = Number($("gd-interval").value);
+  s.guard.motion_threshold = Number($("gd-motion").value);
+  s.guard.hand_area_frac = Number($("gd-hand").value);
+  s.guard.void_on_touch = $("gd-touch").checked;
+  s.guard.require_throw = $("gd-throw").checked;
   s.settle.enabled = $("st-enabled").checked;
   s.settle.motion_threshold = Number($("st-motion").value);
   s.settle.stable_frames = Number($("st-frames").value);
@@ -414,10 +468,14 @@ function renderApiExamples() {
     `# read an image captured somewhere else`,
     `curl -F image=@roll.jpg ${base}/api/v1/detect`,
     ``,
+    `# take the number now, collect the fair-play verdict afterwards`,
+    `curl "${base}/api/v1/roll?verify=0" && curl -X POST ${base}/api/v1/verify`,
+    ``,
     `# from Python`,
     `import requests`,
     `roll = requests.get("${base}/api/v1/roll").json()`,
-    `print(roll["total"], roll["notation"])`,
+    `if roll["usable"]:            # false only for verdict == "void"`,
+    `    print(roll["total"], roll["notation"], roll["verdict"])`,
   ].join("\n");
 }
 
@@ -480,7 +538,8 @@ $("btn-train-stop").onclick = () => api("/api/setup/training/stop", { method: "P
 $("btn-ws").onclick = toggleWebsocket;
 $("live").onchange = (event) => {
   clearInterval(state.timers.live);
-  if (event.target.checked) state.timers.live = setInterval(roll, 1200);
+  // Live view is a display, not a referee: it takes the number and skips the hold window.
+  if (event.target.checked) state.timers.live = setInterval(() => roll(false), 1200);
 };
 $("auto-capture").onchange = (event) => {
   clearInterval(state.timers.capture);

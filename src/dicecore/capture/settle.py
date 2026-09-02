@@ -50,6 +50,9 @@ class SettleResult:
     frames_seen: int
     waited_s: float
     last_motion: float
+    #: The largest motion seen while waiting. Zero means the dice never moved at all, which
+    #: is how "nothing was thrown, this is the previous roll" is told from a real throw.
+    peak_motion: float = 0.0
 
     @property
     def warning(self) -> str | None:
@@ -76,20 +79,22 @@ def wait_for_settle(
     started = now()
     frame = grab()
     if not settings.enabled:
-        return SettleResult(frame, True, 1, 0.0, 0.0)
+        return SettleResult(frame, True, 1, 0.0, 0.0, 0.0)
 
     previous = prepare(frame.image)
     still = 0
     seen = 1
     motion = 0.0
+    peak = 0.0
     while now() - started < settings.timeout_s:
         sleep(0.05)
         frame = grab()
         seen += 1
         current = prepare(frame.image)
         motion = motion_score(previous, current)
+        peak = max(peak, motion)
         previous = current
         still = still + 1 if motion <= settings.motion_threshold else 0
         if still >= settings.stable_frames:
-            return SettleResult(frame, True, seen, now() - started, motion)
-    return SettleResult(frame, False, seen, now() - started, motion)
+            return SettleResult(frame, True, seen, now() - started, motion, peak)
+    return SettleResult(frame, False, seen, now() - started, motion, peak)

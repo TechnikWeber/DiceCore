@@ -20,11 +20,13 @@ SUFFIXES = {".jpg", ".jpeg", ".png", ".bmp", ".webp"}
 
 class FolderSource(FrameSource):
     name = "folder"
+    is_live = False
 
     def __init__(self, folder: str | Path, loop: bool = True) -> None:
         self.folder = Path(folder)
         self.loop = loop
         self._index = 0
+        self._held = False
         self._files = self._scan()
 
     def _scan(self) -> list[Path]:
@@ -38,7 +40,13 @@ class FolderSource(FrameSource):
             )
         return files
 
+    def hold(self, enabled: bool) -> None:
+        """While held, keep returning the frame just handed out — a tray that lies still."""
+        self._held = enabled
+
     def grab(self) -> Frame:
+        if self._held and self._index > 0:
+            self._index -= 1
         # Re-scan when exhausted so images dropped in while running are picked up: the
         # obvious thing to try when someone is testing is to copy a photo into the folder.
         if self._index >= len(self._files):
@@ -58,4 +66,4 @@ class FolderSource(FrameSource):
 
     def describe(self) -> dict[str, Any]:
         return {"name": self.name, "folder": str(self.folder),
-                "images": len(self._files), "position": self._index}
+                "images": len(self._files), "position": self._index, "held": self._held}

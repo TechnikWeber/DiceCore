@@ -18,6 +18,15 @@ from .capture.settle import wait_for_settle
 from .config import Settings
 from .dice import Frame, RollResult
 from .engine import Engine, EngineError, build_engine
+from .guard import TamperGuard
+from .integrity import (
+    INFO,
+    PENDING,
+    WARN,
+    Event,
+    compare_readings,
+    frame_hash,
+)
 
 
 class Reader:
@@ -30,6 +39,11 @@ class Reader:
         self._last: RollResult | None = None
         self._last_jpeg: bytes | None = None
         self._last_frame: Frame | None = None
+        #: Hash of the previous frame's JPEG. Two byte-identical captures cannot happen with
+        #: a real sensor, so a repeat means a frozen or replayed feed.
+        self._last_frame_hash: str | None = None
+        #: Events established while reading, waiting for a hold window to judge them.
+        self._pending_events: list[Event] = []
         #: Why the source or engine is unavailable, in words the UI can show.
         self.problems: list[str] = []
 
@@ -68,9 +82,13 @@ class Reader:
             self._engine = None
 
     # --- reading ------------------------------------------------------------
-    def read(self, wait_for_still: bool = True) -> RollResult:
+    def read(self, wait_for_still: bool = True, verify: bool | None = None) -> RollResult:
         """
         Read one roll.
+
+        With the guard on, this **blocks for `guard.hold_s` after the reading** while the
+        tray is watched — that wait is the feature, not an oversight, and `verify=False`
+        turns it off for a caller that only wants the number now.
 
         Raises `CaptureError` / `EngineError` with a message meant for a human — the UI
         prints them verbatim, because "no camera bound to dtoverlay=imx519" is a repair
@@ -80,22 +98,111 @@ class Reader:
             source = self.source()
             engine = self.engine()
             settle = self.settings.settle
+            guard = self.settings.guard
 
             warnings: list[str] = []
+            threw: bool | None = None
             if wait_for_still and settle.enabled and self.settings.capture.source != "folder":
                 outcome = wait_for_settle(source.grab, settle)
                 frame = outcome.frame
                 if outcome.warning:
                     warnings.append(outcome.warning)
+                threw = outcome.peak_motion > settle.motion_threshold
             else:
                 frame = source.grab()
 
             result = engine.read(frame)
             result.warnings = warnings + result.warnings
-            self._last = result
             self._last_frame = frame
             self._last_jpeg = None
+
+            events = self._pre_roll_events(result, frame, threw)
+            if result.stale:
+                result.warnings.append(
+                    "Nothing moved since the last reading and the dice read the same — this "
+                    "is the previous roll, not a new throw."
+                )
+
+            self._pending_events = events
+            self._last = result
+            if guard.enabled:
+                # Published but not yet judged. A consumer may use the number — `usable` is
+                # true — while knowing the verdict has not landed.
+                result.verdict = PENDING
+
+            verify = guard.enabled if verify is None else verify
+            if verify and guard.enabled:
+                self._run_guard(result, frame)
             return result
+
+    def verify_last(self) -> RollResult:
+        """
+        Run the hold window over a result that was already handed out.
+
+        This is what lets the event stream answer immediately and correct itself: the number
+        goes out as `pending` the moment the dice settle, and the verdict follows once the
+        tray has been watched. Calling it twice is a no-op.
+        """
+        with self._lock:
+            result, frame = self._last, self._last_frame
+            if result is None or frame is None:
+                raise EngineError("Nothing has been read yet, so there is nothing to verify.")
+            if result.integrity is None and self.settings.guard.enabled:
+                self._run_guard(result, frame)
+            return result
+
+    def _run_guard(self, result: RollResult, frame: Frame) -> None:
+        """Watch the tray for `guard.hold_s` and write the verdict onto `result`."""
+        source, engine = self.source(), self.engine()
+        source.hold(True)
+        try:
+            integrity = TamperGuard(self.settings.guard).watch(
+                grab=source.grab,
+                reread=lambda f: engine.read(f).dice,
+                sealed=result.dice,
+                reference=frame,
+                jpeg=self.last_jpeg(),
+                prior_events=self._pending_events,
+                live=source.is_live,
+            )
+        finally:
+            source.hold(False)
+        result.verdict = integrity.verdict
+        result.integrity = integrity.to_json()
+        for event in integrity.events:
+            if event.severity != INFO and event.detail not in result.warnings:
+                result.warnings.append(event.detail)
+
+    def _pre_roll_events(self, result: RollResult, frame: Frame,
+                         threw: bool | None) -> list[Event]:
+        """
+        What is already wrong before the hold window even starts.
+
+        Two things are only visible from here, because they are about the relationship
+        between this roll and the previous one rather than about this frame alone.
+        """
+        events: list[Event] = []
+        previous = self._last
+
+        # Only meaningful on a live source: the folder simulator and a push source both
+        # hand out the same image again by design.
+        jpeg = self.last_jpeg() if self.source().is_live else None
+        if jpeg is not None:
+            digest = frame_hash(jpeg)
+            if digest == self._last_frame_hash:
+                events.append(Event(
+                    "frozen", WARN,
+                    "this capture is byte-identical to the previous one — the video feed is "
+                    "frozen or replayed, since a real sensor never repeats exactly",
+                ))
+            self._last_frame_hash = digest
+
+        if (self.settings.guard.require_throw and threw is False and previous is not None
+                and not compare_readings(previous.dice, result.dice)):
+            result.stale = True
+            events.append(Event("stale", INFO,
+                                "the dice did not move since the last reading"))
+        return events
 
     def read_image(self, image: Any, source_name: str = "upload") -> RollResult:
         """Read a frame that came from outside — an upload, or a push from an agent."""

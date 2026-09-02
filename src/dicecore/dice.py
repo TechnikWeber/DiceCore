@@ -108,6 +108,21 @@ class RollResult:
     warnings: list[str] = field(default_factory=list)
     #: Where the frame was stored, if it was.
     frame_id: str | None = None
+    #: Fair play, see integrity.py: unverified | pending | clean | disturbed | void. A
+    #: consumer that ignores this field still gets a number; one that cares can refuse a
+    #: `void` without knowing anything about how the watching works.
+    verdict: str = "unverified"
+    #: The full record of what the guard saw, or None when it did not run.
+    integrity: dict[str, Any] | None = None
+    #: True when nothing moved since the last reading and the dice read the same — this is
+    #: the previous roll being looked at again, not a new throw. Display modes ignore it;
+    #: anything that counts rolls must not count a stale one twice.
+    stale: bool = False
+
+    @property
+    def usable(self) -> bool:
+        """False only for `void` — the one verdict that means "do not count this"."""
+        return self.verdict != "void"
 
     @property
     def total(self) -> int:
@@ -138,6 +153,7 @@ class RollResult:
         out["total"] = self.total
         out["count"] = self.count
         out["notation"] = self.notation
+        out["usable"] = self.usable
         return out
 
 

@@ -23,6 +23,11 @@ event stream a bot or a game can subscribe to.
   tray and contrast settings adjusted, which is what the **Detection** tab is for.
 - **Honest failure.** Polyhedral dice are *located* and reported as unread rather than
   guessed at, because a confident wrong number is worse than "I need a model for this one".
+- **Fair play.** The tray keeps being watched after the number is read. A hand reaching in
+  is recorded; dice that are *not what was read* void the roll. It catches a die turned over
+  after the throw, a die added or palmed, the same lucky roll reported twice, a frozen feed
+  and a covered lens — and it says plainly that it is
+  [tamper evidence, not tamper proof](docs/ANTI-CHEAT.md).
 - **A label loop instead of a labelling tool.** Roll, glance, correct, confirm — every
   confirmed roll is a training sample, in the browser, with no command line.
 - **Training from the browser**, with live loss and accuracy, exporting an ONNX model the
@@ -51,8 +56,13 @@ Then `curl localhost:8099/api/v1/roll`:
 
 ```json
 {"dice": [{"kind": "d6", "value": 3, "confidence": 0.99, "box": {"x": 88, "y": 154, "w": 98, "h": 98}}],
- "total": 3, "count": 1, "notation": "1d6 → 3", "engine": "classic", "warnings": []}
+ "total": 3, "count": 1, "notation": "1d6 → 3", "engine": "classic", "warnings": [],
+ "verdict": "clean", "usable": true, "stale": false}
 ```
+
+That call takes about two seconds, and the two seconds are the point: it is how long the
+tray is watched after the dice are read. `?verify=0` answers at once with
+`verdict: "pending"` instead.
 
 ## On a Raspberry Pi
 
@@ -91,7 +101,8 @@ That is the entire point — see [docs/API.md](docs/API.md).
 ```python
 import requests
 roll = requests.get("http://dicecore.local:8099/api/v1/roll", timeout=15).json()
-print(roll["notation"], "=", roll["total"])      # 1d6+1d20 → 4, 14 = 18
+if roll["usable"]:                               # false only when the tray was interfered with
+    print(roll["notation"], "=", roll["total"])  # 1d6+1d20 → 4, 14 = 18
 ```
 
 A die that could not be read has `"value": 0` and prints as `?`. Never add it up.
@@ -104,6 +115,7 @@ A die that could not be read has `"value": 0` and prints as `?`. Never add it up
 | [docs/HARDWARE.md](docs/HARDWARE.md) | Which Pi, which camera, where to mount it, how to light it |
 | [docs/API.md](docs/API.md) | The contract other projects depend on |
 | [docs/TRAINING.md](docs/TRAINING.md) | Teaching it your own dice |
+| [docs/ANTI-CHEAT.md](docs/ANTI-CHEAT.md) | What the fair-play watch catches, and what it cannot |
 
 ## Commands
 
@@ -133,6 +145,7 @@ imported. See [CLAUDE.md](CLAUDE.md) for the conventions before changing anythin
 - [ ] Collect the first real dataset and train the first model
 - [ ] Top-face selection and 6/9 handling verified on real d20s
 - [ ] Overlapping and cocked dice: detect and report rather than mis-read
+- [ ] Fair-play thresholds (`hand_area_frac`, `motion_threshold`) checked against real hands
 - [ ] A reference Discord bot, in its own repo, consuming this API
 - [ ] Provisioning: installer, systemd unit, and the IMX519 tuning file shipped
 

@@ -30,6 +30,7 @@ from ..config import Settings, config_path
 from ..dataset.store import DatasetStore
 from ..dice import DIE_FACES, DIE_KINDS, values_for
 from ..engine import MODES, EngineError
+from ..integrity import POLICIES
 from ..reader import Reader
 from ..system import boot_config, diagnostics
 from ..training import TrainingManager
@@ -81,16 +82,21 @@ def create_app(settings: Settings | None = None) -> Any:
                 "version": app.version, "at": time.time()}
 
     @app.get("/api/v1/roll")
-    def roll(wait: int = 1, store_to: str = "") -> Any:
+    def roll(wait: int = 1, store_to: str = "", verify: int | None = None) -> Any:
         """
         Read the dice now. `wait=1` waits for them to settle first.
+
+        With fair play on, this call also **blocks for `guard.hold_s` while the tray is
+        watched** — that wait is what the `verdict` is worth. `verify=0` answers immediately
+        with `verdict: "pending"` instead; `/api/v1/verify` collects the verdict afterwards.
 
         `store_to=<set id>` files the frame into a dataset in the same call — that is how
         the label loop collects without a second capture, and how a consumer can contribute
         training data just by asking for rolls.
         """
         try:
-            result = reader.read(wait_for_still=bool(wait))
+            result = reader.read(wait_for_still=bool(wait),
+                                 verify=None if verify is None else bool(verify))
         except (CaptureError, EngineError) as exc:
             return fail(exc)
         if store_to:
@@ -103,11 +109,25 @@ def create_app(settings: Settings | None = None) -> Any:
                     result.warnings.append(f"Not stored: {exc}")
         return result.to_json()
 
+    @app.post("/api/v1/verify")
+    def verify_last() -> Any:
+        """
+        Finish judging the last roll: watch the tray, then answer with the verdict.
+
+        For a caller that took the number immediately with `verify=0` and wants to know
+        afterwards whether it still stands.
+        """
+        try:
+            return reader.verify_last().to_json()
+        except (CaptureError, EngineError) as exc:
+            return fail(exc)
+
     @app.get("/api/v1/state")
     def last_state() -> Any:
         last = reader.last
         return last.to_json() if last else {"dice": [], "total": 0, "count": 0,
-                                            "notation": "no dice", "engine": "none"}
+                                            "notation": "no dice", "engine": "none",
+                                            "verdict": "unverified", "usable": True}
 
     @app.post("/api/v1/detect")
     async def detect(image: UploadFile = File(...)) -> Any:
@@ -146,11 +166,19 @@ def create_app(settings: Settings | None = None) -> Any:
         try:
             while True:
                 try:
-                    result = await asyncio.to_thread(reader.read, True)
+                    # Two messages per roll on purpose: the number as soon as the dice
+                    # settle (`verdict: "pending"`), then the same roll again once the tray
+                    # has been watched. A scoreboard uses the first; anything that must not
+                    # honour a tampered roll waits for the second.
+                    result = await asyncio.to_thread(reader.read, True, False)
                     payload = json.dumps(result.to_json(), sort_keys=True)
                     if payload != previous:
                         previous = payload
                         await socket.send_text(payload)
+                        if state["settings"].guard.enabled:
+                            verified = await asyncio.to_thread(reader.verify_last)
+                            previous = json.dumps(verified.to_json(), sort_keys=True)
+                            await socket.send_text(previous)
                 except (CaptureError, EngineError) as exc:
                     await socket.send_text(json.dumps({"error": str(exc)}))
                     await asyncio.sleep(2.0)
@@ -194,6 +222,7 @@ def create_app(settings: Settings | None = None) -> Any:
             ],
             "kinds": [{"id": k, "faces": DIE_FACES[k], "values": values_for(k)}
                       for k in DIE_KINDS],
+            "policies": [{"id": i, "label": name} for i, name in POLICIES],
         }
 
     @app.get("/api/setup/settings")
