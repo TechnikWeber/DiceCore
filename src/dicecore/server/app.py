@@ -27,7 +27,7 @@ from pathlib import Path
 from typing import Any
 
 from .. import __version__
-from ..capture import SOURCES, CaptureError
+from ..capture import SOURCES, CaptureError, use_simulator
 from ..config import Settings, config_path
 from ..dataset import transfer
 from ..dataset.store import DatasetStore
@@ -68,7 +68,10 @@ def create_app(settings: Settings | None = None) -> Any:
         ) from exc
 
     loaded, complaints = Settings.load() if settings is None else (settings, [])
-    state: dict[str, Any] = {"settings": loaded, "complaints": complaints, "hub": None}
+    state: dict[str, Any] = {"settings": loaded, "complaints": complaints, "hub": None,
+                             #: Why the chosen dice source would not open, in the words the
+                             #: switch on the game screen prints.
+                             "dice_problem": None}
     hub = OutputHub(loaded.panel)
     state["hub"] = hub
     table = Table(None, loaded.server.public_name)
@@ -479,6 +482,42 @@ def create_app(settings: Settings | None = None) -> Any:
         reader.push.offer(Frame(image=decode(payload), jpeg=payload, source="push"))
         return {"ok": True}
 
+    def dice_view() -> Any:
+        """Which dice this DiceCore is playing with — the switch on the game screen."""
+        capture = state["settings"].capture
+        return {"simulated": capture.source == "sim", "source": capture.source,
+                "camera_source": capture.camera_source,
+                "can_throw": reader.can_throw(),
+                "problem": state["dice_problem"]}
+
+    @app.get("/api/v1/dice")
+    def dice_status() -> Any:
+        return dice_view()
+
+    @app.post("/api/v1/dice")
+    async def dice_switch(request: Request) -> Any:
+        """
+        Switch between real dice and simulated ones.
+
+        On the game screen rather than buried in Setup on purpose: which dice you are
+        playing with is a decision you make at the table, not a setting you configure once.
+        Somebody who has never opened Setup should be able to play without finding it.
+        """
+        body = await request.json()
+        settings = state["settings"]
+        use_simulator(settings.capture, bool(body.get("simulated")),
+                      diagnostics.pi_model() is not None)
+        settings.save()
+        reader.reload(settings)
+        # Open it now rather than at the first throw: pressing "real dice" on a box with no
+        # camera should say so immediately, while the person is still looking at the switch.
+        state["dice_problem"] = None
+        try:
+            reader.source()
+        except Exception as exc:
+            state["dice_problem"] = str(exc)
+        return dice_view()
+
     def table_view() -> Any:
         """Whether this DiceCore is hosting a table, sitting at one, or neither."""
         # Every address another machine could reach this one at, not the configured one:
@@ -613,7 +652,8 @@ def create_app(settings: Settings | None = None) -> Any:
                         previous = ""
                         await socket.send_text(json.dumps({
                             "idle": not guest.my_turn, "manual": not camera, "away": True,
-                            "game": guest.game, "table": table_view()}))
+                            "game": guest.game, "table": table_view(),
+                            "dice": dice_view()}))
                     if camera and guest.my_turn:
                         # A guest with a real tower throws real dice on their own turn, and
                         # `on_roll` sends what landed up to the host. Only on their turn:
@@ -634,7 +674,7 @@ def create_app(settings: Settings | None = None) -> Any:
                     # guest's move has to appear on the host's screen while they are still
                     # looking at it.
                     payload = json.dumps({"idle": not reader.game.running, "manual": True,
-                                          "table": table_view(),
+                                          "table": table_view(), "dice": dice_view(),
                                           "game": reader.game.to_json()}, sort_keys=True)
                     if payload != previous:
                         previous = payload
@@ -648,6 +688,7 @@ def create_app(settings: Settings | None = None) -> Any:
                     # night for an empty table.
                     await socket.send_text(json.dumps({"idle": True,
                                                        "table": table_view(),
+                                                       "dice": dice_view(),
                                                        "game": reader.game.to_json()}))
                     await asyncio.sleep(1.0)
                     previous = None
@@ -664,6 +705,7 @@ def create_app(settings: Settings | None = None) -> Any:
                     # play screen gets the turn state in the same message as the number.
                     body["game"] = reader.game.to_json()
                     body["table"] = table_view()
+                    body["dice"] = dice_view()
                     payload = json.dumps(body, sort_keys=True)
                     if payload != previous:
                         previous = payload
@@ -673,6 +715,7 @@ def create_app(settings: Settings | None = None) -> Any:
                             after = verified.to_json()
                             after["game"] = reader.game.to_json()
                             after["table"] = table_view()
+                            after["dice"] = dice_view()
                             previous = json.dumps(after, sort_keys=True)
                             await socket.send_text(previous)
                 except (CaptureError, EngineError) as exc:
@@ -770,6 +813,9 @@ def create_app(settings: Settings | None = None) -> Any:
         updated = Settings.from_dict(body)
         updated.save()
         state["settings"] = updated
+        # The camera may have been changed from the other page; the switch on the game
+        # screen must not keep printing a complaint about a source nobody uses any more.
+        state["dice_problem"] = None
         reader.reload(updated)
         reader.settings = updated
         training.settings = updated

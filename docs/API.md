@@ -1,3 +1,5 @@
+**English** · [Deutsch](API.de.md)
+
 # The API
 
 `/api/v1/…` is the contract other projects depend on. It is versioned, and it only ever
@@ -103,6 +105,21 @@ renders the first; anything that must not honour a tampered roll acts on the sec
 Roll simulated dice and read them, as the `Throw` button on the game screen does. Answers
 with the same shape as `/roll`. **400 unless the capture source is `sim`** — a camera cannot
 be asked to roll, because the dice on its tray are the ones somebody threw.
+
+### `GET /api/v1/dice` · `POST /api/v1/dice`
+
+Which dice this DiceCore plays with. `POST {"simulated": true}` switches to the simulator,
+`false` switches back to the camera.
+
+```json
+{"simulated": true, "source": "sim", "camera_source": "rpicam",
+ "can_throw": true, "problem": null}
+```
+
+`camera_source` is the camera "real dice" means on this box — remembered rather than
+guessed, because a guess is wrong on anything but a plain Pi. `problem` is why the chosen
+source would not open, filled in by the POST rather than left for the first throw to
+discover.
 
 ### `GET /api/v1/table`
 

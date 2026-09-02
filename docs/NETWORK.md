@@ -1,3 +1,5 @@
+**English** · [Deutsch](NETWORK.de.md)
+
 # Getting the box on the network
 
 A dice tower sits on a shelf with no keyboard and no screen. When it cannot reach the WiFi —

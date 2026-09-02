@@ -1,3 +1,5 @@
+**English** · [Deutsch](ONLINE.de.md)
+
 # Playing against another DiceCore
 
 Everyone has their own DiceCore. One of them holds the game; the others sit at it. Each
@@ -50,9 +52,9 @@ you share — the `100.x` one for Tailscale, the `192.168.x` one for a home netw
 
 ## Sim dice: playing with no dice at all
 
-DiceCore does not need a camera to play. Under **Setup → Camera**, pick the source
-**`sim` — Simulated dice, no camera, throw from the screen**. A `Throw` button appears on the
-game screen, and that is the whole difference.
+DiceCore does not need a camera to play. The switch at the top of the lobby says *Real* or
+*Simulated*; tap **Simulated** and a `Throw` button appears where the tray would be. That is
+the whole difference — and it is the default, so a box out of the box already plays.
 
 The simulator is not a random number generator with a scoreboard attached. It **draws the
 dice and reads the picture back through the real engine** — the same segmentation, the same

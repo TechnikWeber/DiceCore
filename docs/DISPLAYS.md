@@ -1,3 +1,5 @@
+**English** · [Deutsch](DISPLAYS.de.md)
+
 # The screen, the lamps and the buzzer
 
 A number that only exists inside an API is not much use at a table. DiceCore can put the

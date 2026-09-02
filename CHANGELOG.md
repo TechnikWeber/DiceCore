@@ -2,6 +2,35 @@
 
 Notable changes, newest first. Dates are the day the work landed.
 
+## 0.15.0 (2026-09-02)
+
+### Added
+- **Real dice or simulated ones, as one switch at the top of the lobby.** It was a capture
+  backend in a settings page, which is not where anybody looks to find out whether they can
+  play without a tower. Two positions, a sliding thumb, a sentence saying what each one
+  means — and the complaint, if a camera will not open, arrives with the switch rather than
+  at the first throw.
+- **Simulated dice are the default.** The one source that works on the first run with
+  nothing plugged in and nothing generated first. A box with a camera is configured once; a
+  laptop meeting the project for the first time should be able to play a game before it
+  reads anything. The quick start is now two commands.
+- The switch remembers **which** camera "real dice" means (`capture.camera_source`), because
+  the obvious guess is right on a plain Pi and wrong on an Arducam. A box that has never had
+  one gets the one it probably has — the ribbon connector on a Pi, USB elsewhere — and that
+  guess is written down so the next switch is not a fresh one.
+- `GET`/`POST /api/v1/dice`, and `dice` alongside `table` on the event stream.
+- German translations of every document, alongside the English ones.
+
+### Fixed
+- Settling is skipped for any source that is not live rather than for the folder by name:
+  the simulator and a push source were both waiting out `stable_frames` in front of a
+  picture that cannot move.
+- Staleness no longer needs a motion measurement that was never taken. "We did not look for
+  motion" is not evidence that a throw happened, so identical dice in identical places count
+  as stale for the folder and push sources too.
+- `can_throw` opened the capture source to answer a question about a name — several times a
+  second, on a play screen, retrying a camera that would not open every time.
+
 ## 0.14.0 (2026-09-02)
 
 ### Added

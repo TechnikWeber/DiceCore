@@ -1,3 +1,5 @@
+**English** · [Deutsch](AVRAE.de.md)
+
 # Avrae, Discord, and anything else
 
 DiceCore reads physical dice. What a table usually wants next is for that number to appear

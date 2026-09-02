@@ -1,3 +1,5 @@
+**English** · [Deutsch](CONCEPT.de.md)
+
 # DiceCore — Concept
 
 The reference for *what this is meant to be*. Read this before adding features; if a
@@ -17,8 +19,8 @@ replaceable.
 
 Three properties decide every design question here:
 
-1. **Sim-first.** The whole system runs on a laptop with a folder of JPEGs and no camera
-   at all. Hardware paths are only verifiable on the Pi, so everything else must be
+1. **Sim-first.** The whole system runs on a laptop with no camera at all — simulated dice
+   are the default source, and a folder of JPEGs replays real ones. Hardware paths are only verifiable on the Pi, so everything else must be
    verifiable without one.
 2. **The Pi may be weak.** A Pi Zero (v1) is ARMv6 — no PyTorch, no onnxruntime, no
    modern OpenCV wheels. So capture and recognition must be **separable**: the Pi grabs
@@ -73,8 +75,8 @@ swappable through configuration alone.
 
 `FrameSource.grab() -> Frame`. Implementations: `picamera2` (Pi, CSI), `rpicam` (shells out
 to `rpicam-still`, the fallback for Pis where picamera2 is a pain), `v4l2` (USB cameras via
-OpenCV), `folder` (a directory of images — the simulator), `push` (frames arriving through
-the API from another DiceCore node).
+OpenCV), `sim` (drawn dice — the default), `folder` (a directory of images, replayed), `push` (frames
+arriving through the API from another DiceCore node).
 
 **CSI camera modules are configuration, not luck.** A Pi only binds a sensor the firmware
 knows: the four official modules are found by `camera_auto_detect=1`, everything else —
@@ -127,7 +129,7 @@ than none.
 | **All-in-one** | Pi 4 / Pi 5 | `classic` or `model` locally | The normal case |
 | **Split** | Pi Zero / Pi 3 | `remote` → PC or Pi 5 | Weak Pi, or a big model |
 | **Agent only** | Pi Zero | none — pushes frames | Absolute minimum on the Pi |
-| **Desk** | `folder` (sim) | any | Development, training, tests |
+| **Desk** | `sim` / `folder` | any | Development, training, tests |
 
 ### Dataset and training
 
@@ -180,6 +182,17 @@ sees the same game rather than its own copy.
 
 `/` is the game screen and `/setup` is the workshop. Two front doors, one service; see
 [docs/PLAYING.md](PLAYING.md).
+
+### Several DiceCores, one game
+
+A table is not necessarily a room. One instance opens a table, others join it over the
+network, and one game runs across all of them turn by turn — each player throwing on their
+own tray, with their own camera or their own simulator.
+
+**The host owns the game; guests own nothing.** They mirror it and *ask*. Nothing merges and
+no conflict is resolved, because there is exactly one answer to "whose turn is it" — which is
+the difficulty of a turn-based game played in three rooms at once. The turn rule is enforced
+at the host, never at the button. See [docs/ONLINE.md](ONLINE.md).
 
 ## Outputs and modes
 

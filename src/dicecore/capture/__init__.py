@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from ..config import Settings
+from ..config import CaptureSettings, Settings
 from .base import CaptureError, FrameSource
 from .folder import FolderSource
 from .push import PushSource
@@ -17,6 +17,33 @@ SOURCES = (
     ("v4l2", "USB camera via /dev/video*"),
     ("push", "Frames pushed in from another node"),
 )
+
+
+#: What "the camera" means on a box that has never had one configured. A guess, but the
+#: right guess per machine: a Pi means the ribbon connector, anything else means USB.
+def default_camera(is_pi: bool = False) -> str:
+    return "picamera2" if is_pi else "v4l2"
+
+
+def use_simulator(capture: CaptureSettings, simulated: bool, is_pi: bool = False) -> str:
+    """
+    Flip between simulated dice and this box's camera, and remember which camera.
+
+    The switch on the game screen has two positions, but `source` has six values, so the
+    camera that was in use has to be kept somewhere or switching back would land on a guess
+    — and on a box with an Arducam, a guess is wrong.
+    """
+    if simulated:
+        if capture.source != "sim":
+            capture.camera_source = capture.source
+        capture.source = "sim"
+    else:
+        wanted = capture.camera_source
+        capture.source = wanted if wanted and wanted != "sim" else default_camera(is_pi)
+        # Write the guess down as well, so the next switch back is the same camera rather
+        # than a fresh guess made under whatever conditions hold then.
+        capture.camera_source = capture.source
+    return str(capture.source)
 
 
 def open_source(settings: Settings, push: PushSource | None = None) -> FrameSource:
@@ -59,4 +86,4 @@ def open_source(settings: Settings, push: PushSource | None = None) -> FrameSour
 
 
 __all__ = ["CaptureError", "FrameSource", "FolderSource", "PushSource", "SimSource",
-           "SOURCES", "open_source"]
+           "SOURCES", "open_source", "use_simulator", "default_camera"]

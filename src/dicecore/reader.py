@@ -135,11 +135,14 @@ class Reader:
 
     # --- reading ------------------------------------------------------------
     def can_throw(self) -> bool:
-        """Whether dice can be thrown from the screen — true only for the simulator."""
-        try:
-            return isinstance(self.source(), SimSource)
-        except Exception:
-            return False
+        """
+        Whether dice can be thrown from the screen — true only for the simulator.
+
+        Answered from the configured name rather than by opening the source: the play
+        screen asks this several times a second, and a camera that will not open would be
+        retried every time. `throw()` still checks the real object before using it.
+        """
+        return self.settings.capture.source == "sim"
 
     def throw(self, count: int | None = None) -> RollResult:
         """
@@ -193,7 +196,10 @@ class Reader:
 
             warnings: list[str] = []
             threw: bool | None = None
-            if wait_for_still and settle.enabled and self.settings.capture.source != "folder":
+            # `is_live` rather than the source's name: waiting for a still scene is only
+            # meaningful in front of a sensor. The folder replays frames and the simulator
+            # holds one, so both would only ever wait out `stable_frames` for nothing.
+            if wait_for_still and settle.enabled and source.is_live:
                 outcome = wait_for_settle(source.grab, settle)
                 frame = outcome.frame
                 if outcome.warning:
@@ -444,8 +450,11 @@ class Reader:
                 events.append(Event("stale", INFO, "nothing has been thrown since the "
                                                    "last reading"))
             self._last_throws = source.throws
-        elif (self.settings.guard.require_throw and threw is False and previous is not None
+        elif (self.settings.guard.require_throw and threw is not True and previous is not None
                 and not compare_readings(previous.dice, result.dice)):
+            # `is not True` rather than `is False`: settling is skipped entirely for a
+            # source that is not live, and "we never looked for motion" is not evidence that
+            # a throw happened. Same dice, same places, no proof of a throw — stale.
             result.stale = True
             events.append(Event("stale", INFO,
                                 "the dice did not move since the last reading"))

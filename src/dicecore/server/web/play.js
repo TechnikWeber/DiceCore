@@ -17,6 +17,8 @@ const state = {
   wizard: null, socket: null, retry: 1000,
   //: Who this DiceCore is playing with: hosting a table, sitting at one, or neither.
   table: null,
+  //: Which dice: the camera's, or the simulator's.
+  dice: null,
 };
 
 //: This instance is a guest at somebody else's table. Everything changes when it is: there
@@ -36,7 +38,8 @@ const myTurn = () => {
   return !seat || !seat.remote;
 };
 //: Simulated dice, thrown from the screen. A camera cannot be asked to roll.
-const canThrow = () => Boolean(state.table && state.table.can_throw);
+const canThrow = () => Boolean(state.dice ? state.dice.simulated
+                                          : (state.table && state.table.can_throw));
 
 const escapeHtml = (text) => String(text).replace(/[&<>"]/g,
   (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
@@ -113,10 +116,32 @@ function onlineStrip() {
     <button class="quiet" id="btn-table">Play online</button></div>`;
 }
 
+//: Real dice or simulated ones, as one switch at the top of the lobby.
+//:
+//: It is a setting, and it lives in Setup as well — but nobody looks in Setup for "I have
+//: no dice tower yet, can I still play". The answer to that has to be on the page you
+//: arrive at, in words rather than in a list of six capture backends.
+function diceStrip() {
+  const dice = state.dice || {};
+  const simulated = Boolean(dice.simulated);
+  const said = simulated
+    ? "Drawn and read by DiceCore itself. No camera, no tower — throw from this screen."
+    : "Thrown into the tower and read by the camera over the landing area.";
+  return `<div class="strip ${dice.problem ? "warn-strip" : "quiet-strip"}">
+    <b>${simulated ? "Simulated dice" : "Real dice"}</b>
+    <span>${escapeHtml(dice.problem || said)}</span>
+    <div class="switch" data-on="${simulated ? "sim" : "real"}">
+      <button data-dice="real" class="${simulated ? "" : "on"}">Real</button>
+      <button data-dice="sim" class="${simulated ? "on" : ""}">Simulated</button>
+    </div>
+  </div>`;
+}
+
 function renderLobby() {
   const modes = state.options.modes;
   $("app").className = "lobby";
   $("app").innerHTML = `
+    ${diceStrip()}
     ${onlineStrip()}
     <h1>What are we playing?</h1>
     <p class="lead">Pick a game. Nothing is read from the tray until one is running.</p>
@@ -137,6 +162,15 @@ function renderLobby() {
     tile.onclick = () => openWizard(tile.dataset.mode);
   });
   $("btn-table").onclick = () => { state.view = "table"; route(); };
+  $("app").querySelectorAll("[data-dice]").forEach((button) => {
+    button.onclick = async () => {
+      const simulated = button.dataset.dice === "sim";
+      if (simulated === Boolean((state.dice || {}).simulated)) return;
+      button.closest(".switch").dataset.on = simulated ? "sim" : "real";
+      state.dice = await post("/api/v1/dice", { simulated });
+      route();
+    };
+  });
 }
 
 // --- 1b. the table: playing against other DiceCores --------------------------
@@ -821,6 +855,7 @@ function connect() {
     const data = JSON.parse(event.data);
     if (data.error) { state.link = data; $("link-state").textContent = data.error; return; }
     if (data.table) state.table = data.table;
+    if (data.dice) state.dice = data.dice;
     if (data.game) state.game = data.game;
     if (!data.idle && !data.away) state.last = data;
     state.link = data;
@@ -864,6 +899,7 @@ $("btn-quit").onclick = async () => {
 
 (async function boot() {
   state.options = await (await fetch("/api/v1/modes")).json();
+  state.dice = await (await fetch("/api/v1/dice")).json().catch(() => null);
   await refreshTable();
   const info = await (await fetch("/api/v1/game")).json();
   state.game = info.game;

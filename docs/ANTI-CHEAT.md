@@ -1,3 +1,5 @@
+**English** · [Deutsch](ANTI-CHEAT.de.md)
+
 # Fair play
 
 DiceCore watches the tray after it has read the dice, and tells you whether the number it

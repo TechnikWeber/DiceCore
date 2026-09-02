@@ -32,8 +32,16 @@ def state_dir() -> Path:
 
 @dataclass
 class CaptureSettings:
-    #: folder (simulator) | v4l2 | rpicam | picamera2 | push
-    source: str = "folder"
+    #: sim | folder | v4l2 | rpicam | picamera2 | push
+    #
+    # The simulator is the default because it is the one source that works everywhere, on
+    # the first run, with nothing plugged in and nothing generated first. A box with a
+    # camera is configured once; a laptop meeting the project for the first time should be
+    # able to play a game before it reads anything.
+    source: str = "sim"
+    #: What `source` was before somebody switched to the simulator from the game screen, so
+    #: switching back goes to the camera this box actually has rather than to a guess.
+    camera_source: str = ""
     #: `folder`: directory of images played back in order. `v4l2`: /dev/videoN index.
     folder: str = ""
     device: int = 0

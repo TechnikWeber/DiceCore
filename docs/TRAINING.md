@@ -1,3 +1,5 @@
+**English** · [Deutsch](TRAINING.de.md)
+
 # Teaching DiceCore your dice
 
 The classic engine counts pips and needs nothing. Numerals — a d20 showing 14, a d10 showing

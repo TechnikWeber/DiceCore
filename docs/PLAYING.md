@@ -1,3 +1,5 @@
+**English** · [Deutsch](PLAYING.de.md)
+
 # Playing
 
 Two front doors, one service.
@@ -28,6 +30,9 @@ you *start*, and the camera idles until you do.
 Every mode as a tile, in three groups: **Games** (turns, players, a score), **Just show the
 numbers** (DiceCore reads and reports, nothing to play), and **Tools** (the fairness test
 and the build-your-own). Tap one.
+
+Two strips sit above them: the **real or simulated dice** switch, and the offer to play
+**online** against other DiceCores. Both have their own sections below.
 
 ### The setup wizard
 
@@ -205,10 +210,19 @@ land is about as convincing as dice get.
 
 ## Playing without dice
 
-Under **Setup → Camera**, the source **`sim`** replaces the tray with drawn dice and puts a
-`Throw` button on the game screen. It is the same pipeline — the dice are rendered, then read
-back through the real engine — so everything else behaves exactly as it does with a camera.
-Useful for a game night before the tower is built, and for playing at a PC.
+**The switch at the top of the lobby**, next to the online one: *Real* or *Simulated*. That
+is the whole thing. Simulated is the default, because it is the one that works on a box with
+nothing plugged in — a first game should not need a tower, a camera, or a trip through the
+settings.
+
+Simulated dice are drawn by DiceCore and read back through the real engine, so everything
+downstream behaves exactly as it does with a camera. A `Throw` button appears where the tray
+would be. Switching to *Real* goes back to the camera this box had before; if it has never
+had one, it takes the one it probably has (the ribbon connector on a Pi, USB elsewhere) and
+says so plainly if that does not open.
+
+The same choice is still under **Setup → Camera**, where the other four sources live. The
+switch is there because nobody looks in Setup for "I have no dice tower yet, can I play".
 
 ## Playing against other DiceCores
 

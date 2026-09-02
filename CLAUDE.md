@@ -180,6 +180,14 @@ python3 -m venv .venv && .venv/bin/pip install -e '.[vision,server,dev]'
 - `/api/v1/…` is a contract other repos depend on: additive changes only. `/api/setup/…` is
   the UI's own back end and may change freely.
 
+## Documentation is bilingual
+Every `docs/X.md` has a `docs/X.de.md` beside it, and both start with the language line
+(`**English** · [Deutsch](X.de.md)` / `[English](X.md) · **Deutsch**`). **A change to one is
+not finished until the other says the same thing** — the German documents link on to German
+ones, the English to English, and the two must keep the same headings so a section cannot be
+added to one and quietly forgotten in the other. The README pair works the same way, with the
+same H1 in both.
+
 ## Testing
 The suite renders its own dice (`synth.py`) so recognition is genuinely exercised without
 committing photographs. Synthetic scenes are **not** training data — a model trained on them

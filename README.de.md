@@ -10,7 +10,7 @@ als JSON-API und als Live-Stream, den ein Bot oder ein Spiel abonnieren kann.
 > **Status: es spielt, aber nichts davon lief bisher an einem echten Turm.** Von der Kamera
 > bis zum Spielblock funktioniert alles Ende zu Ende auf simulierten Bildern: Aufnahme,
 > Ruhe-Erkennung, Augenzählen, fünfzehn Spielmodi, drei Spielbretter, Züge und Chips, die
-> Fair-Play-Wache, die Label-Schleife, das Panel, die API und beide Weboberflächen — 386
+> Fair-Play-Wache, die Label-Schleife, das Panel, die API und beide Weboberflächen — 395
 > Tests, von denen keiner Hardware braucht.
 >
 > Es fehlt die Hälfte, die nur ein echter Turm liefern kann: **ein trainiertes Modell** (das
@@ -18,8 +18,8 @@ als JSON-API und als Live-Stream, den ein Bot oder ein Spiel abonnieren kann.
 > macht) und **jeder Hardware-Pfad** — Kameramodule, das kleine Display, Lampen und Taster
 > sind geschrieben und ungeprüft, bis sie an einem Pi hängen.
 >
-> [docs/CONCEPT.md](docs/CONCEPT.md) ist die Referenz für das Ziel,
-> [docs/HARDWARE.md](docs/HARDWARE.md) sagt, was zu kaufen ist und wohin es gehört.
+> [docs/CONCEPT.de.md](docs/CONCEPT.de.md) ist die Referenz für das Ziel,
+> [docs/HARDWARE.de.md](docs/HARDWARE.de.md) sagt, was zu kaufen ist und wohin es gehört.
 
 ![Der Spielbildschirm während eines Kniffel-Zugs: „Large Straight“ groß und grün über den fünf als Augen gezeichneten Würfeln, der Wurfzähler bei drei von drei mit zwei Chips, und rechts ein Spielblock für drei Spieler mit je einer Farbe neben dem Namen](docs/screenshots/play.jpg)
 
@@ -40,7 +40,7 @@ kurzen Assistenten durchtippen, werfen.*
   machen den Wurf ungültig. Erkannt werden: ein nachträglich umgedrehter Würfel, ein
   hinzugelegter oder verschwundener, derselbe Glückswurf zweimal gemeldet, ein eingefrorenes
   Videobild und eine abgedeckte Linse — und es sagt offen, dass es
-  [Manipulations*nachweis*, kein Manipulations*schutz*](docs/ANTI-CHEAT.md) ist.
+  [Manipulations*nachweis*, kein Manipulations*schutz*](docs/ANTI-CHEAT.de.md) ist.
 - **Eine Label-Schleife statt eines Label-Werkzeugs.** Würfeln, hinschauen, korrigieren,
   bestätigen — jeder bestätigte Wurf ist ein Trainingsbeispiel, im Browser, ohne Kommandozeile.
 - **Training aus dem Browser**, mit laufender Loss- und Genauigkeitsanzeige, am Ende ein
@@ -74,9 +74,11 @@ kurzen Assistenten durchtippen, werfen.*
   anderen treten mit der angezeigten Adresse bei, und ein Spiel läuft Zug für Zug über alle
   Geräte — jeder Wurf erscheint bei allen, während er fällt. Jeder würfelt auf seiner
   eigenen Landefläche, niemand muss sich einen Turm teilen. Im selben WLAN und über
-  Tailscale. Siehe [docs/ONLINE.md](docs/ONLINE.md).
-- **Würfeln ohne Würfel.** Die Quelle `sim` zeichnet die Würfel und liest das Bild durch die
-  echte Erkennung zurück; auf dem Spielbildschirm ersetzt ein `Throw`-Knopf den Turm. Alles
+  Tailscale. Siehe [docs/ONLINE.de.md](docs/ONLINE.de.md).
+- **Würfeln ohne Würfel, mit einem Schalter dafür.** *Real* oder *Simulated* steht oben in
+  der Lobby — nicht in den Einstellungen, denn dort sucht niemand die Antwort auf „kann ich
+  ohne Turm spielen". Simuliert ist die Voreinstellung. Die Würfel werden gezeichnet und das
+  Bild durch die echte Erkennung zurückgelesen; ein `Throw`-Knopf ersetzt den Turm. Alles
   dahinter — Modi, Blöcke, Panel, Zettel — verhält sich exakt wie mit Kamera. Ein Spieleabend
   ganz ohne Hardware geht damit, und ein Tisch, an dem zwei einen Turm haben und zwei nicht,
   ebenso.
@@ -84,12 +86,15 @@ kurzen Assistenten durchtippen, werfen.*
 - **CSI-Kameramodule als Einstellung** — inklusive Arducam IMX519 / 64MP / Owlsight /
   Pivariety, die ein Pi nicht selbst erkennt. Die Auswahl in der Oberfläche schreibt den
   `dtoverlay` in die `config.txt` und sagt, dass neu gestartet werden muss.
-- **Alles davon ohne Hardware.** `dicecore synth` zeichnet Würfel, die Quelle `folder` spielt
-  sie ab, und alles oben Genannte läuft damit auf dem Laptop.
+- **Alles davon ohne Hardware.** Simulierte Würfel sind die Standardquelle, `dicecore synth`
+  zeichnet Szenen, die die Quelle `folder` abspielt, und alles oben Genannte läuft damit auf
+  dem Laptop, ohne dass etwas angesteckt ist.
 
-![Die Lobby: jeder Modus als Kachel, gruppiert in Spiele für den Tisch, reine Anzeigen und Werkzeuge](docs/screenshots/lobby.jpg)
+![Die Lobby: oben ein Schalter „Simulated dice — von DiceCore selbst gezeichnet und gelesen, keine Kamera, kein Turm" mit Real und Simulated als Schieber, darunter eine Zeile zum Online-Spielen und jeder Spielmodus als Kachel](docs/screenshots/lobby.jpg)
 
-*Die Lobby. Von der Landefläche wird nichts gelesen, bevor ein Spiel läuft.*
+*Die Lobby. Echte oder simulierte Würfel ist ein Tipp, ganz oben auf der Seite, auf
+der man landet — kein Aufnahme-Backend tief in den Einstellungen. Von der
+Landefläche wird nichts gelesen, bevor ein Spiel läuft.*
 
 ![Der Tisch-Bildschirm des Gastgebers: „Your table is open" über der Adresse dicecore.local:8099 in großer Schreibmaschinenschrift, darunter die LAN- und Tailscale-Adresse, und eine Platzliste mit Philipp an diesem Bildschirm und Marie verbunden](docs/screenshots/table.jpg)
 
@@ -122,11 +127,12 @@ Modell wird aus einem oder mehreren Sets trainiert und kennt genau deren Fläche
 git clone https://github.com/TechnikWeber/DiceCore && cd DiceCore
 python3 -m venv .venv && .venv/bin/pip install -e '.[vision,server,dev]'
 
-.venv/bin/dicecore synth --count 20 --kinds d6,d20   # erfundene Würfe zum Lesen
 .venv/bin/dicecore serve                             # → http://localhost:8099/
 ```
 
-`/` ist der Spielbildschirm, `/setup` die Werkstatt.
+Mehr ist es nicht: simulierte Würfel sind die Voreinstellung, die Lobby ist also sofort
+spielbar — Spiel aussuchen und **Throw** drücken. `/` ist der Spielbildschirm, `/setup` die
+Werkstatt. Der Schalter oben in der Lobby wechselt zwischen simulierten Würfeln und Kamera.
 
 Danach `curl localhost:8099/api/v1/roll`:
 
@@ -181,11 +187,11 @@ v4l2 / folder / push  model (ONNX)       WebSocket  /api/v1/events
 ```
 
 Jeder Kasten ist über Einstellungen austauschbar, und jeder hat eine Umsetzung, die ohne
-Hardware funktioniert. Siehe [docs/CONCEPT.md](docs/CONCEPT.md).
+Hardware funktioniert. Siehe [docs/CONCEPT.de.md](docs/CONCEPT.de.md).
 
 ## Aus einem anderen Projekt heraus benutzen
 
-Genau dafür ist das gedacht — siehe [docs/API.md](docs/API.md).
+Genau dafür ist das gedacht — siehe [docs/API.de.md](docs/API.de.md).
 
 ```python
 import requests
@@ -211,17 +217,17 @@ erreicht.*
 
 | | |
 |---|---|
-| [docs/CONCEPT.md](docs/CONCEPT.md) | Was daraus werden soll und warum es so gebaut ist |
-| [docs/NETWORK.md](docs/NETWORK.md) | Das Gerät ins WLAN bringen — und das Netz, das es öffnet, wenn keines da ist |
-| [docs/HARDWARE.md](docs/HARDWARE.md) | Welcher Pi, welche Kamera, wohin montieren, wie beleuchten |
-| [docs/API.md](docs/API.md) | Der Vertrag, auf den andere Projekte sich verlassen |
-| [docs/TRAINING.md](docs/TRAINING.md) | Ihm die eigenen Würfel beibringen |
-| [docs/ANTI-CHEAT.md](docs/ANTI-CHEAT.md) | Was die Fair-Play-Überwachung erkennt — und was nicht |
-| [docs/PLAYING.md](docs/PLAYING.md) | Spielbildschirm, Züge, Chips und die beiden Taster |
-| [docs/ONLINE.md](docs/ONLINE.md) | Gegeneinander spielen, und Würfeln ohne Würfel |
-| [docs/AVRAE.md](docs/AVRAE.md) | Würfe an Avrae, an Discord oder sonstwohin schicken |
-| [docs/GAME-MODES.md](docs/GAME-MODES.md) | Die Modi, was jeder wertet, und wie ein weiterer dazukommt |
-| [docs/DISPLAYS.md](docs/DISPLAYS.md) | Display, Lampen und Summer — Panels, Pins, Verdrahtung |
+| [docs/CONCEPT.de.md](docs/CONCEPT.de.md) | Was daraus werden soll und warum es so gebaut ist |
+| [docs/NETWORK.de.md](docs/NETWORK.de.md) | Das Gerät ins WLAN bringen — und das Netz, das es öffnet, wenn keines da ist |
+| [docs/HARDWARE.de.md](docs/HARDWARE.de.md) | Welcher Pi, welche Kamera, wohin montieren, wie beleuchten |
+| [docs/API.de.md](docs/API.de.md) | Der Vertrag, auf den andere Projekte sich verlassen |
+| [docs/TRAINING.de.md](docs/TRAINING.de.md) | Ihm die eigenen Würfel beibringen |
+| [docs/ANTI-CHEAT.de.md](docs/ANTI-CHEAT.de.md) | Was die Fair-Play-Überwachung erkennt — und was nicht |
+| [docs/PLAYING.de.md](docs/PLAYING.de.md) | Spielbildschirm, Züge, Chips und die beiden Taster |
+| [docs/ONLINE.de.md](docs/ONLINE.de.md) | Gegeneinander spielen, und Würfeln ohne Würfel |
+| [docs/AVRAE.de.md](docs/AVRAE.de.md) | Würfe an Avrae, an Discord oder sonstwohin schicken |
+| [docs/GAME-MODES.de.md](docs/GAME-MODES.de.md) | Die Modi, was jeder wertet, und wie ein weiterer dazukommt |
+| [docs/DISPLAYS.de.md](docs/DISPLAYS.de.md) | Display, Lampen und Summer — Panels, Pins, Verdrahtung |
 
 ## Befehle
 
@@ -247,7 +253,7 @@ nur importiert. Vor Änderungen [CLAUDE.md](CLAUDE.md) lesen.
 
 ## TODO
 
-- [ ] An einem echten Turm mit echter Kamera betreiben, [docs/HARDWARE.md](docs/HARDWARE.md) korrigieren
+- [ ] An einem echten Turm mit echter Kamera betreiben, [docs/HARDWARE.de.md](docs/HARDWARE.de.md) korrigieren
 - [ ] Den ersten echten Datensatz sammeln und das erste Modell trainieren
 - [ ] Auswahl der oberen Fläche und 6/9-Unterscheidung an echten W20 überprüfen
 - [ ] Überlappende und verkantete Würfel erkennen und melden statt falsch lesen

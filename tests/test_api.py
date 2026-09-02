@@ -620,3 +620,29 @@ def test_health_reports_the_package_version(client):
 
     # It was written out by hand once and drifted a whole release behind the package.
     assert client.get("/api/v1/health").json()["version"] == __version__
+
+
+def test_the_dice_switch_flips_between_real_and_simulated(client):
+    # `client` is on the folder source: a "camera" as far as the switch is concerned.
+    assert client.get("/api/v1/dice").json()["simulated"] is False
+
+    on = client.post("/api/v1/dice", json={"simulated": True}).json()
+    assert on["simulated"] is True and on["can_throw"] is True
+    assert client.post("/api/v1/throw").json()["count"] >= 1
+
+    off = client.post("/api/v1/dice", json={"simulated": False}).json()
+    # Back to the source it came from, not to a guess — the folder is still configured.
+    assert off["source"] == "folder" and off["can_throw"] is False
+
+
+def test_the_dice_switch_says_why_a_camera_would_not_open(client):
+    client.post("/api/v1/dice", json={"simulated": True})
+    settings = client.get("/api/setup/settings").json()
+    settings["capture"]["camera_source"] = "v4l2"
+    settings["capture"]["device"] = 99          # nothing is on /dev/video99
+    client.put("/api/setup/settings", json=settings)
+
+    answer = client.post("/api/v1/dice", json={"simulated": False}).json()
+    assert answer["simulated"] is False
+    # The complaint arrives with the switch, not at the first throw minutes later.
+    assert answer["problem"] and "video99" in answer["problem"]

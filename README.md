@@ -10,7 +10,7 @@ event stream a bot or a game can subscribe to.
 > **Status: it plays, but nothing has run on a real tower yet.** Everything from the camera
 > to the scorecard works end to end on simulated frames: capture, settling, pip counting,
 > fifteen game modes, three boards, turns and chips, the fair-play watch, the label loop,
-> the panel, the API and both web front ends — 386 tests, none of which need hardware.
+> the panel, the API and both web front ends — 395 tests, none of which need hardware.
 >
 > What is missing is the half only a real tower can supply: **a trained model** (which needs
 > real dice in front of a real camera, and is what makes a d20 readable at all) and **every
@@ -69,8 +69,10 @@ through a short wizard, throw.*
   address it shows, and one game runs across all of them turn by turn — every roll on every
   screen as it lands. Each player throws on their own tray, so nobody shares a tower. Works
   on a LAN and over Tailscale. See [docs/ONLINE.md](docs/ONLINE.md).
-- **Dice without dice.** The `sim` source draws the dice and reads the picture back through
-  the real engine, so a `Throw` button on the game screen replaces the tower. Everything
+- **Dice without dice, and one switch to say so.** *Real* or *Simulated* sits at the top of
+  the lobby — not in a settings page, because that is not where somebody looks to find out
+  whether they can play without a tower. Simulated is the default. It draws the dice and
+  reads the picture back through the real engine, so a `Throw` button replaces the tower. Everything
   downstream — modes, boards, panel, scorecards — behaves exactly as it does with a camera.
   A game night with no hardware at all plays, and so does a table where two people have
   towers and two do not.
@@ -78,17 +80,20 @@ through a short wizard, throw.*
 - **CSI camera modules as configuration** — including Arducam IMX519 / 64MP / Owlsight /
   Pivariety, which a Pi does not auto-detect. Picking one in the UI writes the `dtoverlay`
   into `config.txt` and tells you to reboot.
-- **The whole thing without hardware.** `dicecore synth` renders dice, the `folder` capture
-  source plays them back, and everything above works on a laptop.
+- **The whole thing without hardware.** Simulated dice are the default source, `dicecore
+  synth` renders scenes for the `folder` source to replay, and everything above works on a
+  laptop with nothing plugged in.
 
 ![Five panels side by side, rendered by DiceCore itself: an ST7789 240x240 showing NICE ROLL over a 20, an ILI9341 320x240 showing HANDS OFF over 18, a narrow ST7789 135x240 showing VOID in red, and two SSD1306 OLEDs](docs/screenshots/displays.png)
 
 *The same renderer drives every panel and the browser preview, so the layout can be worked
 out before anything is soldered.*
 
-![The lobby: every mode as a tile, grouped into games you play round a table, readers that only report numbers, and workshop tools](docs/screenshots/lobby.jpg)
+![The lobby: a switch at the top reading "Simulated dice — drawn and read by DiceCore itself, no camera, no tower" with Real and Simulated as a sliding toggle, a second strip offering to play online, and every game mode as a tile underneath](docs/screenshots/lobby.jpg)
 
-*The lobby. Nothing is read from the tray until a game is running.*
+*The lobby. Real dice or simulated ones is one tap, at the top of the page you
+arrive at — not a capture backend buried in Setup. Nothing is read from the tray
+until a game is running.*
 
 ![The table screen while hosting: "Your table is open" over the address dicecore.local:8099 in large monospace, the LAN and Tailscale addresses offered underneath, and a seat list showing Philipp at this screen and Marie connected](docs/screenshots/table.jpg)
 
@@ -116,11 +121,12 @@ one or more sets and knows exactly the faces that were in them.*
 git clone https://github.com/TechnikWeber/DiceCore && cd DiceCore
 python3 -m venv .venv && .venv/bin/pip install -e '.[vision,server,dev]'
 
-.venv/bin/dicecore synth --count 20 --kinds d6,d20   # fake rolls to read
 .venv/bin/dicecore serve                             # → http://localhost:8099/
 ```
 
-`/` is the game screen, `/setup` is the workshop.
+That is all of it: simulated dice are the default, so the lobby is already playable — pick a
+game and press **Throw**. `/` is the game screen, `/setup` is the workshop. The switch at the
+top of the lobby moves between simulated dice and a camera.
 
 Then `curl localhost:8099/api/v1/roll`:
 

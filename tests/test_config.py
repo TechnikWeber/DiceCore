@@ -36,7 +36,7 @@ def test_a_broken_file_degrades_to_defaults_with_a_complaint(tmp_path):
     path = tmp_path / "config.json"
     path.write_text("{ not json")
     loaded, warnings = Settings.load(path)
-    assert loaded.capture.source == "folder"
+    assert loaded.capture.source == "sim"
     assert warnings and str(path) in warnings[0]
 
 

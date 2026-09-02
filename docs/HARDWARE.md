@@ -1,3 +1,5 @@
+**English** · [Deutsch](HARDWARE.de.md)
+
 # Hardware
 
 What to put where, and what each choice costs you. Nothing here has been built yet — this
