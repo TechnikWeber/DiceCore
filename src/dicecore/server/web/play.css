@@ -190,3 +190,46 @@ button.quiet { background: transparent; border-color: var(--line); font-size: 14
 .standing .score { font-weight: 700; font-size: 24px; }
 .dot { width: 14px; height: 14px; border-radius: 50%; display: inline-block; flex: none; }
 th .dot, td .dot { margin-right: 6px; vertical-align: -2px; }
+
+/* The celebration. It belongs here more than anywhere: this is the screen everybody is
+   looking at, and until now only the little panel over the tower reacted at all. */
+.headline.celebrate { color: var(--good); animation: cheer .7s ease-out; }
+.headline.lament { color: var(--ink-soft); animation: sag .5s ease-out; }
+@keyframes cheer {
+  0% { transform: scale(.82); opacity: .5; }
+  55% { transform: scale(1.07); }
+  100% { transform: scale(1); opacity: 1; }
+}
+@keyframes sag {
+  0% { transform: translateY(-8px); opacity: .4; }
+  100% { transform: translateY(0); opacity: 1; }
+}
+.burst { position: fixed; inset: 0; pointer-events: none; overflow: hidden; z-index: 5; }
+.burst i {
+  position: absolute; width: 10px; height: 10px; border-radius: 2px; top: 42%; left: 50%;
+  animation: fly 1.5s cubic-bezier(.2, .7, .3, 1) forwards;
+}
+@keyframes fly {
+  0% { transform: translate(0, 0) rotate(0deg); opacity: 1; }
+  100% { transform: translate(var(--dx), var(--dy)) rotate(540deg); opacity: 0; }
+}
+/* One ring, expanding, for the tables that would rather not have confetti. */
+.ring {
+  position: fixed; top: 42%; left: 50%; width: 40px; height: 40px; margin: -20px 0 0 -20px;
+  border: 3px solid var(--good); border-radius: 50%; pointer-events: none; z-index: 4;
+  animation: widen 1s ease-out forwards;
+}
+@keyframes widen {
+  0% { transform: scale(.2); opacity: .9; }
+  100% { transform: scale(14); opacity: 0; }
+}
+
+/* The live view sits in a corner rather than in the layout: it is for the people who are
+   not in the room, and it must not push the number they came for off the screen. */
+.livecam {
+  position: fixed; right: 18px; bottom: 18px; width: min(340px, 34vw); z-index: 3;
+  background: var(--panel); border: 1px solid var(--line); border-radius: 12px;
+  padding: 8px; box-shadow: 0 8px 30px rgba(0, 0, 0, .5);
+}
+.livecam img { display: block; width: 100%; border-radius: 8px; background: #000; }
+.livecam span { display: block; font-size: 12px; color: var(--ink-soft); padding: 6px 2px 0; }

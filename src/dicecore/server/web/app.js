@@ -275,6 +275,10 @@ function loadForm() {
       $("cl-lament").checked = s.panel.lament_on_min;
       $("cl-frames").value = s.panel.animation_frames;
     },
+    server: () => {
+      $("sv-stream").checked = s.server.stream_enabled;
+      $("sv-fps").value = s.server.stream_fps;
+    },
     summary: () => {
       $("settings-dump").textContent = JSON.stringify(s, null, 2);
       $("subtitle").textContent =
@@ -342,6 +346,8 @@ function collectForm() {
   s.panel.signals.next_pin = Number($("sg-nextbtn").value);
   s.panel.signals.button_pull_up = $("sg-pullup").checked;
   s.panel.signals.debounce_s = Number($("sg-debounce").value);
+  s.server.stream_enabled = $("sv-stream").checked;
+  s.server.stream_fps = Number($("sv-fps").value);
   s.settle.enabled = $("st-enabled").checked;
   s.settle.motion_threshold = Number($("st-motion").value);
   s.settle.stable_frames = Number($("st-frames").value);

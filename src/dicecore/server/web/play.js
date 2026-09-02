@@ -254,7 +254,19 @@ function renderGame() {
     </aside>`;
 
   $("headline").textContent = headline || "";
-  $("headline").className = "headline" + ((headline || "").length > 7 ? " small" : "");
+  $("headline").className = "headline"
+    + ((headline || "").length > 7 ? " small" : "")
+    + (reading.celebrate ? " celebrate" : "")
+    + (reading.lament ? " lament" : "");
+  // Once per roll, not once per render: the screen redraws on every hold, every chip and
+  // every message, and confetti on all of those would be a strobe light.
+  const stamp = `${game.turn.number}:${game.turn.rolls_used}:${headline}`;
+  if (reading.celebrate && stamp !== state.cheered) {
+    state.cheered = stamp;
+    cheer();
+  } else if (!reading.celebrate) {
+    state.cheered = state.cheered === stamp ? state.cheered : null;
+  }
   $("detail").textContent = reading.detail || (!game.rules.multi && roll ? roll.notation : "");
   if (waiting && !headline) {
     // A visible "your throw" beats a blank screen: the tray is being watched and the
@@ -511,6 +523,31 @@ function route() {
   $("app").innerHTML = `<p class="lead">Loading…</p>`;
 }
 
+// --- the celebration --------------------------------------------------------
+
+const CONFETTI = ["#5b8dff", "#3ecf8e", "#e0a94a", "#f0806f", "#c084fc", "#4dd0e1"];
+
+function cheer() {
+  const ring = document.createElement("div");
+  ring.className = "ring";
+  document.body.appendChild(ring);
+  setTimeout(() => ring.remove(), 1100);
+
+  const burst = document.createElement("div");
+  burst.className = "burst";
+  // Thirty pieces: enough to read as a celebration from the far end of a table, few enough
+  // that a Pi driving a television does not stutter over it.
+  burst.innerHTML = Array.from({ length: 30 }, () => {
+    const angle = Math.random() * Math.PI * 2;
+    const far = 180 + Math.random() * 340;
+    return `<i style="--dx:${Math.cos(angle) * far}px; --dy:${Math.sin(angle) * far}px;
+      background:${CONFETTI[Math.floor(Math.random() * CONFETTI.length)]};
+      animation-delay:${Math.random() * 0.18}s"></i>`;
+  }).join("");
+  document.body.appendChild(burst);
+  setTimeout(() => burst.remove(), 1900);
+}
+
 // --- the connection ---------------------------------------------------------
 
 function connect() {
@@ -535,6 +572,22 @@ function connect() {
   };
 }
 
+//: The stream is only offered when it has been switched on: it is a camera, and leaving
+//: one running on an unauthenticated port is the room's decision, not a default.
+async function setupCamera() {
+  const health = await (await fetch("/api/v1/health")).json().catch(() => ({}));
+  if (!health.stream) return;
+  $("btn-camera").hidden = false;
+  $("btn-camera").onclick = () => {
+    const panel = $("livecam");
+    panel.hidden = !panel.hidden;
+    // The <img> is only given a source while it is visible: an MJPEG connection left open
+    // behind a hidden element keeps the camera busy for nobody.
+    $("livecam-img").src = panel.hidden ? "" : `/api/v1/stream.mjpg?t=${Date.now()}`;
+    $("btn-camera").textContent = panel.hidden ? "Camera" : "Hide camera";
+  };
+}
+
 $("btn-quit").onclick = () => {
   if (confirm("Leave this game? The scores are lost.")) leaveGame();
 };
@@ -549,4 +602,5 @@ $("btn-quit").onclick = () => {
   state.view = info.game.running ? "playing" : "lobby";
   route();
   connect();
+  setupCamera();
 })();

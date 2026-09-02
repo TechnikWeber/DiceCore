@@ -338,7 +338,8 @@ class Reader:
     def _show(self, result: RollResult, phase: str) -> None:
         panel = self.settings.panel
         presentation = phases.presentation_for(result, phase, panel.celebrate,
-                                               panel.celebrate_total, panel.lament_on_min)
+                                               panel.celebrate_total, panel.lament_on_min,
+                                               self.settings.mode.d10_style)
         turn = self.game.turn
         if self.game.rules.multi:
             presentation.turn = {

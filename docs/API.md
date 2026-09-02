@@ -98,6 +98,13 @@ With fair play on, **every roll arrives twice**: first with `verdict: "pending"`
 the dice settle, then again with its verdict once the tray has been watched. A scoreboard
 renders the first; anything that must not honour a tampered roll acts on the second.
 
+### `GET /api/v1/stream.mjpg`
+
+A live view of the tray as `multipart/x-mixed-replace`, for playing with people who are not
+in the room. **403 unless switched on** under *Setup → Camera*. It never opens the camera a
+second time: it sends whatever the reader last captured, so it cannot compete with the
+reading for the device.
+
 ### `GET /api/v1/health`
 
 `{"ok": true, "name": …, "version": …}`. For a supervisor or a status page.

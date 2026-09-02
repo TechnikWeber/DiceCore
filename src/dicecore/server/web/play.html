@@ -13,6 +13,7 @@
   <span class="game" id="game-name"></span>
   <span class="spacer"></span>
   <span class="game" id="link-state">…</span>
+  <button class="quiet" id="btn-camera" hidden>Camera</button>
   <button class="quiet" id="btn-quit" hidden>Leave game</button>
   <a class="setup" href="/setup">Setup</a>
 </header>
@@ -20,6 +21,10 @@
 <!-- Every screen is rendered by play.js: lobby, wizard, game, result. One place decides
      which, so the page can never be halfway between two of them. -->
 <main id="app"></main>
+<div class="livecam" id="livecam" hidden>
+  <img id="livecam-img" alt="the tray, live">
+  <span>live view of the tray</span>
+</div>
 
 <script src="/play.js"></script>
 </body>

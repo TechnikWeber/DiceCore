@@ -250,7 +250,8 @@ class PanelSettings:
 
     display: DisplaySettings = field(default_factory=DisplaySettings)
     signals: SignalSettings = field(default_factory=SignalSettings)
-    #: off | max_die (a natural maximum on any die) | total (the sum reaches a threshold)
+    #: off | max_die (a natural maximum on any die) | near_max (the sum reaches a fraction
+    #: of the best these dice could show) | total (an absolute threshold)
     celebrate: str = "max_die"
     celebrate_total: int = 18
     #: A natural 1 gets its own, quieter acknowledgement.
@@ -277,6 +278,17 @@ class ServerSettings:
     port: int = 8099
     #: Served to the UI so a browser on the LAN can build absolute URLs for consumers.
     public_name: str = "dicecore"
+    #: Offer a live view of the tray at /api/v1/stream.mjpg — for playing with people who
+    #: are not in the room and would like to see the dice land.
+    #:
+    #: **Off by default, on purpose.** The still preview the setup page already uses is one
+    #: picture when somebody asks for it; a continuous stream of whatever the camera can see
+    #: is a different thing to leave running on an unauthenticated port, and that is a
+    #: decision for whoever owns the room rather than a default.
+    stream_enabled: bool = False
+    #: Frames a second for that stream. Low on purpose: it shares the camera with the
+    #: reading, and a dice tray is not sport.
+    stream_fps: int = 5
 
 
 @dataclass

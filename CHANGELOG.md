@@ -2,6 +2,25 @@
 
 Notable changes, newest first. Dates are the day the work landed.
 
+## 0.10.0 (2026-09-02)
+
+### Added
+- **A live view of the tray** at `/api/v1/stream.mjpg`, and a Camera button on the game
+  screen, for playing with people who are not in the room. It never opens the camera a
+  second time — it sends what the reader last captured — and it is **off until switched
+  on**, because a continuous view of whatever a camera can see is the room's decision
+  rather than a default.
+- **The game screen celebrates too.** Until now only the little panel over the tower
+  reacted, which is backwards: the big screen is the one everybody is looking at.
+- A `near_max` celebration rule: nearly the best the dice on the tray could have shown.
+
+### Fixed
+- **Celebration thresholds did not scale with the dice.** A total of 18 is impossible with
+  two six-siders, so a perfect throw of 2d6 never celebrated at all; and a dice pool
+  celebrated at four successes, so three dice all succeeding — the best result there is —
+  was never worth a sound. Both are proportional now.
+- The training page still listed the dice without d2 and d3.
+
 ## 0.9.0 (2026-09-02)
 
 ### Added

@@ -50,7 +50,12 @@ WEB_DIR = Path(__file__).parent / "web"
 def create_app(settings: Settings | None = None) -> Any:
     try:
         from fastapi import FastAPI, File, HTTPException, Request, UploadFile, WebSocket
-        from fastapi.responses import HTMLResponse, JSONResponse, Response
+        from fastapi.responses import (
+            HTMLResponse,
+            JSONResponse,
+            Response,
+            StreamingResponse,
+        )
     except ImportError as exc:  # pragma: no cover - depends on the install
         raise RuntimeError(
             "The server needs FastAPI: `pip install 'dicecore[server]'`."
@@ -87,7 +92,7 @@ def create_app(settings: Settings | None = None) -> Any:
     buttons = ButtonPanel(loaded.panel.signals, on_chip, on_next)
     state["buttons"] = buttons
 
-    app = FastAPI(title="DiceCore", version="0.9.0",
+    app = FastAPI(title="DiceCore", version="0.10.0",
                   description="Reads real dice with a camera.")
     app.state.reader = reader
     app.state.training = training
@@ -115,10 +120,56 @@ def create_app(settings: Settings | None = None) -> Any:
 
     # --- the versioned, embeddable API ------------------------------------------------
 
+    @app.get("/api/v1/stream.mjpg")
+    def stream() -> Any:
+        """
+        A live view of the tray, for playing with people who are not in the room.
+
+        It never opens the camera a second time. What it sends is whatever the reader last
+        captured — so during a game it runs at the pace the dice are being read, and it
+        cannot compete with the reading for the device. When nothing is being read it takes
+        its own frames, slowly, because somebody watching a blank rectangle is being told
+        nothing.
+
+        Off unless switched on: a continuous view of whatever the camera can see is a
+        different proposition from the single still the setup page asks for, and it is the
+        room's decision rather than a default.
+        """
+        if not state["settings"].server.stream_enabled:
+            return JSONResponse(
+                {"error": "StreamDisabled",
+                 "detail": "The live view is switched off. Turn it on under Setup → Camera "
+                           "if you want people outside the room to watch the tray."},
+                status_code=403)
+
+        boundary = "dicecoreframe"
+        interval = 1.0 / max(1, min(15, state["settings"].server.stream_fps))
+
+        def frames() -> Any:
+            last = None
+            while True:
+                jpeg = reader.last_jpeg()
+                if jpeg is None or (not reader.game.running and jpeg is last):
+                    try:
+                        jpeg = reader.preview_jpeg()
+                    except Exception:
+                        time.sleep(interval)
+                        continue
+                if jpeg is not None and jpeg is not last:
+                    last = jpeg
+                    yield (f"--{boundary}\r\nContent-Type: image/jpeg\r\n"
+                           f"Content-Length: {len(jpeg)}\r\n\r\n").encode() + jpeg + b"\r\n"
+                time.sleep(interval)
+
+        return StreamingResponse(
+            frames(), media_type=f"multipart/x-mixed-replace; boundary={boundary}",
+            headers={"Cache-Control": "no-store"})
+
     @app.get("/api/v1/health")
     def health() -> dict[str, Any]:
         return {"ok": True, "name": state["settings"].server.public_name,
-                "version": app.version, "at": time.time()}
+                "version": app.version, "at": time.time(),
+                "stream": state["settings"].server.stream_enabled}
 
     @app.get("/api/v1/modes")
     def modes() -> Any:

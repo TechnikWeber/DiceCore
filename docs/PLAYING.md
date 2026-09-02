@@ -187,6 +187,22 @@ the face except three ones at 1000; four, five and six of a kind double, quadrup
 octuple that; a straight or three pairs is 1500; you need 500 in one turn to get on the
 board; first to 10 000 wins. The target and the entry threshold are settings.
 
+## Playing with people who are not in the room
+
+**Setup → Camera → Live view** offers the tray at `/api/v1/stream.mjpg`, and the game screen
+grows a **Camera** button that shows it in the corner. The people you are playing with can
+watch the dice land, which is the only thing that convinces anybody at a distance.
+
+Two properties worth knowing. It **never opens the camera a second time**: what it sends is
+whatever the reader last captured, so during a game it runs at the pace the dice are being
+read and cannot compete with the reading for the device. And it is **off until you switch it
+on** — a continuous view of whatever the camera can see is a different proposition from the
+single still the setup page asks for, and it is the room's decision rather than a default.
+
+It is not proof of anything on its own; see [ANTI-CHEAT.md](ANTI-CHEAT.md) for what is and
+is not demonstrable. But a number that appears on a screen while everyone watches the dice
+land is about as convincing as dice get.
+
 ## Several players
 
 Chosen in the wizard, and that is the only place they need to be chosen. The tower passes

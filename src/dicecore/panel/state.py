@@ -98,14 +98,26 @@ class Presentation:
 # --- what counts as a good roll ---------------------------------------------------
 
 
-def is_celebration(result: RollResult, mode: str, total_at_least: int) -> bool:
+#: A near-maximum roll celebrates at this fraction of the best the dice could have shown.
+NEAR_MAX = 0.85
+
+
+def is_celebration(result: RollResult, mode: str, total_at_least: int,
+                   d10_style: str = "0-9") -> bool:
     """
     Whether this roll deserves the animation.
 
     `max_die` is the default because it is the moment everyone at the table reacts to
-    anyway — a natural 20, a six. A total threshold is for games where the sum is the
-    thing. Unread dice never celebrate: the machine has no idea what it is
-    looking at, and a party over a number it could not read is worse than silence.
+    anyway — a natural 20, a six — and because it scales by itself: it asks each die
+    whether *it* is at its maximum, whatever the die and however many there are.
+
+    `near_max` is the same idea for a sum: a fraction of the best the dice on the tray could
+    have shown. That matters because a fixed number cannot be right for two tables at once —
+    18 is impossible with two six-siders and unremarkable with six, so a threshold of 18
+    meant a perfect throw of 2d6 never celebrated at all.
+
+    `total` keeps an absolute number for anybody who wants one. Unread dice never celebrate:
+    a party over a number the machine could not read is worse than silence.
     """
     if mode == "off" or not result.dice:
         return False
@@ -113,8 +125,12 @@ def is_celebration(result: RollResult, mode: str, total_at_least: int) -> bool:
         return False
     if mode == "total":
         return result.total >= total_at_least
+    if mode == "near_max":
+        best = dicevocab.best_total([die.kind for die in result.dice], d10_style)
+        return best > 0 and result.total >= best * NEAR_MAX
     if mode == "max_die":
-        return any(die.value == max(dicevocab.values_for(die.kind)) for die in result.dice)
+        return any(die.value == max(dicevocab.values_for(die.kind, d10_style))
+                   for die in result.dice)
     return False
 
 
@@ -135,7 +151,8 @@ def is_lament(result: RollResult, enabled: bool) -> bool:
 
 
 def presentation_for(result: RollResult, phase: str, celebrate_mode: str = "max_die",
-                     celebrate_total: int = 18, lament_on_min: bool = True) -> Presentation:
+                     celebrate_total: int = 18, lament_on_min: bool = True,
+                     d10_style: str = "0-9") -> Presentation:
     """
     Build the frame for a finished (or in-flight) roll.
 
@@ -152,7 +169,7 @@ def presentation_for(result: RollResult, phase: str, celebrate_mode: str = "max_
         dice=[(d.kind, d.value) for d in result.dice],
         verdict=result.verdict,
         celebrate=bool(reading["celebrate"]) if "celebrate" in reading
-        else is_celebration(result, celebrate_mode, celebrate_total),
+        else is_celebration(result, celebrate_mode, celebrate_total, d10_style),
         lament=bool(reading["lament"]) if "lament" in reading
         else is_lament(result, lament_on_min),
     )

@@ -263,3 +263,16 @@ def test_an_unknown_mode_falls_back_instead_of_failing():
 def test_a_parameter_a_mode_does_not_have_is_ignored():
     assert mode_by_id("normal") is not None
     assert interpret([d("d6", 4)], "normal", {"threshold": 99}).headline == "4"
+
+
+def test_a_pool_celebrates_in_proportion_to_the_pool():
+    # With three dice, every one succeeding is the best result there is — and under a fixed
+    # threshold of four successes it was never worth a sound.
+    for count in (2, 3, 5, 8):
+        best = [d("d6", 6)] * count
+        assert interpret(best, "pool", {"threshold": 4}).celebrate, count
+
+
+def test_a_half_hearted_pool_does_not_celebrate():
+    dice = [d("d6", 6), d("d6", 1), d("d6", 1), d("d6", 1), d("d6", 1), d("d6", 1)]
+    assert not interpret(dice, "pool", {"threshold": 4}).celebrate

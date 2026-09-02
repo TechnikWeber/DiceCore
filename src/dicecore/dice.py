@@ -69,6 +69,18 @@ def is_valid(kind: str, value: int, d10_style: str = "0-9") -> bool:
     return kind in DIE_FACES and value in values_for(kind, d10_style)
 
 
+def best_total(kinds: list[str], d10_style: str = "0-9") -> int:
+    """
+    The most these dice could possibly show.
+
+    What makes a total worth celebrating depends on how many dice are on the tray and what
+    they are: 18 is impossible with two six-siders and unremarkable with six. A fixed
+    threshold is therefore always wrong for some table, and this is what a relative one is
+    measured against.
+    """
+    return sum(max(values_for(kind, d10_style), default=0) for kind in kinds)
+
+
 # --- Results ----------------------------------------------------------------------
 
 

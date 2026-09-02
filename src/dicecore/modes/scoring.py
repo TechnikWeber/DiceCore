@@ -118,11 +118,14 @@ def score_pool(dice: list[Die], threshold: int, double_on_max: bool = False,
         hits += counts
         detail.append(f"{value}{'!' if counts == 2 else '' if counts else '·'}")
     word = "success" if hits == 1 else "successes"
+    # In proportion to the pool, not a fixed four: with three dice, every one succeeding is
+    # the best result there is and used never to be worth a sound.
+    worth_it = max(2, -(-len(dice) * 2 // 3)) if dice else 99
     return Score(
         headline=f"{hits} {word}",
         detail=" ".join(detail),
         value=hits,
-        celebrate=hits >= 4,
+        celebrate=hits >= worth_it,
         lament=hits == 0 and bool(dice),
         extras={"successes": hits, "threshold": threshold, "rolled": len(dice)},
     )

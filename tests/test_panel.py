@@ -216,3 +216,38 @@ def test_the_hub_shows_the_newest_state_even_when_it_falls_behind():
         assert hub.latest.total == 29
     finally:
         hub.close()
+
+
+# --- what is worth celebrating has to scale with the tray -------------------------
+
+
+def test_a_perfect_throw_celebrates_however_many_dice_there_are():
+    # A fixed total cannot be right for two tables at once: 18 is impossible with two
+    # six-siders and unremarkable with six, so a threshold of 18 meant a perfect 2d6 never
+    # celebrated at all.
+    for count in (1, 2, 3, 5, 6):
+        assert is_celebration(roll(*[("d6", 6)] * count), "near_max", 0), count
+
+
+def test_a_middling_throw_does_not_celebrate_at_any_count():
+    for count in (2, 3, 5, 6):
+        assert not is_celebration(roll(*[("d6", 3)] * count), "near_max", 0), count
+
+
+def test_near_max_understands_dice_that_are_not_six_siders():
+    assert is_celebration(roll(("d20", 20)), "near_max", 0)
+    assert not is_celebration(roll(("d20", 11)), "near_max", 0)
+    assert is_celebration(roll(("d20", 19), ("d6", 6)), "near_max", 0)
+
+
+def test_an_absolute_total_is_still_available_for_those_who_want_it():
+    assert is_celebration(roll(("d6", 6), ("d6", 6), ("d6", 6)), "total", 18)
+    assert not is_celebration(roll(("d6", 6), ("d6", 6)), "total", 18)
+
+
+def test_the_best_possible_total_is_what_near_max_measures_against():
+    from dicecore.dice import best_total
+
+    assert best_total(["d6", "d6"]) == 12
+    assert best_total(["d20", "d6"]) == 26
+    assert best_total([]) == 0

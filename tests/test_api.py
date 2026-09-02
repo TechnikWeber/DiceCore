@@ -466,3 +466,21 @@ def test_only_a_known_extra_can_be_installed(client):
     assert client.post("/api/setup/install", json={"extra": "train; rm -rf /"}).status_code == 400
     assert client.post("/api/setup/install", json={"extra": "requests"}).status_code == 400
     assert client.post("/api/setup/install", json={"extra": ""}).status_code == 400
+
+
+def test_the_live_view_is_off_until_it_is_switched_on(client):
+    # It is a camera. Leaving one streaming on an unauthenticated port is the room's
+    # decision, not a default.
+    refused = client.get("/api/v1/stream.mjpg")
+    assert refused.status_code == 403 and "switched off" in refused.json()["detail"]
+    assert client.get("/api/v1/health").json()["stream"] is False
+
+
+def test_switching_the_live_view_on_is_reported(client):
+    # The stream itself is not exercised here on purpose: reading an endless MJPEG response
+    # inside the test client is a hang waiting to happen, and what this test can honestly
+    # check is the switch. The stream is checked against a running server instead.
+    settings = client.get("/api/setup/settings").json()
+    settings["server"]["stream_enabled"] = True
+    client.put("/api/setup/settings", json=settings)
+    assert client.get("/api/v1/health").json()["stream"] is True

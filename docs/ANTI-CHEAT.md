@@ -16,6 +16,18 @@ twice. Those are all *visible*, and DiceCore never claims a roll was fair. It sa
 "nothing happened between the throw and this number" or "here is exactly what happened", and
 your game decides what that is worth.
 
+### Playing at a distance
+
+For a game played over a video call, the honest instrument is not the watch but the
+**live view** (`/api/v1/stream.mjpg`, *Setup → Camera*): the people you are playing with see
+the dice land and see the number appear at the same moment. That is about as convincing as
+dice get, and it convinces for the same reason the screen over the tower does — the number
+becomes public before anybody could change it.
+
+It proves nothing on its own, of course. A stream can be pointed anywhere and anything that
+controls the camera controls both. It is evidence between people who are already playing in
+good faith, which is what almost all of this is.
+
 ### The watch is the second line, not the first
 
 Worth being clear about what does the real work here. The number is captured **when the dice

@@ -100,6 +100,22 @@
     </div>
 
     <div class="card">
+      <h2>Live view for people outside the room</h2>
+      <p class="hint"><b>Off by default, and that is deliberate.</b> Switched on, anyone who
+        can reach this DiceCore can watch the tray at
+        <code>/api/v1/stream.mjpg</code> — which is exactly what you want when you are
+        playing with somebody who is not in the room and would like to see the dice land,
+        and exactly what you do not want left running otherwise. It shares the reading's own
+        frames, so it never competes with the camera; whatever else the camera can see, it
+        shows.</p>
+      <div class="grid">
+        <div><label>Offer a live view of the tray</label><input id="sv-stream" type="checkbox"></div>
+        <div><label>Frames a second</label><input id="sv-fps" type="number" min="1" max="15"></div>
+      </div>
+      <div class="row" style="margin-top:12px"><button class="primary" data-save>Save</button></div>
+    </div>
+
+    <div class="card">
       <h2>Preview</h2>
       <div class="frame"><img id="preview-image" alt="camera preview"></div>
     </div>
@@ -324,10 +340,15 @@
 
     <div class="card">
       <h2>What is worth celebrating</h2>
+      <p class="hint">A game that keeps its own score decides this for itself — a Kniffel,
+        four successes out of six, a Farkle worth a thousand. These settings are the answer
+        for everything else. Prefer one of the first two: they scale with what is on the
+        tray, while an absolute total cannot be right for two dice and six at once.</p>
       <div class="grid">
         <div><label>Celebrate</label><select id="cl-mode">
           <option value="off">Nothing</option>
           <option value="max_die">A natural maximum on any die</option>
+          <option value="near_max">Nearly the best these dice could show</option>
           <option value="total">A total of at least…</option>
         </select></div>
         <div><label>…this total</label><input id="cl-total" type="number"></div>
@@ -345,9 +366,9 @@
       <p class="hint">Roll, glance, correct. Every confirmed roll is a training sample —
         there is no separate labelling tool and no command line. Aim for a hundred rolls to
         start with, and watch the thin faces below.</p>
-      <p class="hint"><b>Every die can be learned</b>, not only six-siders: d4, d6, d8, d10,
-        d100, d12 and d20 are all in the vocabulary, and the label list offers whichever
-        faces that kind has. What differs is how much rolling it takes — about ten confirmed
+      <p class="hint"><b>Every die can be learned</b>, not only six-siders: d2, d3, d4, d6, d8,
+        d10, d100, d12 and d20 are all in the vocabulary, and the label list offers
+        whichever faces that kind has. What differs is how much rolling it takes — about ten confirmed
         examples per face, so a d6 wants sixty and a d20 about two hundred. The classic
         reader counts pips and cannot read numerals at all; teaching a model is exactly how
         a d20 becomes readable.</p>
