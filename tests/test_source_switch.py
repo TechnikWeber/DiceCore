@@ -7,7 +7,10 @@ down: switching to the simulator and back must land on the camera the box actual
 on a guess made twice.
 """
 
+import pytest
+
 from dicecore.capture import default_camera, use_simulator
+from dicecore.capture.base import CaptureError, require_tuning_file
 from dicecore.config import CaptureSettings
 
 
@@ -55,3 +58,23 @@ def test_a_remembered_simulator_is_not_a_camera():
     # at the same time.
     capture = CaptureSettings(source="sim", camera_source="sim")
     assert use_simulator(capture, False) != "sim"
+
+
+# --- tuning files ------------------------------------------------------------
+
+
+def test_a_tuning_file_that_is_not_there_is_named_before_libcamera_hides_it(tmp_path):
+    # libcamera does not fall back: it fails to load the IPA, drops the sensor, and
+    # rpicam-still reports "no cameras available" — indistinguishable from an unplugged
+    # ribbon cable, for what is really a wrong path in a text field.
+    with pytest.raises(CaptureError) as caught:
+        require_tuning_file(str(tmp_path / "gone.json"))
+    assert "does not exist" in str(caught.value)
+    assert "no cameras available" in str(caught.value)
+
+
+def test_no_tuning_file_is_the_normal_case_and_not_an_error(tmp_path):
+    require_tuning_file("")
+    present = tmp_path / "there.json"
+    present.write_text("{}")
+    require_tuning_file(str(present))

@@ -222,6 +222,57 @@ def known_tuning_files() -> list[str]:
     return [m.tuning_file for m in CSI_MODULES if m.tuning_file]
 
 
+#: Where libcamera keeps the tuning files it ships, newest pipeline first.
+IPA_DIRS = ("/usr/share/libcamera/ipa/rpi/pisp", "/usr/share/libcamera/ipa/rpi/vc4")
+
+
+def system_tuning_file(overlay: str | None,
+                       dirs: tuple[str, ...] | None = None) -> Path | None:
+    """The tuning file libcamera would pick on its own for this sensor, if it ships one."""
+    if not overlay:
+        return None
+    name = f"{overlay_base_name(overlay)}.json"
+    return next((Path(d) / name for d in dirs or IPA_DIRS if (Path(d) / name).is_file()), None)
+
+
+def has_autofocus_algorithm(path: Path | None) -> bool:
+    """`rpi.af` is the block whose absence makes a focus request a no-op."""
+    if path is None:
+        return False
+    try:
+        return "rpi.af" in path.read_text(errors="replace")
+    except OSError:
+        return False
+
+
+def choose_tuning_file(module: CsiModule) -> tuple[str, str | None]:
+    """
+    Which tuning file to write into the settings for this module, and what to say about it.
+
+    Never the shipped path just because the catalogue names it. A tuning file that is not on
+    disk does not degrade to the stock one: libcamera fails to load the IPA and drops the
+    sensor entirely, so a working Arducam answers *no cameras available* and every symptom
+    points at the ribbon cable. Selecting a module has to leave a camera that takes
+    pictures; a soft picture is a far smaller problem than no picture, and this says which
+    one you have.
+    """
+    if not module.tuning_file:
+        return "", None
+    if Path(module.tuning_file).is_file():
+        return module.tuning_file, None
+    if has_autofocus_algorithm(system_tuning_file(module.overlay)):
+        return "", (
+            f"{module.tuning_file} is not installed, so libcamera's own tuning file is used. "
+            "It has an rpi.af block, so autofocus works — nothing to do."
+        )
+    return "", (
+        f"{module.tuning_file} is not installed, so no tuning file is set — the camera "
+        "works, but libcamera's own tuning for this sensor has no rpi.af block and the lens "
+        "will not move. Pick a focus mode once the file is in place; see "
+        "provisioning/tuning/README.md."
+    )
+
+
 # --- the one place that touches the real file ------------------------------------
 
 

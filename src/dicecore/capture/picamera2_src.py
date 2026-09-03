@@ -13,7 +13,7 @@ import time
 from typing import Any
 
 from ..dice import Frame
-from .base import CaptureError, FrameSource
+from .base import CaptureError, FrameSource, require_tuning_file
 
 
 class Picamera2Source(FrameSource):
@@ -36,6 +36,7 @@ class Picamera2Source(FrameSource):
                 "--system-site-packages, or use capture.source=rpicam instead."
             ) from exc
 
+        require_tuning_file(tuning_file)
         tuning = None
         if tuning_file:
             tuning = Picamera2.load_tuning_file(tuning_file)

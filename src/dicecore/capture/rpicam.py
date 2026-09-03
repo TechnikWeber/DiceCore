@@ -14,7 +14,7 @@ import subprocess
 from typing import Any
 
 from ..dice import Frame
-from .base import CaptureError, FrameSource, require_cv2
+from .base import CaptureError, FrameSource, require_cv2, require_tuning_file
 
 TOOLS = ("rpicam-still", "libcamera-still")
 
@@ -38,6 +38,7 @@ class RpicamSource(FrameSource):
                 "Neither rpicam-still nor libcamera-still is installed. "
                 "`sudo apt install rpicam-apps` on Raspberry Pi OS Bookworm."
             )
+        require_tuning_file(tuning_file)
         self.width, self.height = width, height
         self.tuning_file = tuning_file
         self.focus_mode, self.focus_dioptre = focus_mode, focus_dioptre

@@ -163,7 +163,12 @@
         <div><label>Lens position (dioptre)</label><input id="cap-dioptre" type="number" step="0.1"></div>
       </div>
       <p class="hint" id="csi-note"></p>
-      <div class="row"><button id="btn-module">Apply module and require reboot</button></div>
+      <div class="row">
+        <button id="btn-module">Apply module and require reboot</button>
+        <button id="btn-reboot-csi">Reboot now</button>
+      </div>
+      <p class="hint">A module written here does nothing until the firmware has read it
+        again, so this is the one setting that genuinely needs the reboot button next to it.</p>
     </div>
 
     <div class="card">
@@ -185,6 +190,7 @@
     <div class="card">
       <h2>Preview</h2>
       <div class="frame"><img id="preview-image" alt="camera preview"></div>
+      <div id="preview-error"></div>
     </div>
 
     <div class="card">
@@ -267,6 +273,7 @@
         <div class="traygrid" id="tray-grid"></div>
         <div class="traysel" id="tray-sel" hidden></div>
       </div>
+      <div id="tray-error"></div>
       <div class="row" style="margin:10px 0">
         <button id="btn-tray-refresh">Take a fresh picture</button>
         <button id="btn-tray-all">Use the whole frame</button>
@@ -609,6 +616,17 @@
     <div class="card">
       <h2>This machine</h2>
       <div id="capabilities"></div>
+    </div>
+    <div class="card">
+      <h2>Restart</h2>
+      <p class="hint">The box usually has no keyboard and no screen, so the page you are on
+        is the way back in. <b>Reboot</b> is what a new CSI module waits for.
+        <b>Restart DiceCore</b> only reloads the service, which is what a freshly installed
+        package or a pulled update needs — it leaves the machine up.</p>
+      <div class="row">
+        <button id="btn-reboot">Reboot the Pi</button>
+        <button id="btn-restart-service">Restart DiceCore</button>
+      </div>
     </div>
     <div class="card">
       <h2>Settings file</h2>

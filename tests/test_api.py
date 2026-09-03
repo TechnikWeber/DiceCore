@@ -236,6 +236,68 @@ def test_an_unknown_camera_module_is_refused_before_config_txt_is_touched(client
     assert bad.status_code == 400
 
 
+def test_a_restart_is_answered_before_the_machine_goes_away(client, monkeypatch):
+    # Nothing is rebooted here — the command is captured. What is pinned down is that the
+    # endpoint replies rather than dying mid-response, which is what makes a working reboot
+    # look like a network error and get pressed twice.
+    from dicecore.system import power
+
+    asked: list[str] = []
+    monkeypatch.setattr(power, "schedule", lambda action, **kw: asked.append(action) or
+                        ("systemctl", "reboot"))
+    answer = client.post("/api/setup/restart", json={"action": "reboot"})
+    assert answer.status_code == 200
+    assert asked == ["reboot"]
+    assert "minute" in answer.json()["detail"]
+
+
+def test_a_restart_that_cannot_happen_is_a_sentence_not_a_crash(client, monkeypatch):
+    from dicecore.system import power
+
+    def refuse(action, **kw):
+        raise power.PowerError("Nothing here can reboot this machine.")
+
+    monkeypatch.setattr(power, "schedule", refuse)
+    answer = client.post("/api/setup/restart", json={"action": "reboot"})
+    assert answer.status_code == 400
+    assert answer.json()["detail"] == "Nothing here can reboot this machine."
+
+
+def test_applying_a_module_never_points_libcamera_at_a_tuning_file_that_is_missing(
+        client, tmp_path, monkeypatch):
+    # The failure this prevents: a tuning file that is not there makes libcamera drop the
+    # sensor entirely, so a perfectly good Arducam answers "no cameras available" and every
+    # symptom points at the ribbon cable instead of at this setting.
+    from dicecore.system import boot_config
+
+    config_txt = tmp_path / "config.txt"
+    config_txt.write_text("camera_auto_detect=1\n")
+    monkeypatch.setattr(boot_config, "write_camera_module",
+                        lambda overlay: config_txt)
+
+    answer = client.post("/api/setup/camera-module", json={"module": "imx519"})
+    assert answer.status_code == 200, answer.text
+    assert answer.json()["tuning_file"] == ""
+    assert "not installed" in answer.json()["tuning_note"]
+    assert client.get("/api/setup/settings").json()["capture"]["tuning_file"] == ""
+
+
+def test_switching_modules_does_not_leave_the_last_ones_tuning_file_behind(
+        client, tmp_path, monkeypatch):
+    from dicecore.system import boot_config
+
+    # A tuning file is written for one sensor. Carrying it over to the next module would
+    # apply it to a camera it was never measured on.
+    monkeypatch.setattr(boot_config, "write_camera_module", lambda overlay: tmp_path / "c.txt")
+
+    settings = client.get("/api/setup/settings").json()
+    settings["capture"]["tuning_file"] = boot_config.module_by_id("imx519").tuning_file
+    assert client.put("/api/setup/settings", json=settings).status_code == 200
+
+    assert client.post("/api/setup/camera-module", json={"module": "auto"}).status_code == 200
+    assert client.get("/api/setup/settings").json()["capture"]["tuning_file"] == ""
+
+
 def test_both_front_doors_are_served(client):
     # The game screen is at the root because it is the one that stays on all evening.
     assert "play.js" in client.get("/").text

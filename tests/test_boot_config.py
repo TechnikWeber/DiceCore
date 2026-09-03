@@ -3,15 +3,21 @@ config.txt is the one file that decides whether the Pi boots at all, so every ru
 is pinned down here rather than discovered on a box that no longer comes up.
 """
 
+import json
+
 from dicecore.system.boot_config import (
     BootState,
+    CsiModule,
     apply_camera_module,
     booted_state_changed,
+    choose_tuning_file,
     explain_boot_config,
+    has_autofocus_algorithm,
     module_by_id,
     module_id_for,
     parse_boot_config,
     strip_managed_block,
+    system_tuning_file,
     valid_overlay_name,
 )
 
@@ -83,3 +89,58 @@ def test_no_camera_is_explained_differently_depending_on_why():
     assert off is not None and "never looks" in off
     # A working camera needs no explanation at all.
     assert explain_boot_config(BootState(True, None), 1) is None
+
+
+# --- tuning files ---------------------------------------------------------------
+#
+# A tuning file that is not on disk does not fall back to the stock one: libcamera refuses
+# to register the sensor and rpicam-still answers "no cameras available". Selecting the
+# Arducam then looks exactly like a ribbon cable fault, so these pin down that we never
+# write a path we do not have.
+
+
+def _module(tmp_path, name="imx519-af.json"):
+    return CsiModule("imx519", "Arducam", "imx519", "note", tuning_file=str(tmp_path / name),
+                     focus=True)
+
+
+def test_a_module_without_a_tuning_file_asks_for_none(tmp_path):
+    assert choose_tuning_file(module_by_id("auto")) == ("", None)
+
+
+def test_an_installed_tuning_file_is_used(tmp_path):
+    module = _module(tmp_path)
+    (tmp_path / "imx519-af.json").write_text("{}")
+    assert choose_tuning_file(module) == (module.tuning_file, None)
+
+
+def test_a_missing_tuning_file_is_never_written_into_the_settings(tmp_path):
+    chosen, note = choose_tuning_file(_module(tmp_path))
+    assert chosen == ""
+    assert note and "not installed" in note and "lens" in note
+
+
+def test_the_complaint_says_so_when_libcameras_own_tuning_already_focuses(tmp_path, monkeypatch):
+    ipa = tmp_path / "vc4"
+    ipa.mkdir()
+    (ipa / "imx519.json").write_text(json.dumps({"algorithms": [{"rpi.af": {}}]}))
+    monkeypatch.setattr("dicecore.system.boot_config.IPA_DIRS", (str(ipa),))
+    chosen, note = choose_tuning_file(_module(tmp_path))
+    assert chosen == ""
+    assert note and "autofocus works" in note
+
+
+def test_the_system_tuning_file_is_found_by_sensor_name(tmp_path):
+    (tmp_path / "imx519.json").write_text("{}")
+    assert system_tuning_file("imx519,vcm", (str(tmp_path),)) == tmp_path / "imx519.json"
+    assert system_tuning_file("imx708", (str(tmp_path),)) is None
+    assert system_tuning_file(None, (str(tmp_path),)) is None
+
+
+def test_autofocus_is_decided_by_the_rpi_af_block(tmp_path):
+    plain, af = tmp_path / "a.json", tmp_path / "b.json"
+    plain.write_text('{"algorithms": [{"rpi.agc": {}}]}')
+    af.write_text('{"algorithms": [{"rpi.af": {}}]}')
+    assert not has_autofocus_algorithm(plain)
+    assert has_autofocus_algorithm(af)
+    assert not has_autofocus_algorithm(None)

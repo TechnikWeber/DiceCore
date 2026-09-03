@@ -2,6 +2,33 @@
 
 Notable changes, newest first. Dates are the day the work landed.
 
+## 0.15.2 (2026-09-03)
+
+### Fixed
+- **Selecting the Arducam 16MP left a Pi with no camera at all.** Picking the module set
+  `capture.tuning_file` to the `imx519-af.json` this repo describes but does not ship, and
+  libcamera does not treat a missing tuning file as "use the default one": it fails to load
+  the IPA, drops the sensor, and `rpicam-still` reports *no cameras available*. A correctly
+  wired, correctly detected camera therefore produced every symptom of an unplugged ribbon
+  cable. A tuning file is now only written into the settings when it is actually on disk,
+  and the answer says whether autofocus is available and why not. Switching modules also
+  clears the previous module's tuning file, which was never measured on the new sensor.
+- **The camera preview failed as a broken-image icon.** The error the server had already
+  written — a repair instruction, in a sentence — went into an `<img>`, which can only
+  show that something went wrong and never what. Both the preview and the tray view now
+  fetch the frame and print the sentence underneath instead.
+- `rpicam` and `picamera2` refuse to start with a tuning file that is not there, and name
+  it, rather than letting libcamera turn it into "no cameras available".
+
+### Added
+- **A reboot button**, next to the CSI module panel that needs one and under **System**.
+  Applying a camera module has always ended in "now reboot", on a box that usually has no
+  keyboard and no screen — the page you were already on is the way back in. **Restart
+  DiceCore** is there too, for a freshly installed package or a pulled update; it refuses
+  when nothing is supervising the service, because killing a hand-started `dicecore serve`
+  would take the page away for good. Two presses rather than a modal, and the answer goes
+  out before the machine does.
+
 ## 0.15.1 (2026-09-02)
 
 ### Fixed

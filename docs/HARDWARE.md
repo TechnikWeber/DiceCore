@@ -51,7 +51,7 @@ reboot — the **Camera → CSI camera module** panel writes that for you and sa
 | Module | Overlay | Notes |
 |---|---|---|
 | Camera Module 1/2/3, HQ | *(auto)* | OV5647, IMX219, IMX708, IMX477 |
-| **Arducam 16MP IMX519** | `imx519` | Autofocus. **Needs the shipped tuning file** |
+| **Arducam 16MP IMX519** | `imx519` | Autofocus needs a tuning file with `rpi.af` |
 | Arducam 64MP Hawkeye | `arducam-64mp` | Autofocus |
 | Arducam 64MP Owlsight | `ov64a40` | Autofocus |
 | Arducam Pivariety | `arducam-pivariety` | Answers on I²C 0x0c |
@@ -61,10 +61,28 @@ reboot — the **Camera → CSI camera module** panel writes that for you and sa
 
 Raspberry Pi's own `imx519.json` tuning file contains no `rpi.af` algorithm, so libcamera
 answers every focus request with *no AF algorithm available* and the lens stays where it
-rests. It does not look like a broken focus — it looks like a soft lens. Select the module
-in the UI (which sets `capture.tuning_file` to the shipped `imx519-af.json`) and pick a
-focus mode. Over a dice tray, prefer `manual` at a fixed dioptre: `continuous` hunts every
-time a die moves, and hunting is exactly what you do not want mid-roll.
+rests. It does not look like a broken focus — it looks like a soft lens. The fix is a
+tuning file that has an `rpi.af` block; see `provisioning/tuning/README.md` for how to get
+one onto the box. Once it is at `/var/lib/dicecore/tuning/imx519-af.json`, selecting the
+module sets `capture.tuning_file` to it. Then pick a focus mode: over a dice tray, prefer
+`manual` at a fixed dioptre, because `continuous` hunts every time a die moves and hunting
+is exactly what you do not want mid-roll.
+
+**A tuning file is only ever set if it is actually installed.** This is not politeness.
+libcamera does not fall back to the stock tuning when the file it is pointed at is missing —
+it fails to load the IPA, drops the sensor, and `rpicam-still` reports *no cameras
+available*. A perfectly good Arducam then produces every symptom of an unplugged ribbon
+cable, for what is really a text field. So **Apply module** writes the path only when the
+file exists, and says in the same breath that autofocus is off until it does. A soft picture
+is a much smaller problem than no picture.
+
+### Rebooting
+
+**Camera → CSI camera module → Reboot now**, or **System → Reboot the Pi**. A module written
+into `config.txt` does nothing until the firmware has read it again, and the box normally has
+no keyboard and no screen — the page you are on is the way back in. **System → Restart
+DiceCore** reloads only the service, which is what a freshly installed package or a pulled
+update needs.
 
 ### If no camera is found
 

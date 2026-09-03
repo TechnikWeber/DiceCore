@@ -178,9 +178,14 @@ def _cmd_camera_module(args, settings: Settings) -> int:
         print(exc, file=sys.stderr)
         return 1
     settings.capture.csi_module = module.id
+    tuning, tuning_note = boot_config.choose_tuning_file(module)
+    if settings.capture.tuning_file in boot_config.known_tuning_files():
+        settings.capture.tuning_file = ""
     if module.tuning_file:
-        settings.capture.tuning_file = module.tuning_file
+        settings.capture.tuning_file = tuning
     settings.save()
+    if tuning_note:
+        print(tuning_note)
     print(f"{path} updated. Reboot for it to take effect.")
     return 0
 

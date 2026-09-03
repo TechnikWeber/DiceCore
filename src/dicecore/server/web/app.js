@@ -422,10 +422,49 @@ async function applyModule() {
     const answer = await api("/api/setup/camera-module",
       json("POST", { module: $("csi-module").value, overlay: $("csi-custom").value }));
     alertBox(`Written to ${answer.path}. Reboot for it to take effect.`, "warn");
-    if (answer.tuning_file) $("cap-tuning").value = answer.tuning_file;
+    // The tuning file follows the module, and may come back empty on purpose — the server
+    // refuses to point libcamera at a file that is not installed, because that stops the
+    // camera being found at all. It says so in tuning_note; print it.
+    $("cap-tuning").value = answer.tuning_file || "";
+    if (answer.tuning_note) alertBox(answer.tuning_note, "warn");
   } catch (err) {
     alertBox(err.message);
   }
+}
+
+// --- restarting the machine you are standing at ------------------------------
+
+/**
+ * Two presses rather than a confirm dialog: the setup page is used on a phone propped
+ * against the tower, where a modal is the easiest thing in the world to dismiss by accident
+ * — in either direction.
+ */
+function armRestart(button, action, label) {
+  let armed = false;
+  const idle = button.textContent;
+  button.onclick = async () => {
+    if (!armed) {
+      armed = true;
+      button.textContent = `${label} — press again`;
+      button.classList.add("danger");
+      setTimeout(() => {
+        if (!armed) return;
+        armed = false;
+        button.textContent = idle;
+        button.classList.remove("danger");
+      }, 5000);
+      return;
+    }
+    armed = false;
+    button.textContent = idle;
+    button.classList.remove("danger");
+    try {
+      const answer = await api("/api/setup/restart", json("POST", { action }));
+      alertBox(answer.detail, "warn");
+    } catch (err) {
+      alertBox(err.message);
+    }
+  };
 }
 
 // --- hardware / status ------------------------------------------------------
@@ -494,12 +533,38 @@ function setupTrayEditor() {
   });
 }
 
+async function showFrame(imageId, errorId, path) {
+  const image = $(imageId);
+  const box = $(errorId);
+  try {
+    const response = await fetch(`${path}?t=${Date.now()}`);
+    if (!response.ok) {
+      // Assigning a failing URL to an <img> throws the sentence away and leaves a
+      // broken-image icon, which is the same picture for a missing tuning file, an
+      // unseated ribbon cable and a camera nobody selected yet. Fetch it instead, so the
+      // repair instruction the server wrote actually reaches the person who needs it.
+      const type = response.headers.get("content-type") || "";
+      const body = type.includes("json") ? await response.json() : {};
+      throw new Error(body.detail || body.error || `${response.status} ${response.statusText}`);
+    }
+    const objectUrl = URL.createObjectURL(await response.blob());
+    if (image.dataset.objectUrl) URL.revokeObjectURL(image.dataset.objectUrl);
+    image.dataset.objectUrl = objectUrl;
+    image.src = objectUrl;
+    image.hidden = false;
+    box.innerHTML = "";
+  } catch (err) {
+    image.hidden = true;
+    box.innerHTML = `<div class="msg bad">${escapeHtml(err.message)}</div>`;
+  }
+}
+
 function refreshTrayImage() {
-  $("tray-image").src = `/api/setup/preview.jpg?t=${Date.now()}`;
+  showFrame("tray-image", "tray-error", "/api/setup/preview.jpg");
 }
 
 function refreshPreview() {
-  $("preview-image").src = `/api/setup/preview.jpg?t=${Date.now()}`;
+  showFrame("preview-image", "preview-error", "/api/setup/preview.jpg");
 }
 
 async function refreshHardware() {
@@ -1118,6 +1183,9 @@ async function boot() {
 document.querySelectorAll("[data-save]").forEach((b) => (b.onclick = saveSettings));
 $("btn-roll").onclick = roll;
 $("btn-preview").onclick = refreshPreview;
+armRestart($("btn-reboot"), "reboot", "Reboot");
+armRestart($("btn-reboot-csi"), "reboot", "Reboot");
+armRestart($("btn-restart-service"), "service", "Restart");
 $("btn-hardware").onclick = refreshHardware;
 $("btn-net-refresh").onclick = refreshNetwork;
 $("btn-net-scan").onclick = scanNetworks;

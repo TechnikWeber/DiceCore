@@ -43,7 +43,7 @@ from ..panel import ButtonPanel, OutputHub
 from ..panel import state as phases
 from ..panel.displays import COMMON_SIZES, PANELS
 from ..reader import Reader
-from ..system import boot_config, diagnostics
+from ..system import boot_config, diagnostics, power
 from ..system.network import HotspotProfile, Network, is_country_code
 from ..system.portal import CaptivePortal, Watcher, auto_hotspot_wanted
 from ..table import Guest, Table, addresses
@@ -943,12 +943,40 @@ def create_app(settings: Settings | None = None) -> Any:
 
         current = state["settings"]
         current.capture.csi_module = module_id
+        tuning, tuning_note = boot_config.choose_tuning_file(module)
+        # Switching modules must not leave the previous module's tuning file pointing at the
+        # new sensor, and a path we wrote that was never installed is exactly what turns a
+        # working camera into "no cameras available". Only the catalogue's own paths are
+        # cleared — one typed by hand belongs to whoever typed it.
+        if current.capture.tuning_file in boot_config.known_tuning_files():
+            current.capture.tuning_file = ""
         if module.tuning_file:
-            current.capture.tuning_file = module.tuning_file
+            current.capture.tuning_file = tuning
         current.save()
         reader.reload(current)
         return {"ok": True, "path": str(path), "reboot_required": True,
-                "note": module.note, "tuning_file": module.tuning_file}
+                "note": module.note, "tuning_file": current.capture.tuning_file,
+                "tuning_note": tuning_note}
+
+    @app.post("/api/setup/restart")
+    async def restart(request: Request) -> Any:
+        """
+        Reboot the Pi, or restart DiceCore, from the page that just asked for one.
+
+        Answered before anything happens — systemd takes the machine away the instant it is
+        told to, and a reboot that reports "network error" is one people press twice.
+        """
+        body = await request.json() if await request.body() else {}
+        action = str(body.get("action", "reboot"))
+        try:
+            argv = power.schedule(action)
+        except power.PowerError as exc:
+            return fail(exc, 400)
+        return {"ok": True, "action": action, "command": " ".join(argv),
+                "detail": ("Rebooting now. This page comes back on its own once the Pi is "
+                           "up again — give it about a minute."
+                           if action == "reboot" else
+                           "Restarting DiceCore. The page comes back in a few seconds.")}
 
     @app.get("/api/setup/preview.jpg")
     def preview() -> Any:

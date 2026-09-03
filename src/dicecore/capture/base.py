@@ -8,6 +8,7 @@ node — is one implementation of this, and the rest of DiceCore cannot tell the
 
 from __future__ import annotations
 
+import os
 from abc import ABC, abstractmethod
 from typing import Any
 
@@ -87,3 +88,22 @@ def require_cv2() -> Any:
             "or run the engine on another machine (engine.mode=remote)."
         ) from exc
     return cv2
+
+
+def require_tuning_file(path: str) -> None:
+    """
+    Refuse to start a camera with a tuning file that is not there.
+
+    libcamera does not degrade when `LIBCAMERA_RPI_TUNING_FILE` points at nothing: it fails
+    to load the IPA, refuses to register the sensor, and `rpicam-still` answers *no cameras
+    available* — which reads exactly like an unplugged ribbon cable and sends people back to
+    the hardware for a setting. Saying so here is the difference between a five-minute fix
+    and an evening with a screwdriver.
+    """
+    if path and not os.path.isfile(path):
+        raise CaptureError(
+            f"The tuning file {path} does not exist, and libcamera refuses to open the "
+            "camera at all when one is missing (it reports 'no cameras available', which "
+            "looks like a cable fault). Clear Camera → Tuning file, or press "
+            "\"Apply module\" again, which only sets one that is actually installed."
+        )

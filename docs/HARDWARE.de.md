@@ -56,7 +56,7 @@ es dir auch.
 | Modul | Overlay | Anmerkungen |
 |---|---|---|
 | Camera Module 1/2/3, HQ | *(automatisch)* | OV5647, IMX219, IMX708, IMX477 |
-| **Arducam 16MP IMX519** | `imx519` | Autofokus. **Braucht die mitgelieferte Tuning-Datei** |
+| **Arducam 16MP IMX519** | `imx519` | Autofokus braucht eine Tuning-Datei mit `rpi.af` |
 | Arducam 64MP Hawkeye | `arducam-64mp` | Autofokus |
 | Arducam 64MP Owlsight | `ov64a40` | Autofokus |
 | Arducam Pivariety | `arducam-pivariety` | Antwortet auf I²C 0x0c |
@@ -67,10 +67,28 @@ es dir auch.
 Die Tuning-Datei `imx519.json` von Raspberry Pi enthält keinen `rpi.af`-Algorithmus, also
 beantwortet libcamera jede Fokusanfrage mit *no AF algorithm available*, und das Objektiv
 bleibt, wo es gerade steht. Das sieht nicht nach kaputtem Fokus aus — es sieht nach einem
-weichen Objektiv aus. Wähle das Modul in der Oberfläche (das setzt `capture.tuning_file` auf
-die mitgelieferte `imx519-af.json`) und such einen Fokusmodus aus. Über einer Würfelfläche
-ist `manual` mit fester Dioptrie besser: `continuous` sucht bei jeder Würfelbewegung neu, und
-Suchen ist genau das, was man mitten im Wurf nicht will.
+weichen Objektiv aus. Die Lösung ist eine Tuning-Datei mit `rpi.af`-Block; wie eine auf die
+Kiste kommt, steht in `provisioning/tuning/README.md`. Sobald sie unter
+`/var/lib/dicecore/tuning/imx519-af.json` liegt, setzt die Modulauswahl
+`capture.tuning_file` darauf. Dann einen Fokusmodus aussuchen: über einer Würfelfläche ist
+`manual` mit fester Dioptrie besser, denn `continuous` sucht bei jeder Würfelbewegung neu,
+und Suchen ist genau das, was man mitten im Wurf nicht will.
+
+**Eine Tuning-Datei wird nur gesetzt, wenn sie auch wirklich da ist.** Das ist keine
+Höflichkeit. libcamera fällt nicht auf das Standard-Tuning zurück, wenn die angegebene Datei
+fehlt — es lädt die IPA nicht, verwirft den Sensor, und `rpicam-still` meldet *no cameras
+available*. Eine völlig intakte Arducam zeigt dann sämtliche Symptome eines nicht
+gesteckten Flachbandkabels, wegen eines Textfelds. **Modul anwenden** schreibt den Pfad also
+nur, wenn die Datei existiert, und sagt im selben Atemzug, dass der Autofokus so lange aus
+ist. Ein weiches Bild ist ein viel kleineres Problem als gar kein Bild.
+
+### Neu starten
+
+**Camera → CSI-Kameramodul → Jetzt neu starten**, oder **System → Pi neu starten**. Ein in
+`config.txt` geschriebenes Modul tut nichts, bevor die Firmware sie wieder gelesen hat, und
+die Kiste hat normalerweise weder Tastatur noch Bildschirm — die Seite, auf der man gerade
+ist, ist der Weg zurück hinein. **System → DiceCore neu starten** lädt nur den Dienst neu,
+und das ist es, was ein frisch installiertes Paket oder ein geholtes Update braucht.
 
 ### Wenn keine Kamera gefunden wird
 
