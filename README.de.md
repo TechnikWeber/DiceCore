@@ -264,4 +264,4 @@ nur importiert. Vor Änderungen [CLAUDE.md](CLAUDE.md) lesen.
 
 ## Lizenz
 
-CC BY-NC-ND 4.0 mit zusätzlicher Nicht-Militär-Klausel — siehe [LICENSE](LICENSE).
+CC BY-NC-SA 4.0 — siehe [LICENSE](LICENSE).

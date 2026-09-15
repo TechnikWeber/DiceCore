@@ -2,6 +2,13 @@
 
 Notable changes, newest first. Dates are the day the work landed.
 
+## Unreleased
+
+### Changed
+- **Licence is now CC BY-NC-SA 4.0.** Modified versions may be shared, under the same
+  licence; the separate no-military restriction is dropped. Commercial use still needs
+  permission.
+
 ## 0.15.2 (2026-09-03)
 
 ### Fixed

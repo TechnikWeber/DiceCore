@@ -254,4 +254,4 @@ imported. See [CLAUDE.md](CLAUDE.md) for the conventions before changing anythin
 
 ## Licence
 
-CC BY-NC-ND 4.0 with an additional no-military restriction — see [LICENSE](LICENSE).
+CC BY-NC-SA 4.0 — see [LICENSE](LICENSE).
