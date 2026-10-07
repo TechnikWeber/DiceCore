@@ -264,4 +264,4 @@ nur importiert. Vor Änderungen [CLAUDE.md](CLAUDE.md) lesen.
 
 ## Lizenz
 
-CC BY-NC-SA 4.0 — siehe [LICENSE](LICENSE).
+[PolyForm-Noncommercial-1.0.0](LICENSE): frei benutzen, verändern und weitergeben, solange es nicht kommerziell ist. Hinweise und Fremdkomponenten: [NOTICE.md](NOTICE.md).

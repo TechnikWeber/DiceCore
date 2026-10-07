@@ -5,9 +5,10 @@ Notable changes, newest first. Dates are the day the work landed.
 ## Unreleased
 
 ### Changed
-- **Licence is now CC BY-NC-SA 4.0.** Modified versions may be shared, under the same
-  licence; the separate no-military restriction is dropped. Commercial use still needs
-  permission.
+- **Licence is now PolyForm Noncommercial 1.0.0**, a licence written for software.
+  Using, modifying and sharing stay free for noncommercial purposes; the earlier
+  share-alike condition and the separate no-military restriction are dropped. Commercial
+  use still needs permission. Notes that are not licence terms moved to `NOTICE.md`.
 
 ## 0.15.2 (2026-09-03)
 

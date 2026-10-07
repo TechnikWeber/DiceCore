@@ -252,6 +252,6 @@ imported. See [CLAUDE.md](CLAUDE.md) for the conventions before changing anythin
 - [ ] A reference Discord bot, in its own repo, consuming this API
 - [ ] Provisioning: installer, systemd unit, and the IMX519 tuning file shipped
 
-## Licence
+## License
 
-CC BY-NC-SA 4.0 — see [LICENSE](LICENSE).
+[PolyForm-Noncommercial-1.0.0](LICENSE): free to use, modify and share for noncommercial purposes. Notes and third-party components: [NOTICE.md](NOTICE.md).

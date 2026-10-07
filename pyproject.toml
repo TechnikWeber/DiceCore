@@ -8,7 +8,7 @@ version = "0.15.2"
 description = "Reads real dice with a camera: pips, polyhedral numerals, totals — as an API."
 readme = "README.md"
 requires-python = ">=3.10"
-license = { file = "LICENSE" }
+license = "PolyForm-Noncommercial-1.0.0"
 authors = [{ name = "Philipp Weber" }]
 keywords = ["dice", "raspberry-pi", "camera", "computer-vision", "dice-tower"]
 
