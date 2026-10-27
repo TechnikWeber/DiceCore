@@ -1,5 +1,3 @@
-**English** · [Deutsch](PLAYING.de.md)
-
 # Playing
 
 Two front doors, one service.

@@ -1,5 +1,3 @@
-**English** · [Deutsch](API.de.md)
-
 # The API
 
 `/api/v1/…` is the contract other projects depend on. It is versioned, and it only ever

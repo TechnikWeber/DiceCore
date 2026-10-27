@@ -5,12 +5,12 @@ Required Notice: Copyright (c) 2026 Philipp Weber (https://github.com/TechnikWeb
 DiceCore is licensed under the PolyForm Noncommercial License 1.0.0. The full text is
 in [LICENSE](LICENSE) and at <https://polyformproject.org/licenses/noncommercial/1.0.0>.
 
-## Kurzfassung (unverbindlich — es gilt der volle Lizenztext)
+## Summary (not binding — the full license text applies)
 
-Du darfst DiceCore kostenlos herunterladen, benutzen, verändern und — auch verändert —
-weitergeben, solange der Zweck nicht kommerziell ist. Wer es weitergibt, gibt diese
-Lizenz und die Zeile „Required Notice" oben mit. Kommerzielle Nutzung braucht vorher
-die schriftliche Erlaubnis des Rechteinhabers.
+You may download, use, modify and share DiceCore free of charge — modified versions
+too — as long as the purpose is non-commercial. Whoever shares it passes on this
+license and the "Required Notice" line above. Commercial use needs the prior written
+permission of the copyright holder.
 
 ## Notes
 

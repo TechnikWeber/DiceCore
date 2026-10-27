@@ -1,5 +1,3 @@
-**English** · [Deutsch](ONLINE.de.md)
-
 # Playing against another DiceCore
 
 Everyone has their own DiceCore. One of them holds the game; the others sit at it. Each

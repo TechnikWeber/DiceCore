@@ -1,5 +1,3 @@
-**English** · [Deutsch](README.de.md)
-
 # DiceCore
 
 **Reads real dice with a camera.** A Raspberry Pi looks down on the landing area of a dice

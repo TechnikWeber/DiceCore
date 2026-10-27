@@ -1,5 +1,3 @@
-**English** · [Deutsch](CONCEPT.de.md)
-
 # DiceCore — Concept
 
 The reference for *what this is meant to be*. Read this before adding features; if a

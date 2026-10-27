@@ -1,5 +1,3 @@
-**English** · [Deutsch](GAME-MODES.de.md)
-
 # Game modes
 
 DiceCore reads dice. A **mode** reads the *result*. Those are two different jobs, and keeping
