@@ -2,6 +2,7 @@
 
 <p>
   <img alt="Status: beta 0.15" src="https://img.shields.io/badge/status-beta%200.15-yellow">
+  <a href="https://github.com/TechnikWeber/DiceCore/actions/workflows/ci.yml"><img alt="tests" src="https://img.shields.io/github/actions/workflow/status/TechnikWeber/DiceCore/ci.yml?branch=main&label=tests"></a>
   <img alt="Platform: Raspberry Pi" src="https://img.shields.io/badge/platform-Raspberry%20Pi-blue">
   <img alt="UI: English" src="https://img.shields.io/badge/UI-English-informational">
   <a href="LICENSE"><img alt="License: PolyForm NC 1.0.0" src="https://img.shields.io/badge/license-PolyForm%20NC%201.0.0-lightgrey"></a>
