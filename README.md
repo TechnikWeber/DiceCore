@@ -1,5 +1,12 @@
 # DiceCore
 
+<p>
+  <img alt="Status: beta 0.15" src="https://img.shields.io/badge/status-beta%200.15-yellow">
+  <img alt="Platform: Raspberry Pi" src="https://img.shields.io/badge/platform-Raspberry%20Pi-blue">
+  <img alt="UI: English" src="https://img.shields.io/badge/UI-English-informational">
+  <a href="LICENSE"><img alt="License: PolyForm NC 1.0.0" src="https://img.shields.io/badge/license-PolyForm%20NC%201.0.0-lightgrey"></a>
+</p>
+
 **Reads real dice with a camera.** A Raspberry Pi looks down on the landing area of a dice
 tower and turns what lands there into data: how many dice, of which kind, showing which
 value, and what they add up to — as a number on a screen, as a JSON API, and as a live
